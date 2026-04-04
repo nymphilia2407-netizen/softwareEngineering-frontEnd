@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { DEFAULT_AVATAR } from "../constants/string";
+import '../style/login.css'
 
 export default function Login(){
     const [isLogin, setIsLogin] = useState<boolean>(true); // login or register
