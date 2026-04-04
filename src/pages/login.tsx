@@ -1,7 +1,7 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 import { DEFAULT_AVATAR } from "../constants/string";
-import '../style/login.css'
+import '../styles/login.css'
 
 export default function Login(){
     const [isLogin, setIsLogin] = useState<boolean>(true); // login or register
@@ -11,7 +11,24 @@ export default function Login(){
     const [avatar, setAvatar] = useState<string>(DEFAULT_AVATAR)
 
     function switchForm(){
+        if(!isLogin){
+            setAvatar(DEFAULT_AVATAR);
+        }
         setIsLogin(!isLogin);
+    }
+
+    // register: 上传自定义头像
+    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if(file){
+            if(!file.type.startsWith('image/')){
+                alert('请选择图片文件')
+                return;
+            }
+            // 创建临时本地 URL 并更新状态
+            const imageUrl = URL.createObjectURL(file);
+            setAvatar(imageUrl);
+        }
     }
 
     return(
@@ -22,12 +39,31 @@ export default function Login(){
                      * @todo 增加逻辑，根据上次登录账号选择对应的头像
                      */
                 }
-                <div className="avatar">
-                    <img
-                        src={avatar}
-                        alt="User Avatar"
-                    />
-                </div>
+                <label 
+                    htmlFor={!isLogin ? 'avatar-input' : undefined}
+                    className={`upload-avatar ${!isLogin ? 'can-upload' : ''}`}
+                > 
+                    <div className="avatar">
+                        <img
+                            src={avatar}
+                            alt="User Avatar"
+                        />
+                        {!isLogin &&(
+                            <div className="avatar-change">
+                                <span>更换头像</span>
+                            </div>
+                        )}
+                    </div>
+                    {!isLogin &&(
+                        <input
+                            id="avatar-input"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            style={{ display: 'none' }}
+                        />
+                    )}
+                </label>
                 <form>
                     <div className="input-item">
                         <input
