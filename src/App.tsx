@@ -2,6 +2,8 @@ import { useState ,useEffect } from "react";
 import Index from './pages/index'
 import Login from './pages/login'
 
+import { tokenUtilis } from "./utilis/auth";
+
 export default function App(){
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
@@ -12,7 +14,14 @@ export default function App(){
      * @todo 添加后端对于token的校验环节
      */
     if(token){
-      setIsLoggedIn(true);
+      // 简易的token过期校验
+      const payload = tokenUtilis.decode(token);
+      if(payload && payload.expire > Date.now()){
+        setIsLoggedIn(true);
+      }else{
+        localStorage.removeItem(token);
+        setIsLoggedIn(false);
+      }
     }else{
       setIsLoggedIn(false);
     }
@@ -27,7 +36,7 @@ export default function App(){
       {isLoggedIn ? (
         <Index />
       ):(
-        <Login />
+        <Login onLogInSuccess={ ()=> setIsLoggedIn(true) }/>
       )}
     </div>
   )

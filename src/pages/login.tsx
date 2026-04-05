@@ -1,14 +1,31 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 import { DEFAULT_AVATAR } from "../constants/string";
+
+import { tokenUtilis } from "../utilis/auth";
+
 import '../styles/login.css'
 
-export default function Login(){
+interface LoginProps{
+    readonly onLogInSuccess: () => void
+}
+
+export default function Login({ onLogInSuccess }: LoginProps){
     const [isLogin, setIsLogin] = useState<boolean>(true); // login or register
     const [username, setUsername] = useState<string>('');
     const [password, setPassword] = useState<string>('');
-    const [confirmPassword, setConfirmPassword] = useState<string>('') // only for register
-    const [avatar, setAvatar] = useState<string>(DEFAULT_AVATAR)
+    const [confirmPassword, setConfirmPassword] = useState<string>(''); // only for register
+    const [avatar, setAvatar] = useState<string>(DEFAULT_AVATAR);
+
+    const{
+        register,
+        handleSubmit,
+        watch,
+        formState: { errors }
+    } = useForm();
+
+    const passwordValue = watch("password");
 
     function switchForm(){
         if(!isLogin){
@@ -31,6 +48,45 @@ export default function Login(){
         }
     }
 
+    const onSubmit = (data: any) => {
+        const finalData = {
+            ...data,
+            avatar: avatar,
+            loginType: isLogin ? 'Login' : 'Register',
+            timestamp : new Date().getTime()
+        };
+
+        if(!isLogin){
+            localStorage.setItem('user_profile', JSON.stringify({
+                username: data.username,
+                avatar: avatar
+            }));
+            localStorage.setItem(`avatar-${data.username}`, avatar);
+            alert('注册成功！')
+        }else{
+            /**
+             * @todo 修正逻辑，从后端拿到数据再修改
+             */
+
+            const savedAvatar = localStorage.getItem(`avatar-${data.username}`);
+            if(savedAvatar){
+                setAvatar(savedAvatar);
+            }else{
+                setAvatar(DEFAULT_AVATAR);
+            }
+            localStorage.setItem('user_profile', JSON.stringify({
+                username: data.username,
+                avatar: savedAvatar
+            }))
+        }
+
+        // 无后端 - 生成伪token
+        const token = tokenUtilis.generate(data.username);
+
+        localStorage.setItem("token", token);
+        onLogInSuccess();
+    }
+
     return(
         <div className="login">
             <div className="login-form">
@@ -49,7 +105,7 @@ export default function Login(){
                             alt="User Avatar"
                         />
                         {!isLogin &&(
-                            <div className="avatar-change">
+                            <div className="avatar-changegit config --global http.proxy http://127.0.0.1:7897">
                                 <span>更换头像</span>
                             </div>
                         )}
@@ -64,7 +120,7 @@ export default function Login(){
                         />
                     )}
                 </label>
-                <form>
+                <form onSubmit={handleSubmit(onSubmit)}>
                     <div className="input-item">
                         <input
                             type='text'
