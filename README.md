@@ -1,73 +1,52 @@
-# React + TypeScript + Vite
+# 即时通信系统 - 项目前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+本项目是基于React实现的即时通信系统前端
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 项目结构
+.
+├── eslint.config.js
+├── index.html                    # 项目入口HTML文件
+├── package-lock.json
+├── package.json
+├── pnpm-lock.yaml
+├── public
+│   ├── favicon.svg
+│   └── icons.svg
+├── README.md
+├── src                           # 源代码目录
+│   ├── App.tsx                   # 根组件
+│   ├── assets                    # 静态资源目录
+│   │   ├── chat-icon.jpg           # 聊天图标
+│   │   ├── config-icon.webp        # 设置图标
+│   │   ├── contact-icon.jpg        # 联系人图标
+│   │   ├── default.png             # 默认头像
+│   │   ├── hero.png
+│   │   ├── react.svg
+│   │   └── vite.svg
+│   ├── components                # 公共组件库
+│   │   ├── chatList.tsx            # 聊天列表
+│   │   └── contactList.tsx         # 联系人列表
+│   ├── constants                 # 常量库
+│   │   └── string.ts
+│   ├── main.tsx                  # 应用渲染入口
+│   ├── pages                     # 页面级组件
+│   │   ├── index.tsx               # 主页面
+│   │   └── login.tsx               # 登录/注册页面
+│   ├── services
+│   ├── store
+│   ├── styles                    # 样式目录
+│   │   ├── chatList.css
+│   │   ├── contactList.css
+│   │   ├── global.css
+│   │   ├── index.css
+│   │   └── login.css
+│   ├── types                     # 类型定义
+│   │   ├── chat.ts
+│   │   ├── entity.ts
+│   │   └── ui.ts
+│   └── utils                     # 工具函数
+│       └── auth.ts                 # 处理权限验证，token存储等逻辑
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.node.json
+└── vite.config.ts
