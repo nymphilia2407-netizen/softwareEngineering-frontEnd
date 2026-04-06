@@ -1,0 +1,1 @@
+import '../styles/contactList.css'

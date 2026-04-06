@@ -13,19 +13,19 @@ interface LoginProps{
 
 export default function Login({ onLogInSuccess }: LoginProps){
     const [isLogin, setIsLogin] = useState<boolean>(true); // login or register
-    const [username, setUsername] = useState<string>('');
-    const [password, setPassword] = useState<string>('');
-    const [confirmPassword, setConfirmPassword] = useState<string>(''); // only for register
     const [avatar, setAvatar] = useState<string>(DEFAULT_AVATAR);
 
     const{
         register,
         handleSubmit,
         watch,
+        setError,
         formState: { errors }
     } = useForm();
 
-    const passwordValue = watch("password");
+    const password = watch("password");
+    const confirmPassword = watch("confirmPassword");
+    const passwordInconsistent = !isLogin && confirmPassword && password !== confirmPassword;
 
     function switchForm(){
         if(!isLogin){
@@ -121,38 +121,44 @@ export default function Login({ onLogInSuccess }: LoginProps){
                     )}
                 </label>
                 <form onSubmit={handleSubmit(onSubmit)}>
+                    {!isLogin &&(
+                        <div className="input-item">
+                            <input
+                                type="text"
+                                placeholder="请设置您的用户名"
+                                {...register('username',{required: !isLogin})}
+                            />
+                        </div>
+                    )}
                     <div className="input-item">
                         <input
-                            type='text'
-                            placeholder="请输入您的用户名"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            required
+                            type='email'
+                            placeholder="请输入您的邮箱"
+                            {...register("email", {required: true})}
                         />
                     </div>
                     <div className="input-item">
                         <input
                             type='password'
                             placeholder="请输入您的密码"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
+                            {...register("password",{required: true})}
                         />
                     </div>
 
-                    {/*only for register*/
-                        !isLogin && (
-                            <div className="input-item">
-                                <input
-                                    type="password"
-                                    placeholder="请确认您的密码"
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    required
-                                />
-                            </div>
-                        )
-                    }
+                    {!isLogin && (
+                        <div className="input-item">
+                            <input
+                                type="password"
+                                placeholder="请确认您的密码"
+                                {...register("confirmPassword",{required: !isLogin})}
+                            />
+                            {passwordInconsistent && (
+                                <div className="passwordInconsistent">
+                                    两次输入密码不一致！
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <button type="submit">
                         {isLogin ? "登录" : "注册"}
                     </button>
