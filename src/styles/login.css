@@ -129,21 +129,6 @@ button[type='submit']:active{
     opacity: 1;
 }
 
-.passwordInconsistent {
-    position: absolute;
-    left: 105%;
-    white-space: nowrap;
-    background-color: #ff4d4f;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    box-shadow: 0 4px 10px rgba(255, 77, 79, 0.3);
-    z-index: 10;
-    pointer-events: none;
-    animation: shake 0.3s ease-in-out;
-}
-
 .passwordInconsistent::before {
     content: "";
     position: absolute;
@@ -160,4 +145,3 @@ button[type='submit']:active{
     25% { transform: translateX(-4px); }
     75% { transform: translateX(4px); }
 }
-
