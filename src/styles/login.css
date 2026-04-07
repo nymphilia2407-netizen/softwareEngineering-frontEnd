@@ -43,6 +43,10 @@
     object-fit: cover;
 }
 
+.input-item{
+    position: relative;
+}
+
 .input-item input{
     width: 100%;
     padding: 12px 16px;
@@ -129,6 +133,7 @@ button[type='submit']:active{
     opacity: 1;
 }
 
+// 好像这个没用到？被index.css里覆盖了
 .passwordInconsistent::before {
     content: "";
     position: absolute;

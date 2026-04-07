@@ -23,6 +23,11 @@ export default function Login({ onLogInSuccess }: LoginProps){
         formState: { errors }
     } = useForm();
 
+    // 实时捕捉，检测合法性
+    const username = watch("username");
+    const usernameLengthInvalid = !isLogin && username && (username.length < 3 || username.length > 20);
+    const usernameCharInvalid = !isLogin && username && !/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username);
+
     const password = watch("password");
     const confirmPassword = watch("confirmPassword");
     const passwordInconsistent = !isLogin && confirmPassword && password !== confirmPassword;
@@ -49,7 +54,7 @@ export default function Login({ onLogInSuccess }: LoginProps){
     }
 
     const onSubmit = (data: any) => {
-        const finalData = {
+	const finalData = {
             ...data,
             avatar: avatar,
             loginType: isLogin ? 'Login' : 'Register',
@@ -128,6 +133,16 @@ export default function Login({ onLogInSuccess }: LoginProps){
                                 placeholder="请设置您的用户名"
                                 {...register('username',{required: !isLogin})}
                             />
+			    {usernameLengthInvalid && (
+				<div className="input-error-hint">
+				   用户名只能有3-20个字符！
+				</div>
+			    )}
+			    {usernameCharInvalid && (
+				<div className="input-error-hint">
+			       	   用户名只能包括字母、数字、下划线和中文字符！
+			   	</div>
+		     	    )}		
                         </div>
                     )}
                     <div className="input-item">
@@ -153,7 +168,7 @@ export default function Login({ onLogInSuccess }: LoginProps){
                                 {...register("confirmPassword",{required: !isLogin})}
                             />
                             {passwordInconsistent && (
-                                <div className="passwordInconsistent">
+                                <div className="input-error-hint">
                                     两次输入密码不一致！
                                 </div>
                             )}

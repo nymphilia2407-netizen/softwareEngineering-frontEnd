@@ -124,8 +124,9 @@
     color: #ff3b30;
 }
 
-.passwordInconsistent {
+.input-error-hint {
     position: absolute;
+    top: 0;
     left: 105%; /* 出现在输入框右侧 */
     white-space: nowrap;
     background-color: #ff4d4f;
