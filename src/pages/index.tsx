@@ -1,10 +1,18 @@
 import { useState, useEffect } from "react";
 
+import ContactList from '../components/contactList'
+
 import type { ActiveTabType } from "../types/ui";
+
 import { tokenUtilis } from "../utilis/auth";
+
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/string";
 
 import '../styles/index.css'
+import '../styles/contactList.css'
+
+// 模拟数据
+import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock'
 
 export default function Index(){
     const [userName, setUserName] = useState<string>('');
@@ -88,6 +96,16 @@ export default function Index(){
                     </div>
                 </div>
             )}
+
+            <div className="list-area">
+                {activeTab === 'contacts' && (
+                    <ContactList
+                        friends={MOCK_FRIENDS}
+                        groups={MOCK_GROUPS}
+                        onItemClick={(item, type) => console.log(item, type)}
+                    />
+                )}
+            </div>
         </div>
     )
 }

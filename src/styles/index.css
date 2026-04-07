@@ -123,19 +123,3 @@
 .log-out-item {
     color: #ff3b30;
 }
-
-.input-error-hint {
-    position: absolute;
-    top: 0;
-    left: 105%; /* 出现在输入框右侧 */
-    white-space: nowrap;
-    background-color: #ff4d4f;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    box-shadow: 0 4px 10px rgba(255, 77, 79, 0.3);
-    z-index: 10;
-    pointer-events: none; /* 防止遮挡鼠标点击 */
-    animation: shake 0.3s ease-in-out; /* 出现时带个小抖动 */
-}
