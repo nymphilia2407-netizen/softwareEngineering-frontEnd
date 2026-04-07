@@ -41,6 +41,30 @@ export const MOCK_FRIENDS: User[] = [
         status: 'online',
         registerTime: 1600000000000,
         lastLoginTime: 1712556000000,
+    },
+    {
+        id: '6',
+        username: 'Frank',
+        avatar: DEFAULT_AVATAR,
+        status: 'offline',
+        registerTime: 1600000000000,
+        lastLoginTime: 1712516000000,
+    },
+    {
+        id: '7',
+        username: 'Grace',
+        avatar: DEFAULT_AVATAR,
+        status: 'online',
+        registerTime: 1000000000000,
+        lastLoginTime: 1712516000000,
+    },
+    {
+        id: '8',
+        username: 'Hans',
+        avatar: DEFAULT_AVATAR,
+        status: 'online',
+        registerTime: 1630000000000,
+        lastLoginTime: 18712516000000,
     }
 ];
 
@@ -71,6 +95,24 @@ export const MOCK_GROUPS: Group[] = [
         ownerId: '4',
         adminIds: ['1'],
         memberCount: 45,
+        createdTime: 1711000000000,
+    },
+    {
+        id: 'g4',
+        groupname: 'Group 4',
+        avatar: DEFAULT_AVATAR,
+        ownerId: '4',
+        adminIds: ['1','6'],
+        memberCount: 1000,
+        createdTime: 1711000000000,
+    },
+    {
+        id: 'g5',
+        groupname: 'Group 5',
+        avatar: DEFAULT_AVATAR,
+        ownerId: '6',
+        adminIds: ['1','7'],
+        memberCount: 999,
         createdTime: 1711000000000,
     }
 ];

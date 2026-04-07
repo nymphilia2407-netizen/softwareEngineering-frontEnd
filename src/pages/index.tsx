@@ -9,7 +9,6 @@ import { tokenUtilis } from "../utilis/auth";
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/string";
 
 import '../styles/index.css'
-import '../styles/contactList.css'
 
 // 模拟数据
 import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock'
