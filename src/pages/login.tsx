@@ -131,7 +131,10 @@ export default function Login({ onLogInSuccess }: LoginProps){
                             <input
                                 type="text"
                                 placeholder="请设置您的用户名"
-                                {...register('username',{required: !isLogin})}
+                                {...register('username',{
+                                    required: !isLogin,
+                                    validate: () => !usernameCharInvalid && !usernameLengthInvalid
+                                })}
                             />
 			    {usernameLengthInvalid && (
 				<div className="input-error-hint">
@@ -165,7 +168,10 @@ export default function Login({ onLogInSuccess }: LoginProps){
                             <input
                                 type="password"
                                 placeholder="请确认您的密码"
-                                {...register("confirmPassword",{required: !isLogin})}
+                                {...register("confirmPassword",{
+                                    required: !isLogin,
+                                    validate: (value) => value === password
+                                })}
                             />
                             {passwordInconsistent && (
                                 <div className="input-error-hint">
