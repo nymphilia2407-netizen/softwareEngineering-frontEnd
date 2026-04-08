@@ -4,7 +4,7 @@ import ContactList from '../components/contactList'
 
 import type { ActiveTabType } from "../types/ui";
 
-import { tokenUtilis } from "../utilis/auth";
+import { tokenUtilis } from "../utils/auth";
 
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/string";
 
