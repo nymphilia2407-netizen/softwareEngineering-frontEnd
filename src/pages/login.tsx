@@ -28,6 +28,9 @@ export default function Login({ onLogInSuccess }: LoginProps){
     const usernameLengthInvalid = !isLogin && username && (username.length < 3 || username.length > 20);
     const usernameCharInvalid = !isLogin && username && !/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username);
 
+    const email = watch("email")
+    const emailInvalid = email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+
     const password = watch("password");
     const confirmPassword = watch("confirmPassword");
     const passwordInconsistent = !isLogin && confirmPassword && password !== confirmPassword;
@@ -109,11 +112,6 @@ export default function Login({ onLogInSuccess }: LoginProps){
                     avatar: savedAvatar
                 }))
             }
-
-            // 无后端 - 生成伪token
-            // const token = tokenUtilis.generate(data.username);
-            // localStorage.setItem("token", token);
-            // onLogInSuccess();
 	} catch (error) {
                 console.error('请求失败:', error);
                 alert(error?.response?.data?.info || '请求失败');
@@ -139,7 +137,7 @@ export default function Login({ onLogInSuccess }: LoginProps){
                             alt="User Avatar"
                         />
                         {!isLogin &&(
-                            <div className="avatar-changegit config --global http.proxy http://127.0.0.1:7897">
+                            <div className="avatar-change">
                                 <span>更换头像</span>
                             </div>
                         )}
@@ -181,8 +179,16 @@ export default function Login({ onLogInSuccess }: LoginProps){
                         <input
                             type='email'
                             placeholder="请输入您的邮箱"
-                            {...register("email", {required: true})}
+                            {...register("email", {
+				required: true,
+				validate: () => !emailInvalid
+			    })}
                         />
+			{emailInvalid && (
+			    <div className="input-error-hint">
+			    	邮箱格式不合法！
+			    </div>
+			)}
                     </div>
                     <div className="input-item">
                         <input
