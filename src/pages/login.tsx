@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
-
+import { registerApi, loginApi } from "../api/auth";
 import { DEFAULT_AVATAR } from "../constants/string";
 
-import { tokenUtilis, checkPasswordStrength } from "../utilis/auth";
+import { tokenUtilis, checkPasswordStrength } from "../utils/auth";
 
 import '../styles/login.css'
 
@@ -27,6 +27,9 @@ export default function Login({ onLogInSuccess }: LoginProps){
     const username = watch("username");
     const usernameLengthInvalid = !isLogin && username && (username.length < 3 || username.length > 20);
     const usernameCharInvalid = !isLogin && username && !/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username);
+
+    const email = watch("email")
+    const emailInvalid = email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
 
     const password = watch("password");
     const confirmPassword = watch("confirmPassword");
@@ -53,7 +56,7 @@ export default function Login({ onLogInSuccess }: LoginProps){
         }
     }
 
-    const onSubmit = (data: any) => {
+    const onSubmit = async (data: any) => {
     if (!isLogin) {
         const score = checkPasswordStrength(data.password);
         if (score === -1) {
@@ -144,7 +147,7 @@ export default function Login({ onLogInSuccess }: LoginProps){
                             alt="User Avatar"
                         />
                         {!isLogin &&(
-                            <div className="avatar-changegit config --global http.proxy http://127.0.0.1:7897">
+                            <div className="avatar-change">
                                 <span>更换头像</span>
                             </div>
                         )}
@@ -186,8 +189,16 @@ export default function Login({ onLogInSuccess }: LoginProps){
                         <input
                             type='email'
                             placeholder="请输入您的邮箱"
-                            {...register("email", {required: true})}
+                            {...register("email", {
+				required: true,
+				validate: () => !emailInvalid
+			    })}
                         />
+			{emailInvalid && (
+			    <div className="input-error-hint">
+			    	邮箱格式不合法！
+			    </div>
+			)}
                     </div>
                     <div className="input-item">
                         <input

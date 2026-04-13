@@ -3,7 +3,7 @@ import { useState ,useEffect } from "react";
 import Index from './pages/index'
 import Login from './pages/login'
 
-import { tokenUtilis } from "./utilis/auth";
+import { tokenUtilis } from "./utils/auth";
 
 export default function App(){
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
