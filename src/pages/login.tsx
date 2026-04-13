@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
 import { DEFAULT_AVATAR } from "../constants/string";
 
-import { tokenUtilis } from "../utilis/auth";
+import { tokenUtilis, checkPasswordStrength } from "../utilis/auth";
 
 import '../styles/login.css'
 
@@ -54,6 +54,16 @@ export default function Login({ onLogInSuccess }: LoginProps){
     }
 
     const onSubmit = (data: any) => {
+    if (!isLogin) {
+        const score = checkPasswordStrength(data.password);
+        if (score === -1) {
+            // 这里可以设置一个 react-hook-form 的错误，或者直接提示
+            setError("password", { type: "manual", message: "密码强度不符合要求" });
+            alert("密码太简单或不合法，请重新设置！");
+            return; // 拦截，不执行后续逻辑
+        }
+    }
+
 	const finalData = {
             ...data,
             avatar: avatar,
@@ -91,6 +101,30 @@ export default function Login({ onLogInSuccess }: LoginProps){
         localStorage.setItem("token", token);
         onLogInSuccess();
     }
+
+    const strengthResult = useMemo(() => {
+        if(!password || typeof password !== 'string'){
+            return null;
+        }
+        
+        const score = checkPasswordStrength(password);
+        
+        if (score === -1) {
+            return { label: '不合法', color: '#ff4d4f', width: '30%' };
+        }
+        
+        const levels = [
+            { label: '弱', color: '#ffa940', width: '20%' },
+            { label: '弱', color: '#ffa940', width: '40%' },
+            { label: '中', color: '#8ec5fc', width: '60%' },
+            { label: '强', color: '#a1c4fd', width: '80%' },
+            { label: '极强', color: '#e0c3fc', width: '100%' }
+        ];
+
+        // 确保索引不越界 (0-4)
+        const index = Math.min(Math.max(0, score), 4);
+        return levels[index];
+    }, [password]);
 
     return(
         <div className="login">
@@ -161,6 +195,23 @@ export default function Login({ onLogInSuccess }: LoginProps){
                             placeholder="请输入您的密码"
                             {...register("password",{required: true})}
                         />
+                        {!isLogin && strengthResult && (
+                            <div className="password-strength-wrapper">
+                                <div className="strength-info">
+                                    <span>密码强度: <strong style={{ color: strengthResult.color }}>{strengthResult.label}</strong></span>
+                                </div>
+                                <div className="strength-meter-bg">
+                                    <div 
+                                        className="strength-meter-fill"
+                                        style={{ 
+                                            width: strengthResult.width, 
+                                            backgroundColor: strengthResult.color,
+                                            boxShadow: `0 0 10px ${strengthResult.color}44` 
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {!isLogin && (
