@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import ContactList from '../components/contactList'
+import ChatList from "../components/chatList";
 
 import type { ActiveTabType } from "../types/ui";
 
@@ -18,6 +19,7 @@ export default function Index(){
     const [myAvatar, setMyAvatar] = useState<string>(DEFAULT_AVATAR);
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+    const [activeChatId, setActiveChatId] = useState<string | number>();
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -30,6 +32,31 @@ export default function Index(){
             }
         }
     }, [])
+
+    const chatListData = useMemo(() => {
+        const friendsChat = MOCK_FRIENDS.map(f => ({
+            id: f.id,
+            name: f.username,
+            avatar: f.avatar,
+            lastMessage: "[最近暂无消息]", // 实际开发应从后端获取
+            lastTime: "12:00",
+            unreadCount: 0,
+            type: 'user' as const,
+            status: f.status
+        }));
+
+        const groupsChat = MOCK_GROUPS.map(g => ({
+            id: g.id,
+            name: g.groupname,
+            avatar: g.avatar,
+            lastMessage: "群聊暂无新动态",
+            lastTime: "昨天",
+            unreadCount: 0,
+            type: 'group' as const
+        }));
+
+        return [...friendsChat, ...groupsChat];
+    }, []);
 
     /**
      * @todo 增加跳转到显示按钮相应组件的功能(完成相应组件)
@@ -97,6 +124,16 @@ export default function Index(){
             )}
 
             <div className="list-area">
+                {activeTab === 'chat' && (
+                    <ChatList 
+                        chats={chatListData}
+                        activeId={activeChatId}
+                        onChatClick={(chat) => {
+                            setActiveChatId(chat.id);
+                            console.log('选中聊天:', chat.name);
+                        }}
+                    />
+                )}
                 {activeTab === 'contacts' && (
                     <ContactList
                         friends={MOCK_FRIENDS}
