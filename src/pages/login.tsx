@@ -74,36 +74,61 @@ export default function Login({ onLogInSuccess }: LoginProps){
             timestamp : new Date().getTime()
         };
 
+	try{
         if(!isLogin){
-            localStorage.setItem('user_profile', JSON.stringify({
-                username: data.username,
-                avatar: avatar
-            }));
-            localStorage.setItem(`avatar-${data.username}`, avatar);
-            alert('注册成功！')
-        }else{
-            /**
-             * @todo 修正逻辑，从后端拿到数据再修改
-             */
-
-            const savedAvatar = localStorage.getItem(`avatar-${data.username}`);
-            if(savedAvatar){
-                setAvatar(savedAvatar);
-            }else{
-                setAvatar(DEFAULT_AVATAR);
+                // 需要完善：信息的本地存储
+		    const response = await registerApi({
+                    username: data.username,
+                    email: data.email,
+                    password: data.password
+                });
+            
+            if (response.code === 0) {
+                    alert('注册成功！');
+                    onLogInSuccess();
+            } else {
+                    alert(response.info || '注册失败');  // 用 response.info
             }
-            localStorage.setItem('user_profile', JSON.stringify({
-                username: data.username,
-                avatar: savedAvatar
-            }))
+		
+		// 头像图片需要进一步处理逻辑
+		localStorage.setItem('user_profile', JSON.stringify({
+                    username: data.username,
+                    avatar: avatar
+                }));
+                localStorage.setItem(`avatar-${data.username}`, avatar);
+                
+            }else{
+                const response = await loginApi({
+                    email: data.email,
+                    password: data.password
+            	});
+
+		if (response.code === 0 && response.data) {
+                    alert(`登录成功！`);
+                    onLogInSuccess();
+                } else {
+                    alert(response.info || '登录失败');  // 用 response.info
+                }
+		    
+		const savedAvatar = localStorage.getItem(`avatar-${data.username}`);
+                if(savedAvatar){
+                    setAvatar(savedAvatar);
+                }else{
+                    setAvatar(DEFAULT_AVATAR);
+                }
+
+                localStorage.setItem('user_profile', JSON.stringify({
+                    username: data.username,
+                    avatar: savedAvatar
+                }))
+            }
+	    } catch (error) {
+                console.error('请求失败:', error);
+                alert(error?.response?.data?.info || '请求失败');
         }
 
-        // 无后端 - 生成伪token
-        const token = tokenUtilis.generate(data.username);
-
-        localStorage.setItem("token", token);
-        onLogInSuccess();
     }
+
 
     const strengthResult = useMemo(() => {
         if(!password || typeof password !== 'string'){
