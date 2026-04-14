@@ -8,8 +8,6 @@ import { getCurrentUser } from "../services/user";
 
 import type { ActiveTabType } from "../types/ui";
 
-import { tokenUtils } from "../utils/auth";
-
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/string";
 
 import '../styles/index.css'
