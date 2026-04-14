@@ -3,7 +3,8 @@ import { useForm } from "react-hook-form";
 import { registerApi, loginApi } from "../api/auth";
 import { DEFAULT_AVATAR } from "../constants/string";
 
-import { checkPasswordStrength } from "../utils/auth";
+import { tokenUtils, checkPasswordStrength } from "../utils/auth";
+
 import axios from 'axios';
 
 import '../styles/login.css'
@@ -58,72 +59,76 @@ export default function Login({ onLogInSuccess }: LoginProps){
     }
 
     const onSubmit = async (data: any) => {
-    if (!isLogin) {
-        const score = checkPasswordStrength(data.password);
-        if (score === -1) {
-            // 这里可以设置一个 react-hook-form 的错误，或者直接提示
-            setError("password", { type: "manual", message: "密码强度不符合要求" });
-            alert("密码太简单或不合法，请重新设置！");
-            return; // 拦截，不执行后续逻辑
-        }
-    }
-
-	const finalData = {
-            ...data,
-            avatar: avatar,
-            loginType: isLogin ? 'Login' : 'Register',
-            timestamp : new Date().getTime()
-        };
-
-	try{
-        if(!isLogin){
-                // 需要完善：信息的本地存储
-		    const response = await registerApi({
-                    username: data.username,
-                    email: data.email,
-                    password: data.password
-                });
-            
-            if (response.code === 0) {
-                    alert('注册成功！');
-                    onLogInSuccess();
-            } else {
-                    alert(response.info || '注册失败');  // 用 response.info
+        if (!isLogin) {
+            const score = checkPasswordStrength(data.password);
+            if (score === -1) {
+                // 这里可以设置一个 react-hook-form 的错误，或者直接提示
+                setError("password", { type: "manual", message: "密码强度不符合要求" });
+                alert("密码太简单或不合法，请重新设置！");
+                return; // 拦截，不执行后续逻辑
             }
-		
-		// 头像图片需要进一步处理逻辑
-		localStorage.setItem('user_profile', JSON.stringify({
+        }
+
+        // 疑似并没有用到
+        const finalData = {
+                ...data,
+                avatar: avatar,
+                loginType: isLogin ? 'Login' : 'Register',
+                timestamp : new Date().getTime()
+            };
+
+        try{
+            if(!isLogin){
+                    // 需要完善：信息的本地存储
+                const response = await registerApi({
+                        username: data.username,
+                        email: data.email,
+                        password: data.password
+                    });
+                
+                if (response.code === 0) {
+                        alert('注册成功！');
+                        tokenUtils.setToken(response.data.token);
+                        onLogInSuccess();
+                } else {
+                        alert(response.info || '注册失败');  // 用 response.info
+                }
+            
+                // 头像图片需要进一步处理逻辑
+                localStorage.setItem('user_profile', JSON.stringify({
                     username: data.username,
                     avatar: avatar
                 }));
                 localStorage.setItem(`avatar-${data.username}`, avatar);
-                
+                    
             }else{
                 const response = await loginApi({
                     email: data.email,
                     password: data.password
-            	});
+                });
 
-		if (response.code === 0 && response.data) {
+                if (response.code === 0 && response.data) {
                     alert(`登录成功！`);
+                    tokenUtils.setToken(response.data.token);
                     onLogInSuccess();
                 } else {
                     alert(response.info || '登录失败');  // 用 response.info
                 }
-		    
-		const savedAvatar = localStorage.getItem(`avatar-${data.username}`);
+                
+                const savedAvatar = localStorage.getItem(`avatar-${data.username}`);
                 if(savedAvatar){
                     setAvatar(savedAvatar);
                 }else{
                     setAvatar(DEFAULT_AVATAR);
                 }
-
+                    
+                // 可以找机会统一一下用户信息的存储格式
                 localStorage.setItem('user_profile', JSON.stringify({
                     username: data.username,
                     avatar: savedAvatar
                 }))
             }
-	    } catch (error) {
+        } catch (error) {
                 console.error('请求失败:', error);
                 if (axios.isAxiosError(error)) {
                     alert(error.response?.data?.info || '请求失败');
@@ -131,7 +136,6 @@ export default function Login({ onLogInSuccess }: LoginProps){
                     alert('请求失败');
                 }
         }
-
     }
 
 
