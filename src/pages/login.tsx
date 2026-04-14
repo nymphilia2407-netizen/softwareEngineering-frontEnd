@@ -198,27 +198,37 @@ export default function Login({ onLogInSuccess }: LoginProps){
                                     validate: () => !usernameCharInvalid && !usernameLengthInvalid
                                 })}
                             />
+			    {errors.username?.type === 'required' && (
+			        <div className="input-error-hint">
+				    请输入用户名！
+				</div>
+			    )}
 			    {usernameLengthInvalid && (
 				<div className="input-error-hint">
-				   用户名只能有3-20个字符！
+				    用户名只能有3-20个字符！
 				</div>
 			    )}
 			    {usernameCharInvalid && (
 				<div className="input-error-hint">
-			       	   用户名只能包括字母、数字、下划线和中文字符！
+			       	    用户名只能包括字母、数字、下划线和中文字符！
 			   	</div>
 		     	    )}		
                         </div>
                     )}
                     <div className="input-item">
                         <input
-                            type='email'
+                            type='text'
                             placeholder="请输入您的邮箱"
                             {...register("email", {
 				required: true,
 				validate: () => !emailInvalid
 			    })}
                         />
+			{errors.email?.type === 'required' && (
+			    <div className="input-error-hint">
+			        请输入邮箱！
+			    </div>
+			)}
 			{emailInvalid && (
 			    <div className="input-error-hint">
 			    	邮箱格式不合法！
@@ -231,6 +241,11 @@ export default function Login({ onLogInSuccess }: LoginProps){
                             placeholder="请输入您的密码"
                             {...register("password",{required: true})}
                         />
+			{errors.password?.type === 'required' && (
+			    <div className="input-error-hint">
+			        请输入密码！
+			    </div>
+			)}
                         {!isLogin && strengthResult && (
                             <div className="password-strength-wrapper">
                                 <div className="strength-info">
@@ -260,6 +275,11 @@ export default function Login({ onLogInSuccess }: LoginProps){
                                     validate: (value) => value === password
                                 })}
                             />
+			    {errors.confirmPassword?.type === 'required' && (
+			        <div className="input-error-hint">
+        			    请确认密码！
+    				</div>
+			    )}
                             {passwordInconsistent && (
                                 <div className="input-error-hint">
                                     两次输入密码不一致！

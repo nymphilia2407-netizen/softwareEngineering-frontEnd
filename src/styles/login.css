@@ -135,7 +135,8 @@ button[type='submit']:active{
 
 .input-error-hint {
     position: absolute;
-    top: 0;
+    top: 50%;
+    transform: translateY(-50%); /* 垂直居中 */
     left: 105%; /* 出现在输入框右侧 */
     white-space: nowrap;
     background-color: #ff4d4f;
@@ -150,9 +151,9 @@ button[type='submit']:active{
 }
 
 @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-4px); }
-    75% { transform: translateX(4px); }
+    0%, 100% { transform: translateY(-50%) translateX(0); }
+    25% { transform: translateY(-50%) translateX(-4px); }
+    75% { transform: translateY(-50%) translateX(4px); }
 }
 
 .password-strength-wrapper {
