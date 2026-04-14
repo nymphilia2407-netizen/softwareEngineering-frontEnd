@@ -3,7 +3,8 @@ import { useForm } from "react-hook-form";
 import { registerApi, loginApi } from "../api/auth";
 import { DEFAULT_AVATAR } from "../constants/string";
 
-import { tokenUtilis, checkPasswordStrength } from "../utils/auth";
+import { tokenUtils, checkPasswordStrength } from "../utils/auth";
+import axios from 'axios';
 
 import '../styles/login.css'
 
@@ -124,7 +125,11 @@ export default function Login({ onLogInSuccess }: LoginProps){
             }
 	    } catch (error) {
                 console.error('请求失败:', error);
-                alert(error?.response?.data?.info || '请求失败');
+                if (axios.isAxiosError(error)) {
+                    alert(error.response?.data?.info || '请求失败');
+                } else {
+                    alert('请求失败');
+                }
         }
 
     }

@@ -2,33 +2,39 @@ import { useState, useEffect } from "react";
 
 import ContactList from '../components/contactList'
 
+import type { User } from '../types/entity';
+import { getFriendList } from "../services/friend";
+import { getCurrentUser } from "../services/user";
+
 import type { ActiveTabType } from "../types/ui";
 
-import { tokenUtilis } from "../utils/auth";
+import { tokenUtils } from "../utils/auth";
 
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/string";
 
 import '../styles/index.css'
 
-// 模拟数据
-import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock'
+// 模拟数据（friends已经不需要）
+import { MOCK_GROUPS } from '../mockData/contactListMock'
 
 export default function Index(){
     const [userName, setUserName] = useState<string>('');
     const [myAvatar, setMyAvatar] = useState<string>(DEFAULT_AVATAR);
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+    const [friends, setFriends] = useState<User[]>([]);
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        if(token){
-            const payload = tokenUtilis.decode(token);
-            setUserName(payload.username);
-            const savedAvatar = localStorage.getItem(`avatar-${payload.username}`)
-            if(savedAvatar){
-                setMyAvatar(savedAvatar);
-            }
-        }
+        // 获取当前用户信息
+        getCurrentUser()
+            .then(user => {
+                setUserName(user.username);
+                setMyAvatar(user.avatar || DEFAULT_AVATAR);
+            })
+            .catch(err => console.error('获取用户信息失败:', err));
+        
+        // 获取好友列表
+        getFriendList().then(setFriends);
     }, [])
 
     /**
@@ -99,7 +105,7 @@ export default function Index(){
             <div className="list-area">
                 {activeTab === 'contacts' && (
                     <ContactList
-                        friends={MOCK_FRIENDS}
+                        friends={friends}
                         groups={MOCK_GROUPS}
                         onItemClick={(item, type) => console.log(item, type)}
                     />
