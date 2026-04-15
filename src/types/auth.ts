@@ -1,5 +1,3 @@
-import request from '../utils/request';
-
 // 注册
 export interface RegisterParams {
     username: string;
@@ -17,10 +15,6 @@ export interface RegisterResponse {
     };
 }
 
-export const registerApi = (data: RegisterParams) => {
-    return request.post<any, RegisterResponse>('/api/auth/register', data);
-};
-
 // 登录
 export interface LoginParams {
     email: string;
@@ -36,8 +30,3 @@ export interface LoginResponse {
         username: string;
     };
 }
-
-export const loginApi = (data: LoginParams) => {
-    return request.post<any, LoginResponse>('/api/auth/login', data);
-};
-

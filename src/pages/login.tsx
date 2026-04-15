@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { registerApi, loginApi } from "../api/auth";
-import type {RegisterResponse} from "../api/auth"
+import { registerApi, loginApi } from "../services/auth";
 import { DEFAULT_AVATAR } from "../constants/string";
 
 import { tokenUtils, checkPasswordStrength } from "../utils/auth";

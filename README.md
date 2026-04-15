@@ -33,7 +33,8 @@
 │   ├── pages                     # 页面级组件  
 │   │   ├── index.tsx               # 主页面  
 │   │   └── login.tsx               # 登录/注册页面  
-│   ├── services                  # 请求函数
+│   ├── services                  # 请求相关函数
+|   |   ├── auth.ts                 # 登录和注册  
 |   |   ├── friend.ts               # 好友列表  
 │   │   └── user.ts                 # 本用户信息
 │   ├── store  
@@ -44,6 +45,7 @@
 │   │   ├── index.css  
 │   │   └── login.css  
 │   ├── types                     # 类型定义  
+│   │   ├── auth.ts                  # 注册/登录  
 │   │   ├── chat.ts  
 │   │   ├── entity.ts  
 │   │   └── ui.ts  
