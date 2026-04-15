@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { registerApi, loginApi } from "../api/auth";
+import type {RegisterResponse} from "../api/auth"
 import { DEFAULT_AVATAR } from "../constants/string";
 
 import { tokenUtils, checkPasswordStrength } from "../utils/auth";
@@ -86,7 +87,7 @@ export default function Login({ onLogInSuccess }: LoginProps){
                         password: data.password
                     });
                 
-                if (response.code === 0) {
+                if (response.code === 0 && response.data) {
                         alert('注册成功！');
                         tokenUtils.setToken(response.data.token);
                         onLogInSuccess();

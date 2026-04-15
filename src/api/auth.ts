@@ -10,6 +10,11 @@ export interface RegisterParams {
 export interface RegisterResponse {
     code: number;
     info: string;
+    data?: {
+        token: string;
+        user_id: number;
+        username: string;
+    };
 }
 
 export const registerApi = (data: RegisterParams) => {
