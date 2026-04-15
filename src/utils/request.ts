@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { tokenUtils } from './auth';
 
 // 创建 axios 实例
 const request = axios.create({
@@ -13,7 +14,7 @@ const request = axios.create({
 // 请求拦截器
 request.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('token');
+        const token = tokenUtils.getToken();
         // 如果存在 token，添加到请求头
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
@@ -33,6 +34,12 @@ request.interceptors.response.use(
         return response.data;
     },
     (error) => {
+        // 如果token无效且不在登录，返回到login界面
+        if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
+            tokenUtils.removeToken();
+            window.location.href = '/login';
+            return Promise.resolve(null);
+        }
         // 直接返回错误，让组件自己处理
         return Promise.reject(error);
     }

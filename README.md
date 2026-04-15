@@ -33,7 +33,10 @@
 │   ├── pages                     # 页面级组件  
 │   │   ├── index.tsx               # 主页面  
 │   │   └── login.tsx               # 登录/注册页面  
-│   ├── services  
+│   ├── services                  # 请求相关函数
+|   |   ├── auth.ts                 # 登录和注册  
+|   |   ├── friend.ts               # 好友列表  
+│   │   └── user.ts                 # 本用户信息
 │   ├── store  
 │   ├── styles                    # 样式目录  
 │   │   ├── chatList.css  
@@ -42,14 +45,15 @@
 │   │   ├── index.css  
 │   │   └── login.css  
 │   ├── types                     # 类型定义  
+│   │   ├── auth.ts                  # 注册/登录  
 │   │   ├── chat.ts  
 │   │   ├── entity.ts  
 │   │   └── ui.ts  
 │   ├── utils                     # 工具函数  
-│   │    ├─── auth.ts                 # 处理权限验证，token存储等逻辑  
+│   │    ├── auth.ts                 # 处理权限验证，token存储等逻辑  
+│   │    └── request.ts              # HTTP 请求封装，拦截器等
 │   └── mockData                  # 模拟数据，测试使用
 │        └── contactListMock.tsx     # 联系人列表模拟数据
-│       └── request.ts               # HTTP 请求封装，拦截器等
 ├── tsconfig.app.json  
 ├── tsconfig.json  
 ├── tsconfig.node.json  
