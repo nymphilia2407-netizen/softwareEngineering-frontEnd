@@ -30,3 +30,13 @@ export type Message = {
     timestamp: number;
     time?: string;
 }
+
+// 上行消息格式 (Client -> Server)
+export type WsAction = 
+  | { type: 'send_message'; data: { conversation_id: number; content: string } }
+  | { type: 'read_message'; data: { conversation_id: number; last_message_id: number } };
+
+// 下行消息格式 (Server -> Client)
+export type WsResponse = 
+  | { type: 'new_message'; data: Message }
+  | { type: 'error'; message: string };

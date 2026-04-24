@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 import ContactList from '../components/contactList'
 import ChatList from "../components/chatList";
 import ChatWindow from "../components/chatWindow";
 
-import type { Message } from "../types/entity";
+import type { Message, WsAction, WsResponse } from "../types/entity";
 import type { ActiveTabType } from "../types/ui";
 
-import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/string";
+import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON, BACKENDURL } from "../constants/string";
 
 import '../styles/index.css'
 
@@ -22,6 +22,42 @@ export default function Index(){
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [activeChatId, setActiveChatId] = useState<number>(0);
     const [messages, setMessages] = useState<Message[]>([]);
+
+    const socketRef = useRef<WebSocket | null>(null);
+
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if(!token){
+            return;
+        }
+        
+        const wsBase = BACKENDURL.replace('http', 'ws');
+        const wsUrl = `${wsBase}/ws/chat/?token=${token}`
+        const ws = new WebSocket(wsUrl);
+        socketRef.current = ws;
+
+        ws.onopen = () => console.log("WebSocket Connected")
+
+        ws.onmessage = (event) => {
+            const res = JSON.parse(event.data);
+
+            if(res.type === 'new_message'){
+                const incomingMsg = res.data;
+                if(incomingMsg.conversation_id === activeChatId){
+                    setMessages(prev => [...prev, {
+                        ...incomingMsg,
+                        time: new Date(incomingMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    }])
+                }
+            }
+        };
+
+        ws.onclose = () => console.log('WebSocket Disconnected');
+
+        return () => {
+            ws.close();
+        };
+    }, [activeChatId]);
 
     const chatListData = useMemo(() => {
         const friendsChat = MOCK_FRIENDS.map(f => ({
@@ -75,27 +111,41 @@ export default function Index(){
     }, [activeChatId, chatListData]);
 
     const handleSendMessage = (content: string) => {
-        const payload = {
-            type: "send_message",
+        if(!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN){
+            console.error('WebSocket Not Connected');
+            return;
+        }
+
+        const playload = {
+            type: 'send_message',
             data: {
                 conversation_id: activeChatId,
                 content: content
             }
         };
-        // socket.send(JSON.stringify(payload));
-        console.log("发送消息:", payload);
+
+        socketRef.current.send(JSON.stringify(playload));
+
+        const tempMsg: Message = {
+            id: Date.now(), //临时id
+            senderId: currentUserId,
+            convId: activeChatId,
+            content: content,
+            type: 'text',
+            status: 'sending',
+            timestamp: Date.now(),
+            time: new Date().toLocaleDateString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, tempMsg]);
     };
 
     const handleReadMessage = (convId: number, lastMsgId: number) => {
-        const payload = {
-            type: "read_message",
-            data: {
-                conversation_id: convId,
-                last_message_id: lastMsgId
-            }
-        };
-        // socket.send(JSON.stringify(payload));
-        console.log("标记已读:", payload);
+        if(socketRef.current?.readyState === WebSocket.OPEN){
+            socketRef.current.send(JSON.stringify({
+                type: "read_message",
+                data: { conversation_id: convId, last_message_id: lastMsgId }
+            }));
+        }
     };
 
     return (

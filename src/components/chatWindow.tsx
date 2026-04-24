@@ -26,7 +26,10 @@ export default function ChatWindow({
 
     useEffect(() => {
         if(scrollRef.current){
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: "smooth"
+            });
         }
 
         if(messages.length > 0){
@@ -35,7 +38,7 @@ export default function ChatWindow({
                 onReadMessage(activeChatId, lastMsg.id);
             }
         }
-    }, [messages, activeChatId]);
+    }, [messages]);
 
     const handleSend = () => {
         if(!inputText.trim()) return;
