@@ -2,10 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 
 import ContactList from '../components/contactList'
 import ChatList from "../components/chatList";
+import ChatWindow from "../components/chatWindow";
 
+import type { Message } from "../types/entity";
 import type { ActiveTabType } from "../types/ui";
-
-import { tokenUtilis } from "../utils/auth";
 
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/string";
 
@@ -15,23 +15,13 @@ import '../styles/index.css'
 import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock'
 
 export default function Index(){
+    const [currentUserId, setCurrentUserId] = useState<number>(0)
     const [userName, setUserName] = useState<string>('');
     const [myAvatar, setMyAvatar] = useState<string>(DEFAULT_AVATAR);
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-    const [activeChatId, setActiveChatId] = useState<string | number>();
-
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        if(token){
-            const payload = tokenUtilis.decode(token);
-            setUserName(payload.username);
-            const savedAvatar = localStorage.getItem(`avatar-${payload.username}`)
-            if(savedAvatar){
-                setMyAvatar(savedAvatar);
-            }
-        }
-    }, [])
+    const [activeChatId, setActiveChatId] = useState<number>(0);
+    const [messages, setMessages] = useState<Message[]>([]);
 
     const chatListData = useMemo(() => {
         const friendsChat = MOCK_FRIENDS.map(f => ({
@@ -78,6 +68,34 @@ export default function Index(){
             localStorage.removeItem("token")
             window.location.href = '/login';
         }
+    };
+
+    const activeChat = useMemo(() => {
+        return chatListData.find(chat => chat.id === activeChatId);
+    }, [activeChatId, chatListData]);
+
+    const handleSendMessage = (content: string) => {
+        const payload = {
+            type: "send_message",
+            data: {
+                conversation_id: activeChatId,
+                content: content
+            }
+        };
+        // socket.send(JSON.stringify(payload));
+        console.log("发送消息:", payload);
+    };
+
+    const handleReadMessage = (convId: number, lastMsgId: number) => {
+        const payload = {
+            type: "read_message",
+            data: {
+                conversation_id: convId,
+                last_message_id: lastMsgId
+            }
+        };
+        // socket.send(JSON.stringify(payload));
+        console.log("标记已读:", payload);
     };
 
     return (
@@ -133,6 +151,7 @@ export default function Index(){
                             console.log('选中聊天:', chat.name);
                         }}
                     />
+                    
                 )}
                 {activeTab === 'contacts' && (
                     <ContactList
@@ -142,6 +161,24 @@ export default function Index(){
                     />
                 )}
             </div>
+
+            <main className="chat-area">
+                {activeChat ? (
+                    <ChatWindow
+                        activeChatId={Number(activeChat.id)}
+                        activeChatName={activeChat.name}
+                        messages={messages}
+                        currentUserId={currentUserId}
+                        onSendMessage={handleSendMessage}
+                        onReadMessage={handleReadMessage}
+                    />
+                ) : (
+                    <div className="empty-chat-placeholder">
+                        <p>选择一个联系人开始聊天</p>
+                    </div>
+                )}
+            </main>
+            
         </div>
     )
 }

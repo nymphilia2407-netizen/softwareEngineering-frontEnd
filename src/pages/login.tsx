@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { registerApi, loginApi } from "../api/auth";
 import { DEFAULT_AVATAR } from "../constants/string";
 
-import { tokenUtilis, checkPasswordStrength } from "../utils/auth";
+import { checkPasswordStrength } from "../utils/auth";
 
 import '../styles/login.css'
 

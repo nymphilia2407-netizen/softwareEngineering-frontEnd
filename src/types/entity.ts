@@ -1,5 +1,5 @@
 export interface User{
-    id: string;
+    id: number;
     username: string;
     avatar: string;
     status: 'online' | 'offline' | 'busy';
@@ -8,12 +8,25 @@ export interface User{
 }
 
 export interface Group{
-    id: string;
+    id: number;
     groupname: string;
     avatar: string;
-    ownerId: string;
-    adminIds: string[];
+    ownerId: number;
+    adminIds: number[];
     memberCount: number;
     createdTime: number;
 }
 
+export type MsgType = 'text' | 'image' | 'file';
+export type MsgStatus = 'sending' | 'sent' | 'failed'
+
+export type Message = {
+    id: number;
+    convId: number;
+    senderId: number;
+    type: MsgType;
+    status: MsgStatus;
+    content: string;
+    timestamp: number;
+    time?: string;
+}
