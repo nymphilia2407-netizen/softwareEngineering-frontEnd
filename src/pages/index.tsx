@@ -12,6 +12,8 @@ import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON } from "../constants/
 
 import '../styles/index.css'
 
+import { useChatWebSocket } from '../services/chat';
+
 // 模拟数据（friends已经不需要）
 import { MOCK_GROUPS } from '../mockData/contactListMock'
 
@@ -21,6 +23,9 @@ export default function Index(){
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [friends, setFriends] = useState<User[]>([]);
+
+    const { messages, isConnected, sendMessage } = useChatWebSocket();
+    void messages; void isConnected; void sendMessage; //暂未接入ui，防止报错
 
     useEffect(() => {
         // 获取当前用户信息

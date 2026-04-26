@@ -66,7 +66,7 @@ export class ChatWebSocketService {
   }
 }
 
-// ==================== React Hook ====================
+// 设置React Hook管理ChatWebSocket，页面中直接调用即可
 export const useChatWebSocket = () => {
   const [messages, setMessages] = useState<NewMessageData[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -75,7 +75,7 @@ export const useChatWebSocket = () => {
   const serviceRef = useRef<ChatWebSocketService | null>(null);
 
   useEffect(() => {
-    // 使用 tokenUtils.getToken() 获取 token
+    // 获取 token 进行鉴权
     const token = tokenUtils.getToken();
     if (!token) {
       setError('未登录');
@@ -115,12 +115,12 @@ export const useChatWebSocket = () => {
     };
   }, []);
 
-  /** 发送消息 */
+  // 发送消息 
   const sendMessage = (conversationId: number, content: string) => {
     serviceRef.current?.sendMessage({ conversation_id: conversationId, content });
   };
 
-  /** 标记已读 */
+  // 标记已读 
   const markAsRead = (conversationId: number, lastMessageId: number) => {
     serviceRef.current?.markAsRead({ conversation_id: conversationId, last_message_id: lastMessageId });
   };
