@@ -35,8 +35,10 @@
 │   │   └── login.tsx               # 登录/注册页面  
 │   ├── services                  # 请求相关函数
 |   |   ├── auth.ts                 # 登录和注册  
+|   |   ├── chat.ts                 # 聊天
 |   |   ├── friend.ts               # 好友列表  
-│   │   └── user.ts                 # 本用户信息
+|   |   ├── user.ts                 # 本用户信息 
+│   │   └── websocket.ts            # 长连接基本类型
 │   ├── store  
 │   ├── styles                    # 样式目录  
 │   │   ├── chatList.css  
@@ -46,7 +48,7 @@
 │   │   └── login.css  
 │   ├── types                     # 类型定义  
 │   │   ├── auth.ts                  # 注册/登录  
-│   │   ├── chat.ts  
+│   │   ├── chat.ts                  # 聊天相关
 │   │   ├── entity.ts  
 │   │   └── ui.ts  
 │   ├── utils                     # 工具函数  
