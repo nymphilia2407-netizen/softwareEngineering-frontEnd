@@ -2,26 +2,32 @@ stages:
   - build
   - deploy
 
-# 构建镜像
-docker-build:
+# 使用 Kaniko 构建镜像
+kaniko-build:
   stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
   script:
-    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG .
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    # 创建 Docker 认证配置
+    - mkdir -p /kaniko/.docker
+    # 写入 GitLab CI 容器仓库的认证信息
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # 执行构建并推送
+    - /kaniko/executor
+        --context $CI_PROJECT_DIR
+        --dockerfile $CI_PROJECT_DIR/Dockerfile
+        --destination $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+        --cache=true
   only:
-    - ci/cd
+    - ci/cd 
 
 # 部署到 SECoder
 deploy:
   stage: deploy
-  image: registry-sepi.app.spring26a.secoder.net/secoder/deployer:latest
+  image: front-end-SPQR.app.spring26b.secoder.net/secoder/deployer:latest
   script:
     - deployer dyno replace $CI_PROJECT_NAME "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" "$REGISTRY_USER" "$REGISTRY_PWD"
   only:
-    - ci/cd
+    - ci/cd 
   when: manual
