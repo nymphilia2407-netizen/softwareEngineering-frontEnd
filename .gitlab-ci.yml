@@ -14,7 +14,7 @@ build:
     - export BUILD_IMAGE_PASSWORD=$CI_REGISTRY_PASSWORD
     - deployer build
   only:
-    - ci/cd
+    - main
 
 deploy:
   stage: deploy
@@ -22,5 +22,5 @@ deploy:
     - export API_SERVER=https://deployer.spring26b.secoder.net/api
     - deployer dyno replace $CI_PROJECT_NAME "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" "$DEPLOY_TOKEN" "$REGISTRY_PWD"
   only:
-    - ci/cd
+    - main
   when: manual
