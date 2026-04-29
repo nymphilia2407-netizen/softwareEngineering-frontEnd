@@ -13,7 +13,7 @@ export type OutgoingChatMessage =
   | { type: 'read_message'; data: ReadMessagePayload };
 
 // 后端WebSocket地址
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:80';
 
 // 适配chat功能的WebSocket服务类
 export class ChatWebSocketService {
