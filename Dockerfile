@@ -1,5 +1,5 @@
 # ============ 第一阶段：构建 ============
-FROM node:22-alpine AS builder
+FROM docker.1ms.run/library/node:22-alpine AS builder
 
 # 安装 pnpm
 RUN npm install -g pnpm
@@ -19,7 +19,7 @@ COPY . .
 RUN npx vite build --emptyOutDir
 
 # ============ 第二阶段：运行 ============
-FROM node:22-alpine
+FROM docker.1ms.run/library/node:22-alpine
 
 WORKDIR /app
 
