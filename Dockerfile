@@ -40,4 +40,4 @@ COPY --from=builder /app/dist ./dist
 EXPOSE 80
 
 # 用 vite preview 启动
-CMD ["pnpm", "preview"]
+CMD ["pnpm", "preview", "--port", "80", "--host", "0.0.0.0"]
