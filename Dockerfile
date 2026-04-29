@@ -19,25 +19,15 @@ COPY . .
 RUN npx vite build --emptyOutDir
 
 # ============ 第二阶段：运行 ============
+# ============ 运行阶段 ============
 FROM docker.1ms.run/library/node:22-alpine
 
 WORKDIR /app
 
-# 安装 pnpm
-RUN npm install -g pnpm
+RUN npm install -g serve
 
-# 复制 package.json 和 pnpm-lock.yaml
-COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
-
-# 只安装生产依赖（vite preview 需要）
-RUN pnpm config set registry https://registry.npmmirror.com/ && \
-    pnpm install --prod --frozen-lockfile
-
-# 从构建阶段复制产物
 COPY --from=builder /app/dist ./dist
 
-# 暴露 80 端口
 EXPOSE 80
 
-# 用 vite preview 启动
-CMD ["pnpm", "preview", "--port", "80", "--host", "0.0.0.0"]
+CMD ["serve", "-s", "dist", "-l", "80"]
