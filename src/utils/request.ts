@@ -2,7 +2,7 @@ import axios from 'axios'
 import { tokenUtils } from './auth';
 
 // 部署时导入环境变量
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:80'
 
 // 创建 axios 实例
 const request = axios.create({
