@@ -25,7 +25,7 @@ kaniko-build:
 # 部署到 SECoder
 deploy:
   stage: deploy
-  image: front-end-SPQR.app.spring26b.secoder.net/secoder/deployer:latest
+  image: registry-sepi.app.spring26a.secoder.net/secoder/deployer:latest
   script:
     - deployer dyno replace $CI_PROJECT_NAME "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG" "$REGISTRY_USER" "$REGISTRY_PWD"
   only:
