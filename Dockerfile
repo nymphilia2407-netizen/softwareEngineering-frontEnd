@@ -19,7 +19,6 @@ COPY . .
 RUN npx vite build --emptyOutDir
 
 # ============ 第二阶段：运行 ============
-# ============ 运行阶段 ============
 FROM docker.1ms.run/library/node:22-alpine
 
 WORKDIR /app

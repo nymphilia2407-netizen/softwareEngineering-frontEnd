@@ -3,6 +3,9 @@ import { tokenUtils } from './auth';
 
 // 部署时导入环境变量
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+
+console.log('BASE_URL:', import.meta.env.VITE_API_BASE_URL)
+
 // 创建 axios 实例
 const request = axios.create({
     // 后端地址
