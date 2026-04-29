@@ -1,4 +1,4 @@
 app:
-  name: $CI_PROJECT_NAME
-  image: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+  name: frontend
+  image: registry.spring26b.secoder.net/spqr/front-end:ci-cd
   port: 80
