@@ -8,6 +8,6 @@ export default defineConfig({
   preview: {
     port: parseInt(process.env.PORT || '80'),
     host: '0.0.0.0',
-    allowedHosts: ['front-end-spqr.app.spring26b.secoder.net', '.secoder.net']
+    allowedHosts: ['all']
   }
 })
