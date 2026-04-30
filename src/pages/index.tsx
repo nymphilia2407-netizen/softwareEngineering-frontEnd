@@ -135,6 +135,16 @@ export default function Index() {
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
+    const currentUserIdRef = useRef<number>(currentUserId);
+    const activeChatIdRef = useRef<number>(activeChatId);
+
+    useEffect(() => {
+        currentUserIdRef.current = currentUserId;
+    }, [currentUserId]);
+
+    useEffect(() => {
+        activeChatIdRef.current = activeChatId;
+    }, [activeChatId]);
 
     const mergeMessageStore = (store: Record<number, Message[]>, incomingMessage: Message) => {
         const roomMessages = store[incomingMessage.convId] ?? [];
@@ -232,7 +242,44 @@ export default function Index() {
                 }
 
                 const incomingMsg = formatIncomingMessage(event.data);
+
+                // 合并消息到消息存储
                 setMessageStore((prev) => mergeMessageStore(prev, incomingMsg));
+
+                // 更新会话列表：lastMessage/lastTime/unreadCount，并把会话移到最前
+                setChatRooms((prevRooms) => {
+                    const idx = prevRooms.findIndex((r) => r.id === incomingMsg.convId);
+                    const formattedTime = new Date(incomingMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    // 是否来自自己
+                    const fromSelf = incomingMsg.senderId === currentUserIdRef.current;
+                    const isActive = activeChatIdRef.current === incomingMsg.convId;
+
+                    if (idx !== -1) {
+                        const room = { ...prevRooms[idx] };
+                        room.lastMessage = incomingMsg.content;
+                        room.lastTime = formattedTime;
+                        if (!fromSelf && !isActive) {
+                            room.unreadCount = (room.unreadCount || 0) + 1;
+                        }
+
+                        const newRooms = [...prevRooms.slice(0, idx), ...prevRooms.slice(idx + 1)];
+                        return [room, ...newRooms];
+                    }
+
+                    // 新会话（未在列表中）
+                    const newRoom = {
+                        id: incomingMsg.convId,
+                        name: '[新会话]',
+                        avatar: DEFAULT_AVATAR,
+                        lastMessage: incomingMsg.content,
+                        lastTime: formattedTime,
+                        unreadCount: fromSelf || isActive ? 0 : 1,
+                        otherUserId: null,
+                    };
+
+                    return [newRoom, ...prevRooms];
+                });
             });
 
                 const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
@@ -331,6 +378,9 @@ export default function Index() {
             type: 'read_message',
             data: { conversation_id: convId, last_message_id: lastMsgId },
         });
+
+        // 乐观设置该会话为已读（前端显示）
+        setChatRooms((prev) => prev.map((r) => (r.id === convId ? { ...r, unreadCount: 0 } : r)));
     };
 
     const handleCreateGroup = async ({ groupName, memberIds }: { groupName: string; memberIds: number[] }) => {
