@@ -35,12 +35,16 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<boolean>(false);
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState<boolean>(false);
     const [isAddFriendOpen, setIsAddFriendOpen] = useState<boolean>(false);
+    const [isSearchGroupOpen, setIsSearchGroupOpen] = useState<boolean>(false);
     const [isFriendRequestsOpen, setIsFriendRequestsOpen] = useState<boolean>(false);
     const [friendKeyword, setFriendKeyword] = useState<string>('');
     const [searchResults, setSearchResults] = useState<UserSearchData[]>([]);
     const [searching, setSearching] = useState<boolean>(false);
     const [sendingFriendId, setSendingFriendId] = useState<number | null>(null);
     const [addFriendHint, setAddFriendHint] = useState<string>('');
+    const [groupKeyword, setGroupKeyword] = useState<string>('');
+    const [groupSearchResults, setGroupSearchResults] = useState<Group[]>([]);
+    const [groupHint, setGroupHint] = useState<string>('');
     const [requestHint, setRequestHint] = useState<string>('');
     const [sentRequestKeys, setSentRequestKeys] = useState<string[]>([]);
     const [receivedRequests, setReceivedRequests] = useState<ReceivedFriendRequestData[]>([]);
@@ -173,6 +177,24 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         } finally {
             setSendingFriendId(null);
         }
+    };
+
+    const handleSearchGroup = () => {
+        const keyword = groupKeyword.trim().toLowerCase();
+
+        if (!keyword) {
+            setGroupHint('请输入群聊名称或群聊ID');
+            setGroupSearchResults([]);
+            return;
+        }
+
+        const matchedGroups = groups.filter((group) => (
+            group.groupname.toLowerCase().includes(keyword) ||
+            String(group.id).includes(keyword)
+        ));
+
+        setGroupSearchResults(matchedGroups);
+        setGroupHint(matchedGroups.length === 0 ? '没有找到匹配的群聊' : '');
     };
 
     const handleAcceptRequest = async (requestId: number) => {
@@ -330,6 +352,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 onClick={() => {
                                     setIsActionMenuOpen(false);
                                     setIsAddFriendOpen(true);
+                                    setIsSearchGroupOpen(false);
                                     setIsFriendRequestsOpen(false);
                                     setRequestHint('');
                                 }}
@@ -341,8 +364,23 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 className='action-menu-item'
                                 onClick={() => {
                                     setIsActionMenuOpen(false);
+                                    setIsSearchGroupOpen(true);
+                                    setIsAddFriendOpen(false);
+                                    setIsFriendRequestsOpen(false);
+                                    setAddFriendHint('');
+                                    setRequestHint('');
+                                }}
+                            >
+                                    添加群聊
+                            </button>
+                            <button
+                                type='button'
+                                className='action-menu-item'
+                                onClick={() => {
+                                    setIsActionMenuOpen(false);
                                     setIsFriendRequestsOpen(true);
                                     setIsAddFriendOpen(false);
+                                    setIsSearchGroupOpen(false);
                                     setAddFriendHint('');
                                 }}
                             >
@@ -354,6 +392,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 onClick={() => {
                                     setIsActionMenuOpen(false);
                                     setIsCreateGroupOpen(true);
+                                    setIsSearchGroupOpen(false);
                                 }}
                             >
                                 新建群聊
@@ -450,6 +489,67 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         <button type='button' className='create-group-secondary-button' onClick={() => {
                             setIsAddFriendOpen(false);
                             setAddFriendHint('');
+                        }}>
+                            关闭
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {isSearchGroupOpen && (
+                <div className='add-friend-panel'>
+                    <div className='add-friend-field'>
+                        <label htmlFor='group-search-input'>搜索群聊</label>
+                        <form
+                            className='add-friend-search-row'
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                handleSearchGroup();
+                            }}
+                        >
+                            <input
+                                id='group-search-input'
+                                type='text'
+                                placeholder='输入群聊名称或群聊ID'
+                                value={groupKeyword}
+                                onChange={(e) => setGroupKeyword(e.target.value)}
+                            />
+                            <button type='submit' className='add-friend-search-button'>
+                                搜索
+                            </button>
+                        </form>
+                    </div>
+
+                    {groupHint && <div className='add-friend-hint'>{groupHint}</div>}
+
+                    <div className='add-friend-result-list'>
+                        {groupSearchResults.map((group) => (
+                            <div key={group.id} className='add-friend-result-item'>
+                                <div className='add-friend-user-info'>
+                                    <img className='add-friend-user-avatar' src={group.avatar || DEFAULT_AVATAR} alt='group-avatar' />
+                                    <div className='add-friend-user-text'>
+                                        <span className='add-friend-user-name'>{group.groupname}</span>
+                                        <span className='add-friend-user-email'>群聊ID: {group.id}</span>
+                                    </div>
+                                </div>
+                                <button
+                                    type='button'
+                                    className='add-friend-action-button'
+                                    onClick={() => {
+                                        onItemClick(group, 'group');
+                                        setIsSearchGroupOpen(false);
+                                    }}
+                                >
+                                    进入
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className='create-group-actions'>
+                        <button type='button' className='create-group-secondary-button' onClick={() => {
+                            setIsSearchGroupOpen(false);
+                            setGroupHint('');
                         }}>
                             关闭
                         </button>

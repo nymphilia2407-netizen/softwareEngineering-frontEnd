@@ -38,6 +38,8 @@
     border: none;
     background: rgba(255, 255, 255, 0.62);
     outline: none;
+    height: 30px;
+    box-sizing: border-box;
 }
 
 .action-toggle-button {
@@ -57,6 +59,7 @@
     font-weight: 700;
     transition: transform 0.2s ease, opacity 0.2s ease;
     flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 .action-toggle-button:hover {
@@ -132,21 +135,35 @@
 }
 
 .add-friend-search-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex !important;
+    align-items: center;
+    flex-wrap: nowrap !important;
     gap: 8px;
     width: 100%;
+    --add-friend-search-height: 30px;
 }
 
-.add-friend-search-row input {
-    flex: 1;
-    border: none;
+.add-friend-search-row > input {
+    flex: 1 1 auto;
+    min-width: 120px;
+    max-width: 100%;
+    display: block;
+    width: auto;
+    border: 1px solid rgba(15, 23, 42, 0.14);
     border-radius: 12px;
-    padding: 8px 10px;
-    background: rgba(0, 0, 0, 0.05);
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #0f172a;
     outline: none;
-    min-height: 32px;
+    height: var(--add-friend-search-height);
     font-size: 13px;
+    line-height: 1.1;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+.add-friend-search-row > input::placeholder {
+    color: #94a3b8;
 }
 
 .add-friend-search-button,
@@ -158,15 +175,24 @@
     font-weight: 600;
 }
 
-.add-friend-search-button {
+.add-friend-search-row > .add-friend-search-button {
     background: rgba(255, 255, 255, 0.72);
     border: 1px solid rgba(15, 23, 42, 0.1);
     color: #0f172a;
-    min-width: 56px;
-    min-height: 32px;
-    padding: 6px 10px;
+    min-width: 50px;
+    height: var(--add-friend-search-height);
+    padding: 4px 9px;
     font-size: 12px;
+    line-height: 1;
     white-space: nowrap;
+    box-sizing: border-box;
+    flex: 0 0 auto !important;
+    width: auto !important;
+    max-width: 96px;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .add-friend-search-button:hover {
