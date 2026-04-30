@@ -6,6 +6,7 @@ import ChatWindow from "../components/chatWindow";
 
 import { getCurrentUser } from "../api/user";
 import { getFriendList } from "../api/friend";
+import { getChatRooms, getChatMessages } from "../api/chat";
 import { createChatWebSocketClient, type ChatWebSocketClient, type ChatIncomingMessage } from "../services/websocket";
 import type { Message, User } from "../types/entity";
 import type { ActiveTabType } from "../types/ui";
@@ -25,6 +26,7 @@ interface ChatListItem {
     lastTime: string;
     unreadCount: number;
     status?: 'online' | 'offline' | 'busy';
+    otherUserId?: number | null;
 }
 
 const decodeTokenPayload = () => {
@@ -71,6 +73,21 @@ const mapFriendSummary = (friend: { user_id: number; username: string; avatar?: 
     lastLoginTime: Date.now(),
 });
 
+const mapHistoryMessage = (message: { id: number; room_id: number; sender_id: number; content: string; created_at: string; }): Message => {
+    const timestamp = new Date(message.created_at).getTime();
+
+    return {
+        id: message.id,
+        convId: message.room_id,
+        senderId: message.sender_id,
+        type: 'text',
+        status: 'sent',
+        content: message.content,
+        timestamp,
+        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+};
+
 export default function Index(){
     const tokenPayload = decodeTokenPayload();
     const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0)
@@ -92,6 +109,7 @@ export default function Index(){
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [activeChatId, setActiveChatId] = useState<number>(0);
     const [friends, setFriends] = useState<User[]>(MOCK_FRIENDS);
+    const [chatRooms, setChatRooms] = useState<ChatListItem[]>([]);
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
@@ -140,16 +158,43 @@ export default function Index(){
 
                 const mappedFriends = friendList.map(mapFriendSummary);
                 setFriends(mappedFriends);
-                setActiveChatId(mappedFriends[0]?.id ?? MOCK_GROUPS[0]?.id ?? 0);
+                setActiveChatId(mappedFriends[0]?.id ?? 0);
             } catch (error) {
                 console.error('获取好友列表失败:', error);
                 setFriends(MOCK_FRIENDS);
-                setActiveChatId(MOCK_FRIENDS[0]?.id ?? MOCK_GROUPS[0]?.id ?? 0);
+            }
+        };
+
+        const syncChatRooms = async () => {
+            try {
+                const roomList = await getChatRooms();
+
+                if (cancelled) {
+                    return;
+                }
+
+                const mappedRooms = roomList.map((room) => ({
+                    id: room.room_id,
+                    name: room.name,
+                    avatar: room.avatar || DEFAULT_AVATAR,
+                    lastMessage: room.last_message || '[最近暂无消息]',
+                    lastTime: room.last_time ? new Date(room.last_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '刚刚',
+                    unreadCount: room.unread_count,
+                    otherUserId: room.other_user_id ?? null,
+                    status: undefined,
+                }));
+
+                setChatRooms(mappedRooms);
+                setActiveChatId((currentActiveChatId) => currentActiveChatId || mappedRooms[0]?.id || 0);
+            } catch (error) {
+                console.error('获取会话列表失败:', error);
+                setChatRooms([]);
             }
         };
 
         void syncUserProfile();
         void syncFriendList();
+        void syncChatRooms();
 
         return () => {
             cancelled = true;
@@ -204,27 +249,40 @@ export default function Index(){
         };
     }, []);
 
-    const chatListData: ChatListItem[] = [
-        ...friends.map((friend) => ({
-            id: friend.id,
-            name: friend.username,
-            avatar: friend.avatar,
-            lastMessage: '[最近暂无消息]',
-            lastTime: '12:00',
-            unreadCount: 0,
-            status: friend.status,
-        })),
-        ...MOCK_GROUPS.map((group) => ({
-            id: group.id,
-            name: group.groupname,
-            avatar: group.avatar,
-            lastMessage: '群聊暂无新动态',
-            lastTime: '昨天',
-            unreadCount: 0,
-        })),
-    ];
+    const chatListData: ChatListItem[] = chatRooms;
 
     const messages = messageStore[activeChatId] ?? [];
+
+    useEffect(() => {
+        if (!activeChatId) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadMessages = async () => {
+            try {
+                const history = await getChatMessages(activeChatId, 100, 0);
+
+                if (cancelled) {
+                    return;
+                }
+
+                setMessageStore((prev) => ({
+                    ...prev,
+                    [activeChatId]: history.messages.map(mapHistoryMessage),
+                }));
+            } catch (error) {
+                console.error('获取聊天记录失败:', error);
+            }
+        };
+
+        void loadMessages();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [activeChatId]);
 
     function chatClicked(){
         setActiveTab('chat');
@@ -334,7 +392,10 @@ export default function Index(){
                         onItemClick={(item, type) => {
                             console.log(item, type);
                             if (type === 'user') {
-                                setActiveChatId(item.id);
+                                const matchedRoom = chatRooms.find((room) => room.otherUserId === item.id);
+                                if (matchedRoom) {
+                                    setActiveChatId(matchedRoom.id);
+                                }
                                 setActiveTab('chat');
                             }
                         }}

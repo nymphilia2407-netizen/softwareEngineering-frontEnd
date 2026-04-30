@@ -19,8 +19,7 @@ export default function Login({ onLogInSuccess }: LoginProps){
         register,
         handleSubmit,
         watch,
-        setError,
-        formState: { errors }
+        setError
     } = useForm();
 
     // 实时捕捉，检测合法性
@@ -66,13 +65,6 @@ export default function Login({ onLogInSuccess }: LoginProps){
             return; // 拦截，不执行后续逻辑
         }
     }
-
-	const finalData = {
-            ...data,
-            avatar: avatar,
-            loginType: isLogin ? 'Login' : 'Register',
-            timestamp : new Date().getTime()
-        };
 
 	try{
         if(!isLogin){
@@ -124,7 +116,8 @@ export default function Login({ onLogInSuccess }: LoginProps){
             }
 	    } catch (error) {
                 console.error('请求失败:', error);
-                alert(error?.response?.data?.info || '请求失败');
+            const requestError = error as { response?: { data?: { info?: string } } };
+            alert(requestError.response?.data?.info || '请求失败');
         }
 
     }

@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { type User, type Group } from '../types/entity'
 
 import '../styles/chatList.css'
 
