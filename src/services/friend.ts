@@ -11,6 +11,7 @@ export interface UserSearchData {
     user_id: number;
     username: string;
     avatar?: string;
+    email?: string;
 }
 
 export interface ReceivedFriendRequestData {
@@ -46,6 +47,18 @@ export const searchUsers = async (keyword: string) => {
 
     if (response.code !== 0 || !response.data) {
         throw new Error(response.info || '搜索用户失败');
+    }
+
+    return response.data;
+};
+
+export const searchUsersByEmail = async (email: string) => {
+    const response = await request.get<any, ApiResponse<UserSearchData[]>>('/api/users/search', {
+        params: { email },
+    });
+
+    if (response.code !== 0 || !response.data) {
+        throw new Error(response.info || '按邮箱搜索用户失败');
     }
 
     return response.data;

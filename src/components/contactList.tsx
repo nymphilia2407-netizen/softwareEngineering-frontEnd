@@ -5,11 +5,13 @@ import {
     acceptFriendRequest,
     getReceivedFriendRequests,
     rejectFriendRequest,
+    searchUsersByEmail,
     searchUsers,
     sendFriendRequest,
     type ReceivedFriendRequestData,
     type UserSearchData,
 } from '../services/friend'
+import { DEFAULT_AVATAR } from '../constants/string'
 
 import '../styles/contactList.css'
 
@@ -21,23 +23,27 @@ interface CreateGroupFormValues {
 interface ContactsProps{
     readonly friends: User[];
     readonly groups: Group[];
+    readonly currentUserId: number;
     readonly onItemClick: (item: User | Group, type: 'user' | 'group') => void;
     readonly onCreateGroup: (values: CreateGroupFormValues) => Promise<void> | void;
     readonly onContactsChanged?: () => Promise<void> | void;
 }
 
 export default function ContactList(props: Readonly<ContactsProps>) {
-    const { friends, groups, onItemClick, onCreateGroup, onContactsChanged } = props;
+    const { friends, groups, currentUserId, onItemClick, onCreateGroup, onContactsChanged } = props;
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<boolean>(false);
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState<boolean>(false);
     const [isAddFriendOpen, setIsAddFriendOpen] = useState<boolean>(false);
     const [isFriendRequestsOpen, setIsFriendRequestsOpen] = useState<boolean>(false);
     const [friendKeyword, setFriendKeyword] = useState<string>('');
+    const [friendSearchMode, setFriendSearchMode] = useState<'username' | 'email'>('username');
     const [searchResults, setSearchResults] = useState<UserSearchData[]>([]);
     const [searching, setSearching] = useState<boolean>(false);
     const [sendingFriendId, setSendingFriendId] = useState<number | null>(null);
-    const [friendHint, setFriendHint] = useState<string>('');
+    const [addFriendHint, setAddFriendHint] = useState<string>('');
+    const [requestHint, setRequestHint] = useState<string>('');
+    const [sentRequestIds, setSentRequestIds] = useState<number[]>([]);
     const [receivedRequests, setReceivedRequests] = useState<ReceivedFriendRequestData[]>([]);
     const [requestLoading, setRequestLoading] = useState<boolean>(false);
     const [requestActionId, setRequestActionId] = useState<number | null>(null);
@@ -80,7 +86,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                 }
             } catch (error) {
                 if (!cancelled) {
-                    setFriendHint(error instanceof Error ? error.message : '获取好友请求失败');
+                    setRequestHint(error instanceof Error ? error.message : '获取好友请求失败');
                 }
             } finally {
                 if (!cancelled) {
@@ -115,24 +121,26 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         const keyword = friendKeyword.trim();
 
         if (!keyword) {
-            setFriendHint('请输入用户名关键字');
+            setAddFriendHint(friendSearchMode === 'email' ? '请输入邮箱地址' : '请输入用户名关键字');
             setSearchResults([]);
             return;
         }
 
         setSearching(true);
-        setFriendHint('');
+        setAddFriendHint('');
 
         try {
-            const users = await searchUsers(keyword);
+            const users = friendSearchMode === 'email'
+                ? await searchUsersByEmail(keyword)
+                : await searchUsers(keyword);
             setSearchResults(users);
 
             if (users.length === 0) {
-                setFriendHint('没有找到匹配的用户');
+                setAddFriendHint('没有找到匹配的用户');
             }
         } catch (error) {
             setSearchResults([]);
-            setFriendHint(error instanceof Error ? error.message : '搜索用户失败');
+            setAddFriendHint(error instanceof Error ? error.message : '搜索用户失败');
         } finally {
             setSearching(false);
         }
@@ -140,13 +148,15 @@ export default function ContactList(props: Readonly<ContactsProps>) {
 
     const handleSendFriendRequest = async (targetUserId: number) => {
         setSendingFriendId(targetUserId);
-        setFriendHint('');
+        setAddFriendHint('');
 
         try {
             await sendFriendRequest(targetUserId);
-            setFriendHint('好友请求已发送');
+            setSentRequestIds((current) => (current.includes(targetUserId) ? current : [...current, targetUserId]));
+            setAddFriendHint('好友请求已发送');
+            await onContactsChanged?.();
         } catch (error) {
-            setFriendHint(error instanceof Error ? error.message : '发送好友请求失败');
+            setAddFriendHint(error instanceof Error ? error.message : '发送好友请求失败');
         } finally {
             setSendingFriendId(null);
         }
@@ -154,15 +164,15 @@ export default function ContactList(props: Readonly<ContactsProps>) {
 
     const handleAcceptRequest = async (requestId: number) => {
         setRequestActionId(requestId);
-        setFriendHint('');
+        setRequestHint('');
 
         try {
             await acceptFriendRequest(requestId);
             setReceivedRequests((current) => current.filter((request) => request.request_id !== requestId));
-            setFriendHint('已接受好友请求');
+            setRequestHint('已接受好友请求');
             await onContactsChanged?.();
         } catch (error) {
-            setFriendHint(error instanceof Error ? error.message : '接受好友请求失败');
+            setRequestHint(error instanceof Error ? error.message : '接受好友请求失败');
         } finally {
             setRequestActionId(null);
         }
@@ -170,19 +180,40 @@ export default function ContactList(props: Readonly<ContactsProps>) {
 
     const handleRejectRequest = async (requestId: number) => {
         setRequestActionId(requestId);
-        setFriendHint('');
+        setRequestHint('');
 
         try {
             await rejectFriendRequest(requestId);
             setReceivedRequests((current) => current.filter((request) => request.request_id !== requestId));
-            setFriendHint('已拒绝好友请求');
+            setRequestHint('已拒绝好友请求');
             await onContactsChanged?.();
         } catch (error) {
-            setFriendHint(error instanceof Error ? error.message : '拒绝好友请求失败');
+            setRequestHint(error instanceof Error ? error.message : '拒绝好友请求失败');
         } finally {
             setRequestActionId(null);
         }
     };
+
+    const friendIdSet = new Set(friends.map((friend) => friend.id));
+
+    const getAddFriendButtonText = (userId: number) => {
+        if (userId === currentUserId) {
+            return '自己';
+        }
+
+        if (friendIdSet.has(userId)) {
+            return '已是好友';
+        }
+
+        if (sentRequestIds.includes(userId)) {
+            return '已发送';
+        }
+
+        return sendingFriendId === userId ? '发送中' : '加好友';
+    };
+
+    const isAddFriendDisabled = (userId: number) =>
+        sendingFriendId === userId || userId === currentUserId || friendIdSet.has(userId) || sentRequestIds.includes(userId);
 
     let friendRequestContent: ReactNode;
 
@@ -276,6 +307,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                     setIsActionMenuOpen(false);
                                     setIsAddFriendOpen(true);
                                     setIsFriendRequestsOpen(false);
+                                    setRequestHint('');
                                 }}
                             >
                                     添加好友
@@ -287,6 +319,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                     setIsActionMenuOpen(false);
                                     setIsFriendRequestsOpen(true);
                                     setIsAddFriendOpen(false);
+                                    setAddFriendHint('');
                                 }}
                             >
                                 好友请求
@@ -355,7 +388,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                             <input
                                 id='friend-search-input'
                                 type='text'
-                                placeholder='输入用户名关键字'
+                                placeholder={friendSearchMode === 'email' ? '输入邮箱地址' : '输入用户名关键字'}
                                 value={friendKeyword}
                                 onChange={(e) => setFriendKeyword(e.target.value)}
                                 onKeyDown={(e) => {
@@ -365,34 +398,54 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                     }
                                 }}
                             />
+                            <select
+                                className='add-friend-search-mode'
+                                value={friendSearchMode}
+                                onChange={(e) => {
+                                    setFriendSearchMode(e.target.value as 'username' | 'email');
+                                    setSearchResults([]);
+                                    setAddFriendHint('');
+                                }}
+                            >
+                                <option value='username'>用户名</option>
+                                <option value='email'>邮箱</option>
+                            </select>
                             <button type='button' className='add-friend-search-button' onClick={() => void handleSearchFriend()} disabled={searching}>
                                 {searching ? '搜索中' : '搜索'}
                             </button>
                         </div>
                     </div>
 
-                    {friendHint && <div className='add-friend-hint'>{friendHint}</div>}
+                    {addFriendHint && <div className='add-friend-hint'>{addFriendHint}</div>}
 
                     <div className='add-friend-result-list'>
                         {searchResults.map((user) => (
                             <div key={user.user_id} className='add-friend-result-item'>
                                 <div className='add-friend-user-info'>
+                                    <img className='add-friend-user-avatar' src={user.avatar || DEFAULT_AVATAR} alt='avatar' />
+                                    <div className='add-friend-user-text'>
                                     <span className='add-friend-user-name'>{user.username}</span>
+                                        <span className='add-friend-user-id'>ID: {user.user_id}</span>
+                                        {user.email && <span className='add-friend-user-email'>{user.email}</span>}
+                                    </div>
                                 </div>
                                 <button
                                     type='button'
-                                    className='add-friend-action-button'
+                                    className={`add-friend-action-button ${isAddFriendDisabled(user.user_id) ? 'is-disabled' : ''}`}
                                     onClick={() => void handleSendFriendRequest(user.user_id)}
-                                    disabled={sendingFriendId === user.user_id}
+                                    disabled={isAddFriendDisabled(user.user_id)}
                                 >
-                                    {sendingFriendId === user.user_id ? '发送中' : '加好友'}
+                                    {getAddFriendButtonText(user.user_id)}
                                 </button>
                             </div>
                         ))}
                     </div>
 
                     <div className='create-group-actions'>
-                        <button type='button' className='create-group-secondary-button' onClick={() => setIsAddFriendOpen(false)}>
+                        <button type='button' className='create-group-secondary-button' onClick={() => {
+                            setIsAddFriendOpen(false);
+                            setAddFriendHint('');
+                        }}>
                             关闭
                         </button>
                     </div>
@@ -411,7 +464,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         </button>
                     </div>
 
-                    {friendHint && <div className='friend-request-hint'>{friendHint}</div>}
+                    {requestHint && <div className='friend-request-hint'>{requestHint}</div>}
 
                     <div className='friend-request-list'>
                         {friendRequestContent}

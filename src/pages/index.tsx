@@ -692,6 +692,7 @@ export default function Index() {
                     <ContactList
                         friends={friends}
                         groups={groups}
+                        currentUserId={currentUserId}
                         onItemClick={(item, type) => {
                             if (type === 'user') {
                                 const userItem = item as User;
