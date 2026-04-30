@@ -1,24 +1,20 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from 'react';
 
-import ContactList from '../components/contactList'
-import ChatList from "../components/chatList";
-import ChatWindow from "../components/chatWindow";
+import ChatList from '../components/chatList';
+import ChatWindow from '../components/chatWindow';
+import ContactList from '../components/contactList';
 
-import { getCurrentUser } from "../services/user";
-import { getFriendList } from "../services/friend";
-import { getChatRooms, getChatMessages } from "../services/chat";
-import { createChatWebSocketClient, type ChatWebSocketClient, type ChatIncomingMessage } from "../services/websocket";
-import type { Message, User } from "../types/entity";
-import type { ActiveTabType } from "../types/ui";
+import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
+import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock';
+import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
+import { getFriendList, type FriendSummaryData } from '../services/friend';
+import { getCurrentUser } from '../services/user';
+import { createChatWebSocketClient, type ChatIncomingMessage, type ChatWebSocketClient } from '../services/websocket';
+import { tokenUtils } from '../utils/auth';
+import type { Message, User } from '../types/entity';
+import type { ActiveTabType } from '../types/ui';
 
-import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON, BACKENDURL } from "../constants/string";
-
-import '../styles/index.css'
-
-import { useChatWebSocket } from '../services/chat';
-
-// 模拟数据（friends已经不需要）
-import { MOCK_FRIENDS ,MOCK_GROUPS } from '../mockData/contactListMock'
+import '../styles/index.css';
 
 interface ChatListItem {
     id: number;
@@ -32,7 +28,7 @@ interface ChatListItem {
 }
 
 const decodeTokenPayload = () => {
-    const token = localStorage.getItem('token');
+    const token = tokenUtils.getToken();
     if (!token) {
         return null;
     }
@@ -62,11 +58,11 @@ const formatIncomingMessage = (message: ChatIncomingMessage): Message => {
         status: 'sent',
         content: message.content,
         timestamp,
-        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 };
 
-const mapFriendSummary = (friend: { user_id: number; username: string; avatar?: string; status?: 'online' | 'offline' | 'busy'; }): User => ({
+const mapFriendSummary = (friend: FriendSummaryData): User => ({
     id: friend.user_id,
     username: friend.username,
     avatar: friend.avatar ?? DEFAULT_AVATAR,
@@ -75,7 +71,7 @@ const mapFriendSummary = (friend: { user_id: number; username: string; avatar?: 
     lastLoginTime: Date.now(),
 });
 
-const mapHistoryMessage = (message: { id: number; room_id: number; sender_id: number; content: string; created_at: string; }): Message => {
+const mapHistoryMessage = (message: ChatMessageData): Message => {
     const timestamp = new Date(message.created_at).getTime();
 
     return {
@@ -86,13 +82,24 @@ const mapHistoryMessage = (message: { id: number; room_id: number; sender_id: nu
         status: 'sent',
         content: message.content,
         timestamp,
-        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 };
 
-export default function Index(){
+const mapChatRoom = (room: ChatRoomSummaryData): ChatListItem => ({
+    id: room.room_id,
+    name: room.name,
+    avatar: room.avatar || DEFAULT_AVATAR,
+    lastMessage: room.last_message || '[最近暂无消息]',
+    lastTime: room.last_time ? new Date(room.last_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '刚刚',
+    unreadCount: room.unread_count,
+    otherUserId: room.other_user_id ?? null,
+    status: undefined,
+});
+
+export default function Index() {
     const tokenPayload = decodeTokenPayload();
-    const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0)
+    const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0);
     const [userName, setUserName] = useState<string>(tokenPayload?.username ?? '');
     const [myAvatar, setMyAvatar] = useState<string>(() => {
         const storedProfile = localStorage.getItem('user_profile');
@@ -119,10 +126,8 @@ export default function Index(){
     const mergeMessageStore = (store: Record<number, Message[]>, incomingMessage: Message) => {
         const roomMessages = store[incomingMessage.convId] ?? [];
 
-        for (const roomMessage of roomMessages) {
-            if (roomMessage.id === incomingMessage.id) {
-                return store;
-            }
+        if (roomMessages.some((roomMessage) => roomMessage.id === incomingMessage.id)) {
+            return store;
         }
 
         return {
@@ -134,7 +139,7 @@ export default function Index(){
     useEffect(() => {
         let cancelled = false;
 
-        const syncUserProfile = async () => {
+        const syncCurrentUser = async () => {
             try {
                 const currentUser = await getCurrentUser();
 
@@ -158,9 +163,7 @@ export default function Index(){
                     return;
                 }
 
-                const mappedFriends = friendList.map(mapFriendSummary);
-                setFriends(mappedFriends);
-                setActiveChatId(mappedFriends[0]?.id ?? 0);
+                setFriends(friendList.map(mapFriendSummary));
             } catch (error) {
                 console.error('获取好友列表失败:', error);
                 setFriends(MOCK_FRIENDS);
@@ -175,17 +178,7 @@ export default function Index(){
                     return;
                 }
 
-                const mappedRooms = roomList.map((room) => ({
-                    id: room.room_id,
-                    name: room.name,
-                    avatar: room.avatar || DEFAULT_AVATAR,
-                    lastMessage: room.last_message || '[最近暂无消息]',
-                    lastTime: room.last_time ? new Date(room.last_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '刚刚',
-                    unreadCount: room.unread_count,
-                    otherUserId: room.other_user_id ?? null,
-                    status: undefined,
-                }));
-
+                const mappedRooms = roomList.map(mapChatRoom);
                 setChatRooms(mappedRooms);
                 setActiveChatId((currentActiveChatId) => currentActiveChatId || mappedRooms[0]?.id || 0);
             } catch (error) {
@@ -194,7 +187,46 @@ export default function Index(){
             }
         };
 
-        void syncUserProfile();
+        const token = tokenUtils.getToken();
+        if (token) {
+            const client = createChatWebSocketClient({
+                backendUrl: BACKENDURL,
+                token,
+                autoReconnect: true,
+                reconnectDelayMs: 3000,
+            });
+
+            socketRef.current = client;
+
+            const unsubscribeMessage = client.onMessage((event) => {
+                if (event.type !== 'new_message') {
+                    return;
+                }
+
+                const incomingMsg = formatIncomingMessage(event.data);
+                setMessageStore((prev) => mergeMessageStore(prev, incomingMsg));
+            });
+
+            const unsubscribeStatus = client.onStatusChange((status) => {
+                console.log('WebSocket status:', status);
+            });
+
+            client.connect();
+
+            void syncCurrentUser();
+            void syncFriendList();
+            void syncChatRooms();
+
+            return () => {
+                cancelled = true;
+                unsubscribeMessage();
+                unsubscribeStatus();
+                client.disconnect();
+                socketRef.current = null;
+            };
+        }
+
+        void syncCurrentUser();
         void syncFriendList();
         void syncChatRooms();
 
@@ -202,64 +234,8 @@ export default function Index(){
             cancelled = true;
         };
     }, []);
-    const [friends, setFriends] = useState<User[]>([]);
-
-    const { messages, isConnected, sendMessage } = useChatWebSocket();
-    void messages; void isConnected; void sendMessage; //暂未接入ui，防止报错
-
-    useEffect(() => {
-        getCurrentUser()
-            .then(user => {
-                setUserName(user.username);
-                setMyAvatar(user.avatar || DEFAULT_AVATAR);
-            })
-            .catch(err => console.log('获取用户信息失败: ', err))
-
-        const client = createChatWebSocketClient({
-            backendUrl: BACKENDURL,
-            token,
-            autoReconnect: true,
-            reconnectDelayMs: 3000,
-        });
-
-        getFriendList().then(setFriends);
-
-        socketRef.current = client;
-
-        const unsubscribeMessage = client.onMessage((event) => {
-            if (event.type !== 'new_message') {
-                return;
-            }
-
-            const incomingMsg = formatIncomingMessage({
-                id: event.data.id,
-                conversation_id: event.data.conversation_id,
-                sender_id: event.data.sender_id,
-                content: event.data.content,
-                created_at: event.data.created_at,
-            });
-
-            setMessageStore((prev) => {
-                return mergeMessageStore(prev, incomingMsg);
-            });
-        });
-
-        const unsubscribeStatus = client.onStatusChange((status) => {
-            console.log('WebSocket status:', status);
-        });
-
-        client.connect();
-
-        return () => {
-            unsubscribeMessage();
-            unsubscribeStatus();
-            client.disconnect();
-            socketRef.current = null;
-        };
-    }, []);
 
     const chatListData: ChatListItem[] = chatRooms;
-
     const messages = messageStore[activeChatId] ?? [];
 
     useEffect(() => {
@@ -293,31 +269,21 @@ export default function Index(){
         };
     }, [activeChatId]);
 
-    function chatClicked(){
-        setActiveTab('chat');
-    }
-    function contactsClicked(){
-        setActiveTab('contacts')
-    }
-    function configClicked(){
-        setActiveTab('settings')
-        setIsSettingsOpen(true);
-    }
-
     const handleLogout = () => {
-        const isConfirmed = globalThis.confirm('确认要退出登录吗？')
-        if(isConfirmed){
-            socketRef.current?.disconnect();
-            localStorage.removeItem('token')
-            globalThis.location.href = '/login';
+        const isConfirmed = globalThis.confirm('确认要退出登录吗？');
+        if (!isConfirmed) {
+            return;
         }
+
+        socketRef.current?.disconnect();
+        tokenUtils.removeToken();
+        globalThis.location.reload();
     };
 
     const activeChat = chatListData.find((chat) => chat.id === activeChatId);
 
     const handleSendMessage = (content: string) => {
-        if(!socketRef.current){
-            console.error('WebSocket Not Connected');
+        if (!socketRef.current || !activeChatId || !content.trim()) {
             return;
         }
 
@@ -325,7 +291,7 @@ export default function Index(){
             type: 'send_message',
             data: {
                 conversation_id: activeChatId,
-                content: content,
+                content,
             },
         });
     };
@@ -347,22 +313,25 @@ export default function Index(){
                     <nav className="nav-menu">
                         <button
                             className={`nav-button ${activeTab === 'chat' ? 'active-button' : ''}`}
-                            onClick={chatClicked}
+                            onClick={() => setActiveTab('chat')}
                         >
-                            <img src={CHATICON} alt='chat-icon' />
+                            <img src={CHATICON} alt="chat-icon" />
                         </button>
                         <button
                             className={`nav-button ${activeTab === 'contacts' ? 'active-button' : ''}`}
-                            onClick={contactsClicked}
+                            onClick={() => setActiveTab('contacts')}
                         >
                             <img src={CONTACTICON} alt="contact-icon" />
                         </button>
                     </nav>
                 </div>
                 <div className="nav-bottom">
-                    <button 
+                    <button
                         className={`nav-button ${activeTab === 'settings' ? 'active-button' : ''}`}
-                        onClick={configClicked}
+                        onClick={() => {
+                            setActiveTab('settings');
+                            setIsSettingsOpen(true);
+                        }}
                     >
                         <img src={CONFIGICON} alt="config-icon" />
                     </button>
@@ -372,41 +341,44 @@ export default function Index(){
             {isSettingsOpen && (
                 <div className="overlay">
                     <div className="config-panel">
-                        <button className="config-button" onClick={() => setIsSettingsOpen(false)}>关闭</button>
+                        <button className="config-button" onClick={() => setIsSettingsOpen(false)}>
+                            关闭
+                        </button>
                         <button className="config-button">个人资料</button>
                         <button className="config-button">修改设置</button>
                         <button className="config-button">切换账号</button>
-                        <button className="config-button log-out-item" onClick={handleLogout}>退出登录</button>
+                        <button className="config-button log-out-item" onClick={handleLogout}>
+                            退出登录
+                        </button>
                     </div>
                 </div>
             )}
 
             <div className="list-area">
                 {activeTab === 'chat' && (
-                    <ChatList 
+                    <ChatList
                         chats={chatListData}
                         activeId={activeChatId}
                         onChatClick={(chat) => {
                             setActiveChatId(chat.id);
                             setActiveTab('chat');
-                            console.log('选中聊天:', chat.name);
                         }}
                     />
-                    
                 )}
                 {activeTab === 'contacts' && (
                     <ContactList
                         friends={friends}
                         groups={MOCK_GROUPS}
                         onItemClick={(item, type) => {
-                            console.log(item, type);
-                            if (type === 'user') {
-                                const matchedRoom = chatRooms.find((room) => room.otherUserId === item.id);
-                                if (matchedRoom) {
-                                    setActiveChatId(matchedRoom.id);
-                                }
-                                setActiveTab('chat');
+                            if (type !== 'user') {
+                                return;
                             }
+
+                            const matchedRoom = chatRooms.find((room) => room.otherUserId === item.id);
+                            if (matchedRoom) {
+                                setActiveChatId(matchedRoom.id);
+                            }
+                            setActiveTab('chat');
                         }}
                     />
                 )}
@@ -428,7 +400,6 @@ export default function Index(){
                     </div>
                 )}
             </main>
-            
         </div>
-    )
+    );
 }
