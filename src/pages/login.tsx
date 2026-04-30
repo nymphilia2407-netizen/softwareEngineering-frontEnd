@@ -79,17 +79,25 @@ export default function Login({ onLogInSuccess }: LoginProps){
 
         try{
             if(!isLogin){
-                    // 需要完善：信息的本地存储
                 const response = await registerApi({
                         username: data.username,
                         email: data.email,
                         password: data.password
                     });
                 
-                if (response.code === 0 && response.data) {
+                if (response.code === 0) {
+                    const loginResponse = await loginApi({
+                        email: data.email,
+                        password: data.password
+                    });
+
+                    if (loginResponse.code === 0 && loginResponse.data) {
                         alert('注册成功！');
-                        tokenUtils.setToken(response.data.token);
+                        tokenUtils.setToken(loginResponse.data.token);
                         onLogInSuccess();
+                    } else {
+                        alert(loginResponse.info || '注册成功，但自动登录失败');
+                    }
                 } else {
                         alert(response.info || '注册失败');  // 用 response.info
                 }
