@@ -8,4 +8,5 @@ export const CHATICON = chatIcon;
 export const CONTACTICON = contactIcon;
 export const CONFIGICON = configIcon;
 
-export const BACKENDURL = "http://127.0.0.1:8000/"
+// 与 request 保持一致：优先环境变量，兜底本地
+export const BACKENDURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:80';
