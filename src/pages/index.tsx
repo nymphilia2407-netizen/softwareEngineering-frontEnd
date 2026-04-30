@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import ContactList from '../components/contactList'
 import ChatList from "../components/chatList";
@@ -6,8 +6,8 @@ import ChatWindow from "../components/chatWindow";
 
 import { getCurrentUser } from "../api/user";
 import { getFriendList } from "../api/friend";
-import { createChatWebSocketClient, type ChatWebSocketClient } from "../services/websocket";
-import type { Message, User, Group } from "../types/entity";
+import { createChatWebSocketClient, type ChatWebSocketClient, type ChatIncomingMessage } from "../services/websocket";
+import type { Message, User } from "../types/entity";
 import type { ActiveTabType } from "../types/ui";
 
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON, BACKENDURL } from "../constants/string";
@@ -39,7 +39,7 @@ const decodeTokenPayload = () => {
     }
 
     try {
-        const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const normalizedPayload = payload.replaceAll('-', '+').replaceAll('_', '/');
         const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
         return JSON.parse(atob(paddedPayload)) as { user_id?: number; username?: string };
     } catch {
@@ -47,7 +47,7 @@ const decodeTokenPayload = () => {
     }
 };
 
-const formatIncomingMessage = (message: { id: number; conversation_id: number; sender_id: number; content: string; created_at: string; }): Message => {
+const formatIncomingMessage = (message: ChatIncomingMessage): Message => {
     const timestamp = new Date(message.created_at).getTime();
 
     return {
@@ -95,11 +95,21 @@ export default function Index(){
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
-    const activeChatIdRef = useRef<number>(activeChatId);
 
-    useEffect(() => {
-        activeChatIdRef.current = activeChatId;
-    }, [activeChatId]);
+    const mergeMessageStore = (store: Record<number, Message[]>, incomingMessage: Message) => {
+        const roomMessages = store[incomingMessage.convId] ?? [];
+
+        for (const roomMessage of roomMessages) {
+            if (roomMessage.id === incomingMessage.id) {
+                return store;
+            }
+        }
+
+        return {
+            ...store,
+            [incomingMessage.convId]: [...roomMessages, incomingMessage].sort((left, right) => left.timestamp - right.timestamp),
+        };
+    };
 
     useEffect(() => {
         let cancelled = false;
@@ -128,10 +138,13 @@ export default function Index(){
                     return;
                 }
 
-                setFriends(friendList.map(mapFriendSummary));
+                const mappedFriends = friendList.map(mapFriendSummary);
+                setFriends(mappedFriends);
+                setActiveChatId(mappedFriends[0]?.id ?? MOCK_GROUPS[0]?.id ?? 0);
             } catch (error) {
                 console.error('获取好友列表失败:', error);
                 setFriends(MOCK_FRIENDS);
+                setActiveChatId(MOCK_FRIENDS[0]?.id ?? MOCK_GROUPS[0]?.id ?? 0);
             }
         };
 
@@ -142,12 +155,6 @@ export default function Index(){
             cancelled = true;
         };
     }, []);
-
-    useEffect(() => {
-        if (!activeChatId && chatListData.length > 0) {
-            setActiveChatId(chatListData[0].id);
-        }
-    }, [activeChatId]);
 
     useEffect(() => {
         const token = localStorage.getItem('token');
@@ -179,16 +186,7 @@ export default function Index(){
             });
 
             setMessageStore((prev) => {
-                const roomMessages = prev[incomingMsg.convId] ?? [];
-
-                if (roomMessages.some((item) => item.id === incomingMsg.id)) {
-                    return prev;
-                }
-
-                return {
-                    ...prev,
-                    [incomingMsg.convId]: [...roomMessages, incomingMsg].sort((a, b) => a.timestamp - b.timestamp),
-                };
+                return mergeMessageStore(prev, incomingMsg);
             });
         });
 
@@ -206,42 +204,28 @@ export default function Index(){
         };
     }, []);
 
-    const chatListData = useMemo<ChatListItem[]>(() => {
-        const friendsChat = friends.map(friend => ({
+    const chatListData: ChatListItem[] = [
+        ...friends.map((friend) => ({
             id: friend.id,
             name: friend.username,
             avatar: friend.avatar,
             lastMessage: '[最近暂无消息]',
             lastTime: '12:00',
             unreadCount: 0,
-            type: 'user' as const,
             status: friend.status,
-        }));
-
-        const groupsChat = MOCK_GROUPS.map(group => ({
+        })),
+        ...MOCK_GROUPS.map((group) => ({
             id: group.id,
             name: group.groupname,
             avatar: group.avatar,
             lastMessage: '群聊暂无新动态',
             lastTime: '昨天',
             unreadCount: 0,
-            type: 'group' as const,
-        }));
-
-        return [...friendsChat, ...groupsChat];
-    }, [friends]);
-
-    useEffect(() => {
-        if (!activeChatId && chatListData.length > 0) {
-            setActiveChatId(chatListData[0].id);
-        }
-    }, [activeChatId, chatListData]);
+        })),
+    ];
 
     const messages = messageStore[activeChatId] ?? [];
 
-    /**
-     * @todo 增加跳转到显示按钮相应组件的功能(完成相应组件)
-     */
     function chatClicked(){
         setActiveTab('chat');
     }
@@ -254,17 +238,15 @@ export default function Index(){
     }
 
     const handleLogout = () => {
-        const isConfirmed = window.confirm('确认要退出登录吗？')
+        const isConfirmed = globalThis.confirm('确认要退出登录吗？')
         if(isConfirmed){
             socketRef.current?.disconnect();
             localStorage.removeItem('token')
-            window.location.href = '/login';
+            globalThis.location.href = '/login';
         }
     };
 
-    const activeChat = useMemo(() => {
-        return chatListData.find(chat => chat.id === activeChatId);
-    }, [activeChatId, chatListData]);
+    const activeChat = chatListData.find((chat) => chat.id === activeChatId);
 
     const handleSendMessage = (content: string) => {
         if(!socketRef.current){
@@ -293,7 +275,7 @@ export default function Index(){
             <aside className="side-bar">
                 <div className="nav-top">
                     <div className="user-avatar">
-                        <img src={myAvatar} alt="myAvatar" />
+                        <img src={myAvatar} alt="myAvatar" title={userName || '当前用户'} />
                     </div>
                     <nav className="nav-menu">
                         <button
@@ -321,8 +303,9 @@ export default function Index(){
             </aside>
 
             {isSettingsOpen && (
-                <div className="overlay" onClick={() => setIsSettingsOpen(false)}>
-                    <div className="config-panel" onClick={(e) => e.stopPropagation()}>
+                <div className="overlay">
+                    <div className="config-panel">
+                        <button className="config-button" onClick={() => setIsSettingsOpen(false)}>关闭</button>
                         <button className="config-button">个人资料</button>
                         <button className="config-button">修改设置</button>
                         <button className="config-button">切换账号</button>

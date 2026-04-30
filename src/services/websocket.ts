@@ -1,4 +1,4 @@
-import type { WsAction, WsResponse } from '../types/entity';
+import type { WsAction } from '../types/entity';
 
 export interface ChatWebSocketOptions {
     backendUrl: string;
@@ -7,7 +7,21 @@ export interface ChatWebSocketOptions {
     reconnectDelayMs?: number;
 }
 
-export type ChatSocketEvent = WsResponse | {
+export interface ChatIncomingMessage {
+    id: number;
+    conversation_id: number;
+    sender_id: number;
+    content: string;
+    created_at: string;
+}
+
+export type ChatSocketEvent = {
+    type: 'new_message';
+    data: ChatIncomingMessage;
+} | {
+    type: 'error';
+    message: string;
+} | {
     type: 'init';
     data: {
         message: string;
@@ -32,7 +46,11 @@ export class ChatWebSocketClient {
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private manualClose = false;
 
-    constructor(private readonly options: ChatWebSocketOptions) {}
+    private readonly options: ChatWebSocketOptions;
+
+    constructor(options: ChatWebSocketOptions) {
+        this.options = options;
+    }
 
     connect() {
         if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
@@ -113,7 +131,7 @@ export class ChatWebSocketClient {
     }
 
     private flushPendingPayloads() {
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        if (this.socket?.readyState !== WebSocket.OPEN) {
             return;
         }
 
