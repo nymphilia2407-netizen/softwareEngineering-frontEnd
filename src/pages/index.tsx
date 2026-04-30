@@ -4,7 +4,10 @@ import ContactList from '../components/contactList'
 import ChatList from "../components/chatList";
 import ChatWindow from "../components/chatWindow";
 
-import type { Message, WsAction, WsResponse } from "../types/entity";
+import { getCurrentUser } from "../api/user";
+import { getFriendList } from "../api/friend";
+import { createChatWebSocketClient, type ChatWebSocketClient } from "../services/websocket";
+import type { Message, User, Group } from "../types/entity";
 import type { ActiveTabType } from "../types/ui";
 
 import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON, BACKENDURL } from "../constants/string";
@@ -14,75 +17,227 @@ import '../styles/index.css'
 // 模拟数据
 import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock'
 
+interface ChatListItem {
+    id: number;
+    name: string;
+    avatar: string;
+    lastMessage: string;
+    lastTime: string;
+    unreadCount: number;
+    status?: 'online' | 'offline' | 'busy';
+}
+
+const decodeTokenPayload = () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+        return null;
+    }
+
+    const payload = token.split('.')[1];
+    if (!payload) {
+        return null;
+    }
+
+    try {
+        const normalizedPayload = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
+        return JSON.parse(atob(paddedPayload)) as { user_id?: number; username?: string };
+    } catch {
+        return null;
+    }
+};
+
+const formatIncomingMessage = (message: { id: number; conversation_id: number; sender_id: number; content: string; created_at: string; }): Message => {
+    const timestamp = new Date(message.created_at).getTime();
+
+    return {
+        id: message.id,
+        convId: message.conversation_id,
+        senderId: message.sender_id,
+        type: 'text',
+        status: 'sent',
+        content: message.content,
+        timestamp,
+        time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+};
+
+const mapFriendSummary = (friend: { user_id: number; username: string; avatar?: string; status?: 'online' | 'offline' | 'busy'; }): User => ({
+    id: friend.user_id,
+    username: friend.username,
+    avatar: friend.avatar ?? DEFAULT_AVATAR,
+    status: friend.status ?? 'online',
+    registerTime: Date.now(),
+    lastLoginTime: Date.now(),
+});
+
 export default function Index(){
-    const [currentUserId, setCurrentUserId] = useState<number>(0)
-    const [userName, setUserName] = useState<string>('');
-    const [myAvatar, setMyAvatar] = useState<string>(DEFAULT_AVATAR);
+    const tokenPayload = decodeTokenPayload();
+    const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0)
+    const [userName, setUserName] = useState<string>(tokenPayload?.username ?? '');
+    const [myAvatar, setMyAvatar] = useState<string>(() => {
+        const storedProfile = localStorage.getItem('user_profile');
+        if (!storedProfile) {
+            return DEFAULT_AVATAR;
+        }
+
+        try {
+            const parsed = JSON.parse(storedProfile) as { avatar?: string };
+            return parsed.avatar ?? DEFAULT_AVATAR;
+        } catch {
+            return DEFAULT_AVATAR;
+        }
+    });
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [activeChatId, setActiveChatId] = useState<number>(0);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [friends, setFriends] = useState<User[]>(MOCK_FRIENDS);
+    const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
 
-    const socketRef = useRef<WebSocket | null>(null);
+    const socketRef = useRef<ChatWebSocketClient | null>(null);
+    const activeChatIdRef = useRef<number>(activeChatId);
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
-        if(!token){
-            return;
-        }
-        
-        const wsBase = BACKENDURL.replace('http', 'ws');
-        const wsUrl = `${wsBase}/ws/chat/?token=${token}`
-        const ws = new WebSocket(wsUrl);
-        socketRef.current = ws;
+        activeChatIdRef.current = activeChatId;
+    }, [activeChatId]);
 
-        ws.onopen = () => console.log("WebSocket Connected")
+    useEffect(() => {
+        let cancelled = false;
 
-        ws.onmessage = (event) => {
-            const res = JSON.parse(event.data);
+        const syncUserProfile = async () => {
+            try {
+                const currentUser = await getCurrentUser();
 
-            if(res.type === 'new_message'){
-                const incomingMsg = res.data;
-                if(incomingMsg.conversation_id === activeChatId){
-                    setMessages(prev => [...prev, {
-                        ...incomingMsg,
-                        time: new Date(incomingMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    }])
+                if (cancelled) {
+                    return;
                 }
+
+                setCurrentUserId(currentUser.user_id);
+                setUserName(currentUser.username);
+                setMyAvatar(currentUser.avatar || DEFAULT_AVATAR);
+            } catch (error) {
+                console.error('获取当前用户失败:', error);
             }
         };
 
-        ws.onclose = () => console.log('WebSocket Disconnected');
+        const syncFriendList = async () => {
+            try {
+                const friendList = await getFriendList();
+
+                if (cancelled) {
+                    return;
+                }
+
+                setFriends(friendList.map(mapFriendSummary));
+            } catch (error) {
+                console.error('获取好友列表失败:', error);
+                setFriends(MOCK_FRIENDS);
+            }
+        };
+
+        void syncUserProfile();
+        void syncFriendList();
 
         return () => {
-            ws.close();
+            cancelled = true;
         };
+    }, []);
+
+    useEffect(() => {
+        if (!activeChatId && chatListData.length > 0) {
+            setActiveChatId(chatListData[0].id);
+        }
     }, [activeChatId]);
 
-    const chatListData = useMemo(() => {
-        const friendsChat = MOCK_FRIENDS.map(f => ({
-            id: f.id,
-            name: f.username,
-            avatar: f.avatar,
-            lastMessage: "[最近暂无消息]", // 实际开发应从后端获取
-            lastTime: "12:00",
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+
+        if (!token) {
+            return;
+        }
+
+        const client = createChatWebSocketClient({
+            backendUrl: BACKENDURL,
+            token,
+            autoReconnect: true,
+            reconnectDelayMs: 3000,
+        });
+
+        socketRef.current = client;
+
+        const unsubscribeMessage = client.onMessage((event) => {
+            if (event.type !== 'new_message') {
+                return;
+            }
+
+            const incomingMsg = formatIncomingMessage({
+                id: event.data.id,
+                conversation_id: event.data.conversation_id,
+                sender_id: event.data.sender_id,
+                content: event.data.content,
+                created_at: event.data.created_at,
+            });
+
+            setMessageStore((prev) => {
+                const roomMessages = prev[incomingMsg.convId] ?? [];
+
+                if (roomMessages.some((item) => item.id === incomingMsg.id)) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    [incomingMsg.convId]: [...roomMessages, incomingMsg].sort((a, b) => a.timestamp - b.timestamp),
+                };
+            });
+        });
+
+        const unsubscribeStatus = client.onStatusChange((status) => {
+            console.log('WebSocket status:', status);
+        });
+
+        client.connect();
+
+        return () => {
+            unsubscribeMessage();
+            unsubscribeStatus();
+            client.disconnect();
+            socketRef.current = null;
+        };
+    }, []);
+
+    const chatListData = useMemo<ChatListItem[]>(() => {
+        const friendsChat = friends.map(friend => ({
+            id: friend.id,
+            name: friend.username,
+            avatar: friend.avatar,
+            lastMessage: '[最近暂无消息]',
+            lastTime: '12:00',
             unreadCount: 0,
             type: 'user' as const,
-            status: f.status
+            status: friend.status,
         }));
 
-        const groupsChat = MOCK_GROUPS.map(g => ({
-            id: g.id,
-            name: g.groupname,
-            avatar: g.avatar,
-            lastMessage: "群聊暂无新动态",
-            lastTime: "昨天",
+        const groupsChat = MOCK_GROUPS.map(group => ({
+            id: group.id,
+            name: group.groupname,
+            avatar: group.avatar,
+            lastMessage: '群聊暂无新动态',
+            lastTime: '昨天',
             unreadCount: 0,
-            type: 'group' as const
+            type: 'group' as const,
         }));
 
         return [...friendsChat, ...groupsChat];
-    }, []);
+    }, [friends]);
+
+    useEffect(() => {
+        if (!activeChatId && chatListData.length > 0) {
+            setActiveChatId(chatListData[0].id);
+        }
+    }, [activeChatId, chatListData]);
+
+    const messages = messageStore[activeChatId] ?? [];
 
     /**
      * @todo 增加跳转到显示按钮相应组件的功能(完成相应组件)
@@ -101,7 +256,8 @@ export default function Index(){
     const handleLogout = () => {
         const isConfirmed = window.confirm('确认要退出登录吗？')
         if(isConfirmed){
-            localStorage.removeItem("token")
+            socketRef.current?.disconnect();
+            localStorage.removeItem('token')
             window.location.href = '/login';
         }
     };
@@ -111,41 +267,25 @@ export default function Index(){
     }, [activeChatId, chatListData]);
 
     const handleSendMessage = (content: string) => {
-        if(!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN){
+        if(!socketRef.current){
             console.error('WebSocket Not Connected');
             return;
         }
 
-        const playload = {
+        socketRef.current.send({
             type: 'send_message',
             data: {
                 conversation_id: activeChatId,
-                content: content
-            }
-        };
-
-        socketRef.current.send(JSON.stringify(playload));
-
-        const tempMsg: Message = {
-            id: Date.now(), //临时id
-            senderId: currentUserId,
-            convId: activeChatId,
-            content: content,
-            type: 'text',
-            status: 'sending',
-            timestamp: Date.now(),
-            time: new Date().toLocaleDateString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        setMessages(prev => [...prev, tempMsg]);
+                content: content,
+            },
+        });
     };
 
     const handleReadMessage = (convId: number, lastMsgId: number) => {
-        if(socketRef.current?.readyState === WebSocket.OPEN){
-            socketRef.current.send(JSON.stringify({
-                type: "read_message",
-                data: { conversation_id: convId, last_message_id: lastMsgId }
-            }));
-        }
+        socketRef.current?.send({
+            type: 'read_message',
+            data: { conversation_id: convId, last_message_id: lastMsgId },
+        });
     };
 
     return (
@@ -198,6 +338,7 @@ export default function Index(){
                         activeId={activeChatId}
                         onChatClick={(chat) => {
                             setActiveChatId(chat.id);
+                            setActiveTab('chat');
                             console.log('选中聊天:', chat.name);
                         }}
                     />
@@ -205,9 +346,15 @@ export default function Index(){
                 )}
                 {activeTab === 'contacts' && (
                     <ContactList
-                        friends={MOCK_FRIENDS}
+                        friends={friends}
                         groups={MOCK_GROUPS}
-                        onItemClick={(item, type) => console.log(item, type)}
+                        onItemClick={(item, type) => {
+                            console.log(item, type);
+                            if (type === 'user') {
+                                setActiveChatId(item.id);
+                                setActiveTab('chat');
+                            }
+                        }}
                     />
                 )}
             </div>
