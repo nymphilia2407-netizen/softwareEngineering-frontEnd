@@ -197,6 +197,116 @@
     white-space: nowrap;
 }
 
+.friend-request-panel {
+    margin: 0 16px 12px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.friend-request-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.friend-request-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.friend-request-subtitle {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 2px;
+}
+
+.friend-request-close-button,
+.friend-request-accept-button,
+.friend-request-reject-button {
+    border: none;
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.friend-request-close-button {
+    background: #e2e8f0;
+    color: #0f172a;
+    flex-shrink: 0;
+}
+
+.friend-request-hint {
+    font-size: 12px;
+    color: #475569;
+}
+
+.friend-request-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 230px;
+    overflow-y: auto;
+}
+
+.friend-request-empty {
+    padding: 14px 12px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.04);
+    font-size: 13px;
+}
+
+.friend-request-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+        color: #020617;
+}
+
+.friend-request-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.friend-request-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.friend-request-time {
+    font-size: 12px;
+    color: #475569;
+}
+
+.friend-request-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.friend-request-accept-button {
+    background: #0f172a;
+    color: #fff;
+}
+
+.friend-request-reject-button {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
 .create-group-field {
     display: flex;
     flex-direction: column;

@@ -13,6 +13,15 @@ export interface UserSearchData {
     avatar?: string;
 }
 
+export interface ReceivedFriendRequestData {
+    request_id: number;
+    from_user: {
+        user_id: number;
+        username: string;
+    };
+    created_at: string;
+}
+
 interface ApiResponse<T> {
     code: number;
     info: string;
@@ -49,6 +58,36 @@ export const sendFriendRequest = async (targetUserId: number) => {
 
     if (response.code !== 0) {
         throw new Error(response.info || '发送好友请求失败');
+    }
+
+    return true;
+};
+
+export const getReceivedFriendRequests = async () => {
+    const response = await request.get<any, ApiResponse<ReceivedFriendRequestData[]>>('/api/friends/requests');
+
+    if (response.code !== 0 || !response.data) {
+        throw new Error(response.info || '获取好友请求失败');
+    }
+
+    return response.data;
+};
+
+export const acceptFriendRequest = async (requestId: number) => {
+    const response = await request.post<any, ApiResponse<null>>(`/api/friends/requests/${requestId}/accept`);
+
+    if (response.code !== 0) {
+        throw new Error(response.info || '接受好友请求失败');
+    }
+
+    return true;
+};
+
+export const rejectFriendRequest = async (requestId: number) => {
+    const response = await request.post<any, ApiResponse<null>>(`/api/friends/requests/${requestId}/reject`);
+
+    if (response.code !== 0) {
+        throw new Error(response.info || '拒绝好友请求失败');
     }
 
     return true;

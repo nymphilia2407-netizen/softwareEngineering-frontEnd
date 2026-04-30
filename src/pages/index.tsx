@@ -468,6 +468,16 @@ export default function Index() {
         globalThis.location.reload();
     };
 
+    const refreshFriendsAndRooms = async () => {
+        try {
+            const [friendList, roomList] = await Promise.all([getFriendList(), getChatRooms()]);
+            setFriends(friendList.map(mapFriendSummary));
+            setChatRooms(roomList.map(mapChatRoom));
+        } catch (error) {
+            console.error('刷新好友或会话失败:', error);
+        }
+    };
+
     const handleSendMessage = (content: string) => {
         if (!socketRef.current || !activeChatId || !content.trim()) {
             return;
@@ -698,6 +708,7 @@ export default function Index() {
                             setActiveTab('chat');
                         }}
                         onCreateGroup={handleCreateGroup}
+                        onContactsChanged={refreshFriendsAndRooms}
                     />
                 )}
             </div>

@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { type User, type Group } from '../types/entity'
-import { searchUsers, sendFriendRequest, type UserSearchData } from '../services/friend'
+import {
+    acceptFriendRequest,
+    getReceivedFriendRequests,
+    rejectFriendRequest,
+    searchUsers,
+    sendFriendRequest,
+    type ReceivedFriendRequestData,
+    type UserSearchData,
+} from '../services/friend'
 
 import '../styles/contactList.css'
 
@@ -15,19 +23,24 @@ interface ContactsProps{
     readonly groups: Group[];
     readonly onItemClick: (item: User | Group, type: 'user' | 'group') => void;
     readonly onCreateGroup: (values: CreateGroupFormValues) => Promise<void> | void;
+    readonly onContactsChanged?: () => Promise<void> | void;
 }
 
 export default function ContactList(props: Readonly<ContactsProps>) {
-    const { friends, groups, onItemClick, onCreateGroup } = props;
+    const { friends, groups, onItemClick, onCreateGroup, onContactsChanged } = props;
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<boolean>(false);
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState<boolean>(false);
     const [isAddFriendOpen, setIsAddFriendOpen] = useState<boolean>(false);
+    const [isFriendRequestsOpen, setIsFriendRequestsOpen] = useState<boolean>(false);
     const [friendKeyword, setFriendKeyword] = useState<string>('');
     const [searchResults, setSearchResults] = useState<UserSearchData[]>([]);
     const [searching, setSearching] = useState<boolean>(false);
     const [sendingFriendId, setSendingFriendId] = useState<number | null>(null);
     const [friendHint, setFriendHint] = useState<string>('');
+    const [receivedRequests, setReceivedRequests] = useState<ReceivedFriendRequestData[]>([]);
+    const [requestLoading, setRequestLoading] = useState<boolean>(false);
+    const [requestActionId, setRequestActionId] = useState<number | null>(null);
     const [groupName, setGroupName] = useState<string>('');
     const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
     const actionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -49,6 +62,39 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             document.removeEventListener('mousedown', handleDocumentClick);
         };
     }, []);
+
+    useEffect(() => {
+        if (!isFriendRequestsOpen) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadRequests = async () => {
+            setRequestLoading(true);
+
+            try {
+                const requests = await getReceivedFriendRequests();
+                if (!cancelled) {
+                    setReceivedRequests(requests);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setFriendHint(error instanceof Error ? error.message : '获取好友请求失败');
+                }
+            } finally {
+                if (!cancelled) {
+                    setRequestLoading(false);
+                }
+            }
+        };
+
+        void loadRequests();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isFriendRequestsOpen]);
 
     const filteredFriends = friends.filter(f =>
         f.username.toLowerCase().includes(searchQuery.toLowerCase())
@@ -106,6 +152,77 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         }
     };
 
+    const handleAcceptRequest = async (requestId: number) => {
+        setRequestActionId(requestId);
+        setFriendHint('');
+
+        try {
+            await acceptFriendRequest(requestId);
+            setReceivedRequests((current) => current.filter((request) => request.request_id !== requestId));
+            setFriendHint('已接受好友请求');
+            await onContactsChanged?.();
+        } catch (error) {
+            setFriendHint(error instanceof Error ? error.message : '接受好友请求失败');
+        } finally {
+            setRequestActionId(null);
+        }
+    };
+
+    const handleRejectRequest = async (requestId: number) => {
+        setRequestActionId(requestId);
+        setFriendHint('');
+
+        try {
+            await rejectFriendRequest(requestId);
+            setReceivedRequests((current) => current.filter((request) => request.request_id !== requestId));
+            setFriendHint('已拒绝好友请求');
+            await onContactsChanged?.();
+        } catch (error) {
+            setFriendHint(error instanceof Error ? error.message : '拒绝好友请求失败');
+        } finally {
+            setRequestActionId(null);
+        }
+    };
+
+    let friendRequestContent: ReactNode;
+
+    if (requestLoading) {
+        friendRequestContent = <div className='friend-request-empty'>加载中...</div>;
+    } else if (receivedRequests.length === 0) {
+        friendRequestContent = <div className='friend-request-empty'>暂无待处理请求</div>;
+    } else {
+        friendRequestContent = (
+            <>
+                {receivedRequests.map((request) => (
+                    <div key={request.request_id} className='friend-request-item'>
+                        <div className='friend-request-meta'>
+                            <span className='friend-request-name'>{request.from_user.username}</span>
+                            <span className='friend-request-time'>{new Date(request.created_at).toLocaleString()}</span>
+                        </div>
+                        <div className='friend-request-actions'>
+                            <button
+                                type='button'
+                                className='friend-request-accept-button'
+                                onClick={() => void handleAcceptRequest(request.request_id)}
+                                disabled={requestActionId === request.request_id}
+                            >
+                                {requestActionId === request.request_id ? '处理中' : '接受'}
+                            </button>
+                            <button
+                                type='button'
+                                className='friend-request-reject-button'
+                                onClick={() => void handleRejectRequest(request.request_id)}
+                                disabled={requestActionId === request.request_id}
+                            >
+                                拒绝
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </>
+        );
+    }
+
     const handleCreateGroup = async () => {
         const trimmedGroupName = groupName.trim();
 
@@ -158,9 +275,21 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 onClick={() => {
                                     setIsActionMenuOpen(false);
                                     setIsAddFriendOpen(true);
+                                    setIsFriendRequestsOpen(false);
                                 }}
                             >
                                     添加好友
+                            </button>
+                            <button
+                                type='button'
+                                className='action-menu-item'
+                                onClick={() => {
+                                    setIsActionMenuOpen(false);
+                                    setIsFriendRequestsOpen(true);
+                                    setIsAddFriendOpen(false);
+                                }}
+                            >
+                                好友请求
                             </button>
                             <button
                                 type='button'
@@ -266,6 +395,26 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         <button type='button' className='create-group-secondary-button' onClick={() => setIsAddFriendOpen(false)}>
                             关闭
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {isFriendRequestsOpen && (
+                <div className='friend-request-panel'>
+                    <div className='friend-request-header'>
+                        <div>
+                            <div className='friend-request-title'>好友请求</div>
+                            <div className='friend-request-subtitle'>处理其他人发来的好友申请</div>
+                        </div>
+                        <button type='button' className='friend-request-close-button' onClick={() => setIsFriendRequestsOpen(false)}>
+                            关闭
+                        </button>
+                    </div>
+
+                    {friendHint && <div className='friend-request-hint'>{friendHint}</div>}
+
+                    <div className='friend-request-list'>
+                        {friendRequestContent}
                     </div>
                 </div>
             )}
