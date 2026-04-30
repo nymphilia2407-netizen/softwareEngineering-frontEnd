@@ -7,11 +7,12 @@ import ContactList from '../components/contactList';
 import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
 import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
+import { createGroup, getGroupList, type GroupSummaryData } from '../services/group';
 import { getFriendList, type FriendSummaryData } from '../services/friend';
 import { getCurrentUser } from '../services/user';
-import { createChatWebSocketClient, type ChatIncomingMessage, type ChatWebSocketClient } from '../services/websocket';
+import { createChatWebSocketClient, type ChatIncomingMessage, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { tokenUtils } from '../utils/auth';
-import type { Message, User } from '../types/entity';
+import type { Group, Message, User } from '../types/entity';
 import type { ActiveTabType } from '../types/ui';
 
 import '../styles/index.css';
@@ -97,6 +98,16 @@ const mapChatRoom = (room: ChatRoomSummaryData): ChatListItem => ({
     status: undefined,
 });
 
+const mapGroupSummary = (group: GroupSummaryData): Group => ({
+    id: group.room_id,
+    groupname: group.group_name,
+    avatar: group.avatar || DEFAULT_AVATAR,
+    ownerId: group.owner_id ?? 0,
+    adminIds: [],
+    memberCount: group.member_count,
+    createdTime: new Date(group.created_at).getTime(),
+});
+
 export default function Index() {
     const tokenPayload = decodeTokenPayload();
     const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0);
@@ -117,7 +128,9 @@ export default function Index() {
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [activeChatId, setActiveChatId] = useState<number>(0);
+    const [selectedContact, setSelectedContact] = useState<User | null>(null);
     const [friends, setFriends] = useState<User[]>(MOCK_FRIENDS);
+    const [groups, setGroups] = useState<Group[]>(MOCK_GROUPS);
     const [chatRooms, setChatRooms] = useState<ChatListItem[]>([]);
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
 
@@ -187,6 +200,21 @@ export default function Index() {
             }
         };
 
+        const syncGroupList = async () => {
+            try {
+                const groupList = await getGroupList();
+
+                if (cancelled) {
+                    return;
+                }
+
+                setGroups(groupList.map(mapGroupSummary));
+            } catch (error) {
+                console.error('获取群聊列表失败:', error);
+                setGroups(MOCK_GROUPS);
+            }
+        };
+
         const token = tokenUtils.getToken();
         if (token) {
             const client = createChatWebSocketClient({
@@ -198,7 +226,7 @@ export default function Index() {
 
             socketRef.current = client;
 
-            const unsubscribeMessage = client.onMessage((event) => {
+            const unsubscribeMessage = client.onMessage((event: ChatSocketEvent) => {
                 if (event.type !== 'new_message') {
                     return;
                 }
@@ -207,7 +235,7 @@ export default function Index() {
                 setMessageStore((prev) => mergeMessageStore(prev, incomingMsg));
             });
 
-            const unsubscribeStatus = client.onStatusChange((status) => {
+                const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
                 console.log('WebSocket status:', status);
             });
 
@@ -216,6 +244,7 @@ export default function Index() {
             void syncCurrentUser();
             void syncFriendList();
             void syncChatRooms();
+            void syncGroupList();
 
             return () => {
                 cancelled = true;
@@ -229,6 +258,7 @@ export default function Index() {
         void syncCurrentUser();
         void syncFriendList();
         void syncChatRooms();
+        void syncGroupList();
 
         return () => {
             cancelled = true;
@@ -237,6 +267,8 @@ export default function Index() {
 
     const chatListData: ChatListItem[] = chatRooms;
     const messages = messageStore[activeChatId] ?? [];
+    const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
+    const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
 
     useEffect(() => {
         if (!activeChatId) {
@@ -280,8 +312,6 @@ export default function Index() {
         globalThis.location.reload();
     };
 
-    const activeChat = chatListData.find((chat) => chat.id === activeChatId);
-
     const handleSendMessage = (content: string) => {
         if (!socketRef.current || !activeChatId || !content.trim()) {
             return;
@@ -303,6 +333,37 @@ export default function Index() {
         });
     };
 
+    const handleCreateGroup = async ({ groupName, memberIds }: { groupName: string; memberIds: number[] }) => {
+        try {
+            const createdGroup = await createGroup({
+                group_name: groupName,
+                member_ids: memberIds,
+            });
+
+            setActiveTab('chat');
+            setSelectedContact(null);
+            setActiveChatId(createdGroup.room_id);
+
+            const mappedGroup = mapGroupSummary(createdGroup);
+            setGroups((currentGroups) => [mappedGroup, ...currentGroups.filter((group) => group.id !== mappedGroup.id)]);
+            setChatRooms((currentRooms) => [
+                {
+                    id: createdGroup.room_id,
+                    name: createdGroup.group_name,
+                    avatar: createdGroup.avatar || DEFAULT_AVATAR,
+                    lastMessage: '[最近暂无消息]',
+                    lastTime: new Date(createdGroup.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    unreadCount: 0,
+                    otherUserId: null,
+                },
+                ...currentRooms.filter((room) => room.id !== createdGroup.room_id),
+            ]);
+        } catch (error) {
+            console.error('创建群聊失败:', error);
+            alert(error instanceof Error ? error.message : '创建群聊失败');
+        }
+    };
+
     return (
         <div className="main">
             <aside className="side-bar">
@@ -313,7 +374,10 @@ export default function Index() {
                     <nav className="nav-menu">
                         <button
                             className={`nav-button ${activeTab === 'chat' ? 'active-button' : ''}`}
-                            onClick={() => setActiveTab('chat')}
+                            onClick={() => {
+                                setActiveTab('chat');
+                                setSelectedContact(null);
+                            }}
                         >
                             <img src={CHATICON} alt="chat-icon" />
                         </button>
@@ -361,6 +425,7 @@ export default function Index() {
                         activeId={activeChatId}
                         onChatClick={(chat) => {
                             setActiveChatId(chat.id);
+                            setSelectedContact(null);
                             setActiveTab('chat');
                         }}
                     />
@@ -368,27 +433,32 @@ export default function Index() {
                 {activeTab === 'contacts' && (
                     <ContactList
                         friends={friends}
-                        groups={MOCK_GROUPS}
+                        groups={groups}
                         onItemClick={(item, type) => {
-                            if (type !== 'user') {
+                            if (type === 'user') {
+                                const userItem = item as User;
+                                setSelectedContact(userItem);
+                                const matchedRoom = chatRooms.find((room) => room.otherUserId === userItem.id);
+                                setActiveChatId(matchedRoom?.id ?? 0);
+                                setActiveTab('chat');
                                 return;
                             }
 
-                            const matchedRoom = chatRooms.find((room) => room.otherUserId === item.id);
-                            if (matchedRoom) {
-                                setActiveChatId(matchedRoom.id);
-                            }
+                            const groupItem = item as { id: number };
+                            setSelectedContact(null);
+                            setActiveChatId(groupItem.id);
                             setActiveTab('chat');
                         }}
+                        onCreateGroup={handleCreateGroup}
                     />
                 )}
             </div>
 
             <main className="chat-area">
-                {activeChat ? (
+                {activeChatName ? (
                     <ChatWindow
-                        activeChatId={Number(activeChat.id)}
-                        activeChatName={activeChat.name}
+                        activeChatId={activeChatId}
+                        activeChatName={activeChatName}
                         messages={messages}
                         currentUserId={currentUserId}
                         onSendMessage={handleSendMessage}

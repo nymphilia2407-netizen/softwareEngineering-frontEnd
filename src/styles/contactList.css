@@ -2,6 +2,7 @@
     width: 300px;
     height: 100%;
     background: rgba(224, 240, 255, 0.5);
+    -webkit-backdrop-filter: blur(12px);
     backdrop-filter: blur(12px);
     border-right: 1px solid rgba(0, 0, 0, 0.08);
     display: flex;
@@ -12,6 +13,16 @@
 .contacts-header {
     padding: 20px 16px 12px;
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.search-action-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .search-container input {
@@ -21,6 +32,168 @@
     border: none;
     background: rgba(0, 0, 0, 0.05);
     outline: none;
+}
+
+.action-toggle-button {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    background: #0f172a;
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-weight: 700;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+    flex-shrink: 0;
+}
+
+.action-toggle-button:hover {
+    transform: translateY(-1px);
+    opacity: 0.95;
+}
+
+.action-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 156px;
+    padding: 6px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 18px 30px rgba(0, 0, 0, 0.12);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 20;
+}
+
+.action-menu-item {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: transparent;
+    color: #0f172a;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.action-menu-item:hover {
+    background: rgba(15, 23, 42, 0.06);
+}
+
+.create-group-panel {
+    margin: 0 16px 12px;
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.create-group-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.create-group-field label,
+.create-group-label-row label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #666;
+}
+
+.create-group-field input {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.05);
+    outline: none;
+}
+
+.create-group-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.create-group-label-row span {
+    font-size: 12px;
+    color: #999;
+}
+
+.create-group-member-list-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #666;
+}
+
+.create-group-member-list {
+    max-height: 150px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 2px;
+}
+
+.create-group-member-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #0f172a;
+}
+
+.create-group-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.create-group-secondary-button,
+.create-group-primary-button {
+    border: none;
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.create-group-secondary-button {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.create-group-primary-button {
+    background: #0f172a;
+    color: #fff;
+}
+
+.contact-button {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 0;
+    text-align: left;
+    appearance: none;
+}
+
+.contact-button:focus-visible {
+    outline: 2px solid rgba(15, 23, 42, 0.28);
+    outline-offset: 2px;
+    border-radius: 10px;
 }
 
 
