@@ -1,0 +1,4 @@
+app:
+  name: frontend
+  image: registry.spring26b.secoder.net/spqr/front-end:ci-cd
+  port: 80

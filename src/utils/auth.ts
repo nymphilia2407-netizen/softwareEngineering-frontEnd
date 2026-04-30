@@ -1,3 +1,24 @@
+// token存储、提取用
+export const tokenUtils = {
+    setToken: (token: string) => {
+        localStorage.setItem('token', token);
+    },
+    
+    getToken: (): string | null => {
+        return localStorage.getItem('token');
+    },
+    
+    removeToken: () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user_profile');
+    },
+
+    // 检测是否已经有token
+    isAuthenticated: (): boolean => {
+    return !!localStorage.getItem('token');
+    }
+}
+
 export const checkPasswordStrength = (password: string) => {
     let score = 0;
     const len = password.length;

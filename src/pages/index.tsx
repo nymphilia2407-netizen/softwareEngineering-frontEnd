@@ -4,9 +4,9 @@ import ContactList from '../components/contactList'
 import ChatList from "../components/chatList";
 import ChatWindow from "../components/chatWindow";
 
-import { getCurrentUser } from "../api/user";
-import { getFriendList } from "../api/friend";
-import { getChatRooms, getChatMessages } from "../api/chat";
+import { getCurrentUser } from "../services/user";
+import { getFriendList } from "../services/friend";
+import { getChatRooms, getChatMessages } from "../services/chat";
 import { createChatWebSocketClient, type ChatWebSocketClient, type ChatIncomingMessage } from "../services/websocket";
 import type { Message, User } from "../types/entity";
 import type { ActiveTabType } from "../types/ui";
@@ -15,8 +15,10 @@ import { DEFAULT_AVATAR, CHATICON, CONTACTICON, CONFIGICON, BACKENDURL } from ".
 
 import '../styles/index.css'
 
-// 模拟数据
-import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock'
+import { useChatWebSocket } from '../services/chat';
+
+// 模拟数据（friends已经不需要）
+import { MOCK_FRIENDS ,MOCK_GROUPS } from '../mockData/contactListMock'
 
 interface ChatListItem {
     id: number;
@@ -200,13 +202,18 @@ export default function Index(){
             cancelled = true;
         };
     }, []);
+    const [friends, setFriends] = useState<User[]>([]);
+
+    const { messages, isConnected, sendMessage } = useChatWebSocket();
+    void messages; void isConnected; void sendMessage; //暂未接入ui，防止报错
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
-
-        if (!token) {
-            return;
-        }
+        getCurrentUser()
+            .then(user => {
+                setUserName(user.username);
+                setMyAvatar(user.avatar || DEFAULT_AVATAR);
+            })
+            .catch(err => console.log('获取用户信息失败: ', err))
 
         const client = createChatWebSocketClient({
             backendUrl: BACKENDURL,
@@ -214,6 +221,8 @@ export default function Index(){
             autoReconnect: true,
             reconnectDelayMs: 3000,
         });
+
+        getFriendList().then(setFriends);
 
         socketRef.current = client;
 

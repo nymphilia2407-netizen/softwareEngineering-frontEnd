@@ -1,0 +1,23 @@
+# Dependencies and build output
+node_modules
+dist
+.vite
+
+# VCS and editor artifacts
+.git
+.gitignore
+.DS_Store
+.vscode
+
+# Logs and reports
+*.log
+coverage
+
+# Local env files not needed for image build
+.env.local
+.env.development
+.env.test
+
+# CI metadata not needed in runtime image
+.gitlab-ci.yml
+README.md

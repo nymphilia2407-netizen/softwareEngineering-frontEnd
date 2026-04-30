@@ -13,6 +13,7 @@ interface ApiResponse<T> {
     data?: T;
 }
 
+/** 获取好友列表 */
 export const getFriendList = async () => {
     const response = await request.get<any, ApiResponse<FriendSummaryData[]>>('/api/friends/');
 
