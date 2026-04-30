@@ -11,6 +11,7 @@ interface ChatWindowProps{
     currentUserId: number;
     onSendMessage: (content: string) => void
     onReadMessage: (convId: number, lastMsgId: number) => void;
+    onRetryMessage?: (clientId: string) => void;
 }
 
 export default function ChatWindow({
@@ -19,7 +20,8 @@ export default function ChatWindow({
     messages,
     currentUserId,
     onSendMessage,
-    onReadMessage
+    onReadMessage,
+    onRetryMessage
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -68,6 +70,14 @@ return (
                         <div className="message-bubble">
                             <p>{msg.content}</p>
                             <span className="msg-time">{msg.time}</span>
+                            {msg.senderId === currentUserId && (
+                                <>
+                                    <span className="msg-read">{msg.isRead ? '已读' : (msg.status === 'sending' ? '发送中' : '')}</span>
+                                    {msg.status === 'failed' && msg.clientId && (
+                                        <button className="msg-retry" onClick={() => onRetryMessage?.(msg.clientId!)}>重试</button>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
                 ))}

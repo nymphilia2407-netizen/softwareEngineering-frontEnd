@@ -13,12 +13,23 @@ export interface ChatIncomingMessage {
     sender_id: number;
     content: string;
     created_at: string;
+    client_id?: string;
+}
+
+export interface ChatReadReceiptData {
+    conversation_id: number;
+    reader_id: number;
+    last_message_id: number;
 }
 
 export type ChatSocketEvent =
     | {
           type: 'new_message';
           data: ChatIncomingMessage;
+      }
+    | {
+          type: 'read_receipt';
+            data: ChatReadReceiptData;
       }
     | {
           type: 'error';

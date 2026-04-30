@@ -10,7 +10,7 @@ import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSumma
 import { createGroup, getGroupList, type GroupSummaryData } from '../services/group';
 import { getFriendList, type FriendSummaryData } from '../services/friend';
 import { getCurrentUser } from '../services/user';
-import { createChatWebSocketClient, type ChatIncomingMessage, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
+import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { tokenUtils } from '../utils/auth';
 import type { Group, Message, User } from '../types/entity';
 import type { ActiveTabType } from '../types/ui';
@@ -60,8 +60,138 @@ const formatIncomingMessage = (message: ChatIncomingMessage): Message => {
         content: message.content,
         timestamp,
         time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isRead: false,
+        clientId: message.client_id,
     };
 };
+
+const sortMessagesByTime = (messages: Message[]) => [...messages].sort((left, right) => left.timestamp - right.timestamp);
+
+const replaceOrAppendIncomingMessage = (
+    store: Record<number, Message[]>,
+    incomingMessage: Message,
+    currentUserId: number
+) => {
+    const conversationId = incomingMessage.convId;
+    const roomMessages = store[conversationId] ? [...store[conversationId]] : [];
+
+    if (incomingMessage.clientId) {
+        const matchedIndex = roomMessages.findIndex((message) => message.clientId === incomingMessage.clientId);
+
+        if (matchedIndex !== -1) {
+            roomMessages[matchedIndex] = { ...incomingMessage, status: 'sent' };
+            return {
+                nextStore: {
+                    ...store,
+                    [conversationId]: sortMessagesByTime(roomMessages),
+                },
+                consumedClientId: incomingMessage.clientId,
+            };
+        }
+    }
+
+    if (roomMessages.some((message) => message.id === incomingMessage.id)) {
+        return { nextStore: store };
+    }
+
+    return {
+        nextStore: {
+            ...store,
+            [conversationId]: sortMessagesByTime([...roomMessages, incomingMessage]),
+        },
+        fromSelf: incomingMessage.senderId === currentUserId,
+    };
+};
+
+const applyReadReceiptToMessages = (
+    store: Record<number, Message[]>,
+    receipt: ChatReadReceiptData,
+    currentUserId: number
+) => {
+    const roomMessages = store[receipt.conversation_id] ? [...store[receipt.conversation_id]] : [];
+
+    if (roomMessages.length === 0) {
+        return store;
+    }
+
+    const updatedMessages = roomMessages.map((message) => {
+        if (message.id > receipt.last_message_id) {
+            return message;
+        }
+
+        if (receipt.reader_id === currentUserId) {
+            return message.senderId === currentUserId ? message : { ...message, isRead: true };
+        }
+
+        return message.senderId === currentUserId ? { ...message, isRead: true } : message;
+    });
+
+    return {
+        ...store,
+        [receipt.conversation_id]: updatedMessages,
+    };
+};
+
+const markMessageFailedInStore = (
+    store: Record<number, Message[]>,
+    conversationId: number,
+    clientId: string
+) => ({
+    ...store,
+    [conversationId]: sortMessagesByTime(
+        (store[conversationId] ?? []).map((message) => (message.clientId === clientId ? { ...message, status: 'failed' } : message))
+    ),
+});
+
+const appendOptimisticMessage = (
+    store: Record<number, Message[]>,
+    conversationId: number,
+    message: Message
+) => ({
+    ...store,
+    [conversationId]: [...(store[conversationId] ?? []), message],
+});
+
+const updateRoomOnIncomingMessage = (
+    rooms: ChatListItem[],
+    incomingMessage: Message,
+    currentUserId: number,
+    activeChatId: number
+) => {
+    const formattedTime = new Date(incomingMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const fromSelf = incomingMessage.senderId === currentUserId;
+    const isActive = activeChatId === incomingMessage.convId;
+    const index = rooms.findIndex((room) => room.id === incomingMessage.convId);
+
+    if (index !== -1) {
+        const room = { ...rooms[index] };
+        room.lastMessage = incomingMessage.content;
+        room.lastTime = formattedTime;
+
+        if (!fromSelf && !isActive) {
+            room.unreadCount = (room.unreadCount || 0) + 1;
+        }
+
+        const remainingRooms = [...rooms.slice(0, index), ...rooms.slice(index + 1)];
+        return [room, ...remainingRooms];
+    }
+
+    return [
+        {
+            id: incomingMessage.convId,
+            name: '[新会话]',
+            avatar: DEFAULT_AVATAR,
+            lastMessage: incomingMessage.content,
+            lastTime: formattedTime,
+            unreadCount: fromSelf || isActive ? 0 : 1,
+            otherUserId: null,
+        },
+        ...rooms,
+    ];
+};
+
+const clearUnreadRoom = (rooms: ChatListItem[], conversationId: number) =>
+    rooms.map((room) => (room.id === conversationId ? { ...room, unreadCount: 0 } : room));
 
 const mapFriendSummary = (friend: FriendSummaryData): User => ({
     id: friend.user_id,
@@ -137,6 +267,7 @@ export default function Index() {
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
     const activeChatIdRef = useRef<number>(activeChatId);
+    const pendingSendTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
 
     useEffect(() => {
         currentUserIdRef.current = currentUserId;
@@ -145,19 +276,6 @@ export default function Index() {
     useEffect(() => {
         activeChatIdRef.current = activeChatId;
     }, [activeChatId]);
-
-    const mergeMessageStore = (store: Record<number, Message[]>, incomingMessage: Message) => {
-        const roomMessages = store[incomingMessage.convId] ?? [];
-
-        if (roomMessages.some((roomMessage) => roomMessage.id === incomingMessage.id)) {
-            return store;
-        }
-
-        return {
-            ...store,
-            [incomingMessage.convId]: [...roomMessages, incomingMessage].sort((left, right) => left.timestamp - right.timestamp),
-        };
-    };
 
     useEffect(() => {
         let cancelled = false;
@@ -226,6 +344,13 @@ export default function Index() {
         };
 
         const token = tokenUtils.getToken();
+
+        // 先同步当前用户/列表数据
+        void syncCurrentUser();
+        void syncFriendList();
+        void syncChatRooms();
+        void syncGroupList();
+
         if (token) {
             const client = createChatWebSocketClient({
                 backendUrl: BACKENDURL,
@@ -237,61 +362,38 @@ export default function Index() {
             socketRef.current = client;
 
             const unsubscribeMessage = client.onMessage((event: ChatSocketEvent) => {
-                if (event.type !== 'new_message') {
-                    return;
-                }
+                if (event.type === 'new_message') {
+                    const incomingMsg = formatIncomingMessage(event.data);
 
-                const incomingMsg = formatIncomingMessage(event.data);
+                    setMessageStore((prev) => {
+                        const result = replaceOrAppendIncomingMessage(prev, incomingMsg, currentUserIdRef.current);
 
-                // 合并消息到消息存储
-                setMessageStore((prev) => mergeMessageStore(prev, incomingMsg));
+                        if (result.consumedClientId) {
+                            const timer = pendingSendTimers.current[result.consumedClientId];
+                            if (timer) {
+                                clearTimeout(timer);
+                            }
 
-                // 更新会话列表：lastMessage/lastTime/unreadCount，并把会话移到最前
-                setChatRooms((prevRooms) => {
-                    const idx = prevRooms.findIndex((r) => r.id === incomingMsg.convId);
-                    const formattedTime = new Date(incomingMsg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-                    // 是否来自自己
-                    const fromSelf = incomingMsg.senderId === currentUserIdRef.current;
-                    const isActive = activeChatIdRef.current === incomingMsg.convId;
-
-                    if (idx !== -1) {
-                        const room = { ...prevRooms[idx] };
-                        room.lastMessage = incomingMsg.content;
-                        room.lastTime = formattedTime;
-                        if (!fromSelf && !isActive) {
-                            room.unreadCount = (room.unreadCount || 0) + 1;
+                            delete pendingSendTimers.current[result.consumedClientId];
                         }
 
-                        const newRooms = [...prevRooms.slice(0, idx), ...prevRooms.slice(idx + 1)];
-                        return [room, ...newRooms];
-                    }
+                        return result.nextStore;
+                    });
 
-                    // 新会话（未在列表中）
-                    const newRoom = {
-                        id: incomingMsg.convId,
-                        name: '[新会话]',
-                        avatar: DEFAULT_AVATAR,
-                        lastMessage: incomingMsg.content,
-                        lastTime: formattedTime,
-                        unreadCount: fromSelf || isActive ? 0 : 1,
-                        otherUserId: null,
-                    };
+                    setChatRooms((prevRooms) => updateRoomOnIncomingMessage(prevRooms, incomingMsg, currentUserIdRef.current, activeChatIdRef.current));
+                }
 
-                    return [newRoom, ...prevRooms];
-                });
+                if (event.type === 'read_receipt') {
+                    setMessageStore((prev) => applyReadReceiptToMessages(prev, event.data, currentUserIdRef.current));
+                    setChatRooms((prev) => clearUnreadRoom(prev, event.data.conversation_id));
+                }
             });
 
-                const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
+            const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
                 console.log('WebSocket status:', status);
             });
 
             client.connect();
-
-            void syncCurrentUser();
-            void syncFriendList();
-            void syncChatRooms();
-            void syncGroupList();
 
             return () => {
                 cancelled = true;
@@ -299,16 +401,23 @@ export default function Index() {
                 unsubscribeStatus();
                 client.disconnect();
                 socketRef.current = null;
+
+                // 组件卸载时清理所有发送超时
+                Object.values(pendingSendTimers.current).forEach((t) => {
+                    if (t) clearTimeout(t);
+                });
+                pendingSendTimers.current = {};
             };
         }
 
-        void syncCurrentUser();
-        void syncFriendList();
-        void syncChatRooms();
-        void syncGroupList();
-
         return () => {
             cancelled = true;
+
+            // 组件卸载时清理所有发送超时
+            Object.values(pendingSendTimers.current).forEach((t) => {
+                if (t) clearTimeout(t);
+            });
+            pendingSendTimers.current = {};
         };
     }, []);
 
@@ -364,13 +473,102 @@ export default function Index() {
             return;
         }
 
+        // 生成客户端临时 id，并乐观地将消息加入本地列表
+        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const tempId = -Date.now();
+        const timestamp = Date.now();
+
+        const optimisticMsg: Message = {
+            id: tempId,
+            convId: activeChatId,
+            senderId: currentUserIdRef.current,
+            type: 'text',
+            status: 'sending',
+            content,
+            timestamp,
+            time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isRead: false,
+            clientId,
+        };
+
+        setMessageStore((prev) => appendOptimisticMessage(prev, activeChatId, optimisticMsg));
+
+        // 更新会话列表显示
+        setChatRooms((prev) => updateRoomOnIncomingMessage(prev, optimisticMsg, currentUserIdRef.current, activeChatId));
+
+        // 设置发送超时，如果在超时时间内未收到服务器回包则标记为失败
+        const timer = setTimeout(() => {
+            setMessageStore((prev) => markMessageFailedInStore(prev, activeChatId, clientId));
+
+            delete pendingSendTimers.current[clientId];
+        }, 8000);
+
+        pendingSendTimers.current[clientId] = timer;
+
+        // 通过 websocket 发送（包含 client_id）
         socketRef.current.send({
             type: 'send_message',
             data: {
                 conversation_id: activeChatId,
                 content,
+                client_id: clientId,
             },
         });
+    };
+
+    // 直接向指定会话发送（用于重试）
+    const sendMessageDirect = (convId: number, content: string) => {
+        if (!socketRef.current || !convId || !content.trim()) return;
+
+        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const tempId = -Date.now();
+        const timestamp = Date.now();
+
+        const optimisticMsg: Message = {
+            id: tempId,
+            convId,
+            senderId: currentUserIdRef.current,
+            type: 'text',
+            status: 'sending',
+            content,
+            timestamp,
+            time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isRead: false,
+            clientId,
+        };
+
+        setMessageStore((prev) => {
+            const roomMessages = prev[convId] ? [...prev[convId]] : [];
+            return { ...prev, [convId]: [...roomMessages, optimisticMsg] };
+        });
+
+        // 设置超时
+        const timer = setTimeout(() => {
+            setMessageStore((prev) => markMessageFailedInStore(prev, convId, clientId));
+
+            delete pendingSendTimers.current[clientId];
+        }, 8000);
+
+        pendingSendTimers.current[clientId] = timer;
+
+        socketRef.current.send({ type: 'send_message', data: { conversation_id: convId, content, client_id: clientId } });
+    };
+
+    const handleRetryMessage = (clientId: string) => {
+        // 找到原消息
+        const store = messageStore;
+        for (const convKey of Object.keys(store)) {
+            const convId = Number(convKey);
+            const msgs = store[convId] || [];
+            const orig = msgs.find((m) => m.clientId === clientId);
+            if (orig) {
+                // 移除旧的失败消息
+                setMessageStore((prev) => ({ ...prev, [convId]: prev[convId].filter((m) => m.clientId !== clientId) }));
+                // 用新 clientId 重新发送
+                sendMessageDirect(convId, orig.content);
+                return;
+            }
+        }
     };
 
     const handleReadMessage = (convId: number, lastMsgId: number) => {
@@ -513,6 +711,7 @@ export default function Index() {
                         currentUserId={currentUserId}
                         onSendMessage={handleSendMessage}
                         onReadMessage={handleReadMessage}
+                        onRetryMessage={handleRetryMessage}
                     />
                 ) : (
                     <div className="empty-chat-placeholder">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { type User, type Group } from '../types/entity'
+import { searchUsers, sendFriendRequest, type UserSearchData } from '../services/friend'
 
 import '../styles/contactList.css'
 
@@ -21,6 +22,12 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<boolean>(false);
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState<boolean>(false);
+    const [isAddFriendOpen, setIsAddFriendOpen] = useState<boolean>(false);
+    const [friendKeyword, setFriendKeyword] = useState<string>('');
+    const [searchResults, setSearchResults] = useState<UserSearchData[]>([]);
+    const [searching, setSearching] = useState<boolean>(false);
+    const [sendingFriendId, setSendingFriendId] = useState<number | null>(null);
+    const [friendHint, setFriendHint] = useState<string>('');
     const [groupName, setGroupName] = useState<string>('');
     const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
     const actionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -56,6 +63,47 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                 ? currentIds.filter((id) => id !== memberId)
                 : [...currentIds, memberId]
         ));
+    };
+
+    const handleSearchFriend = async () => {
+        const keyword = friendKeyword.trim();
+
+        if (!keyword) {
+            setFriendHint('请输入用户名关键字');
+            setSearchResults([]);
+            return;
+        }
+
+        setSearching(true);
+        setFriendHint('');
+
+        try {
+            const users = await searchUsers(keyword);
+            setSearchResults(users);
+
+            if (users.length === 0) {
+                setFriendHint('没有找到匹配的用户');
+            }
+        } catch (error) {
+            setSearchResults([]);
+            setFriendHint(error instanceof Error ? error.message : '搜索用户失败');
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    const handleSendFriendRequest = async (targetUserId: number) => {
+        setSendingFriendId(targetUserId);
+        setFriendHint('');
+
+        try {
+            await sendFriendRequest(targetUserId);
+            setFriendHint('好友请求已发送');
+        } catch (error) {
+            setFriendHint(error instanceof Error ? error.message : '发送好友请求失败');
+        } finally {
+            setSendingFriendId(null);
+        }
     };
 
     const handleCreateGroup = async () => {
@@ -109,10 +157,10 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 className='action-menu-item'
                                 onClick={() => {
                                     setIsActionMenuOpen(false);
-                                    globalThis.alert('添加好友/群聊 功能待接入');
+                                    setIsAddFriendOpen(true);
                                 }}
                             >
-                                添加好友/群聊
+                                    添加好友
                             </button>
                             <button
                                 type='button'
@@ -165,6 +213,58 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         </button>
                         <button type='button' className='create-group-primary-button' onClick={() => void handleCreateGroup()}>
                             创建群聊
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {isAddFriendOpen && (
+                <div className='add-friend-panel'>
+                    <div className='add-friend-field'>
+                        <label htmlFor='friend-search-input'>搜索用户名</label>
+                        <div className='add-friend-search-row'>
+                            <input
+                                id='friend-search-input'
+                                type='text'
+                                placeholder='输入用户名关键字'
+                                value={friendKeyword}
+                                onChange={(e) => setFriendKeyword(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        void handleSearchFriend();
+                                    }
+                                }}
+                            />
+                            <button type='button' className='add-friend-search-button' onClick={() => void handleSearchFriend()} disabled={searching}>
+                                {searching ? '搜索中' : '搜索'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {friendHint && <div className='add-friend-hint'>{friendHint}</div>}
+
+                    <div className='add-friend-result-list'>
+                        {searchResults.map((user) => (
+                            <div key={user.user_id} className='add-friend-result-item'>
+                                <div className='add-friend-user-info'>
+                                    <span className='add-friend-user-name'>{user.username}</span>
+                                </div>
+                                <button
+                                    type='button'
+                                    className='add-friend-action-button'
+                                    onClick={() => void handleSendFriendRequest(user.user_id)}
+                                    disabled={sendingFriendId === user.user_id}
+                                >
+                                    {sendingFriendId === user.user_id ? '发送中' : '加好友'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className='create-group-actions'>
+                        <button type='button' className='create-group-secondary-button' onClick={() => setIsAddFriendOpen(false)}>
+                            关闭
                         </button>
                     </div>
                 </div>
