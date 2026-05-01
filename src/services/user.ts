@@ -29,6 +29,9 @@ export interface UpdateProfilePayload {
     email?: string;
     password?: string;
     old_password?: string;
+    birthday?: string;
+    address?: string;
+    signature?: string;
 }
 
 export const updateUserProfile = async (payload: UpdateProfilePayload) => {

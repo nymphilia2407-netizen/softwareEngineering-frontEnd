@@ -284,6 +284,9 @@ export default function Index() {
     const [chatRooms, setChatRooms] = useState<ChatListItem[]>([]);
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
     const [chatSessionInfoOpen, setChatSessionInfoOpen] = useState<boolean>(false);
+    const [profileBirthday, setProfileBirthday] = useState<string>('');
+    const [profileAddress, setProfileAddress] = useState<string>('');
+    const [profileSignature, setProfileSignature] = useState<string>('');
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -705,6 +708,19 @@ export default function Index() {
         }
     };
 
+    const handleSaveProfile = async () => {
+        try {
+            await updateUserProfile({
+                birthday: profileBirthday,
+                address: profileAddress,
+                signature: profileSignature,
+            });
+            alert('保存并提交成功');
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '保存或提交失败');
+        }
+    };
+
     return (
         <div className="main">
             <aside className="side-bar">
@@ -836,6 +852,35 @@ export default function Index() {
                                     {profileAvatarSaving ? '保存中…' : '选择图片并上传'}
                                 </label>
                                 <p className="profile-settings-hint">支持常见图片格式，单张不超过 4MB。</p>
+                                
+                                <div className="profile-settings-title">生日</div>
+                                <input
+                                    type="date"
+                                    className="profile-settings-input"
+                                    value={profileBirthday}
+                                    onChange={(e) => setProfileBirthday(e.target.value)}
+                                />
+
+                                <div className="profile-settings-title">地址</div>
+                                <input
+                                    type="text"
+                                    className="profile-settings-input"
+                                    value={profileAddress}
+                                    onChange={(e) => setProfileAddress(e.target.value)}
+                                />
+
+                                <div className="profile-settings-title">个性签名</div>
+                                <input
+                                    type="text"
+                                    className="profile-settings-input"
+                                    value={profileSignature}
+                                    onChange={(e) => setProfileSignature(e.target.value)}
+                                />
+
+                                <button type="button" className="config-button" onClick={handleSaveProfile}>
+                                    保存并提交
+                                </button>
+
                                 <button type="button" className="config-button" onClick={() => setSettingsPanel('menu')}>
                                     返回
                                 </button>
