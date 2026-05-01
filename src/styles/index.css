@@ -78,6 +78,7 @@
     cursor: pointer;
     margin: 12px 0;
     padding: 10px;
+    position: relative;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -93,6 +94,25 @@
 .nav-button.active-button{
     background-color: rgba(0, 0, 0, 0.15);
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.nav-unread-badge {
+    position: absolute;
+    top: 5px;
+    right: 4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 10px;
+    background: #ff3b30;
+    color: #fff;
+    font-size: 11px;
+    line-height: 18px;
+    font-weight: 700;
+    text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    box-sizing: border-box;
+    pointer-events: none;
 }
 
 .overlay{

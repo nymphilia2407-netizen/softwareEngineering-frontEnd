@@ -464,6 +464,10 @@ export default function Index() {
     }, []);
 
     const chatListData: ChatListItem[] = chatRooms;
+    const totalUnreadCount = useMemo(
+        () => chatListData.reduce((sum, room) => sum + Math.max(0, room.unreadCount || 0), 0),
+        [chatListData]
+    );
     const messages = messageStore[activeChatId] ?? [];
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
@@ -727,6 +731,11 @@ export default function Index() {
                             }}
                         >
                             <img src={CHATICON} alt="chat-icon" />
+                            {totalUnreadCount > 0 && (
+                                <span className="nav-unread-badge" aria-label={`${totalUnreadCount} 条未读消息`}>
+                                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                                </span>
+                            )}
                         </button>
                         <button
                             className={`nav-button ${activeTab === 'contacts' ? 'active-button' : ''}`}
