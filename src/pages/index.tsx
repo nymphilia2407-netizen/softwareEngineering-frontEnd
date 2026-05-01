@@ -152,7 +152,9 @@ const markMessageFailedInStore = (
 ) => ({
     ...store,
     [conversationId]: sortMessagesByTime(
-        (store[conversationId] ?? []).map((message) => (message.clientId === clientId ? { ...message, status: 'failed' } : message))
+        (store[conversationId] ?? []).map((message) =>
+            message.clientId === clientId && message.status === 'sending' ? { ...message, status: 'failed' } : message
+        )
     ),
 });
 
@@ -256,6 +258,9 @@ const mapGroupSummary = (group: GroupSummaryData): Group => ({
     createdTime: new Date(group.created_at).getTime(),
 });
 
+const SEND_ACK_TIMEOUT_MS = 15000;
+const SEND_ACK_GRACE_MS = 2000;
+
 export default function Index() {
     const tokenPayload = decodeTokenPayload();
     const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0);
@@ -294,6 +299,7 @@ export default function Index() {
     const userNameRef = useRef<string>(userName);
     const myAvatarRef = useRef<string>(myAvatar);
     const pendingSendTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+    const messageStoreRef = useRef<Record<number, Message[]>>(messageStore);
     /** 乐观消息的临时负数 id，保证同毫秒内多次发送也不与 React key 冲突 */
     const optimisticIdSeqRef = useRef(0);
 
@@ -318,6 +324,10 @@ export default function Index() {
     useEffect(() => {
         myAvatarRef.current = myAvatar;
     }, [myAvatar]);
+
+    useEffect(() => {
+        messageStoreRef.current = messageStore;
+    }, [messageStore]);
 
     const activeChatIsGroup = useMemo(
         () => chatRooms.find((room) => room.id === activeChatId)?.isGroup ?? false,
@@ -543,6 +553,35 @@ export default function Index() {
         }
     };
 
+    const clearPendingSendTimer = (clientId: string) => {
+        const timer = pendingSendTimers.current[clientId];
+        if (timer) {
+            clearTimeout(timer);
+        }
+        delete pendingSendTimers.current[clientId];
+    };
+
+    const scheduleSendFailureCheck = (conversationId: number, clientId: string) => {
+        const timer = setTimeout(() => {
+            const roomMessages = messageStoreRef.current[conversationId] ?? [];
+            const stillSending = roomMessages.some((message) => message.clientId === clientId && message.status === 'sending');
+
+            if (!stillSending) {
+                clearPendingSendTimer(clientId);
+                return;
+            }
+
+            const graceTimer = setTimeout(() => {
+                setMessageStore((prev) => markMessageFailedInStore(prev, conversationId, clientId));
+                clearPendingSendTimer(clientId);
+            }, SEND_ACK_GRACE_MS);
+
+            pendingSendTimers.current[clientId] = graceTimer;
+        }, SEND_ACK_TIMEOUT_MS);
+
+        pendingSendTimers.current[clientId] = timer;
+    };
+
     const handleSendMessage = (content: string) => {
         if (!activeChatId || !content.trim()) {
             return;
@@ -570,23 +609,11 @@ export default function Index() {
 
         setMessageStore((prev) => appendOptimisticMessage(prev, activeChatId, optimisticMsg));
         setChatRooms((prev) => updateRoomOnIncomingMessage(prev, optimisticMsg, currentUserIdRef.current, activeChatId));
-
-        const clearSendTimer = () => {
-            const t = pendingSendTimers.current[clientId];
-            if (t) clearTimeout(t);
-            delete pendingSendTimers.current[clientId];
-        };
-
-        const timer = setTimeout(() => {
-            setMessageStore((prev) => markMessageFailedInStore(prev, activeChatId, clientId));
-            clearSendTimer();
-        }, 8000);
-
-        pendingSendTimers.current[clientId] = timer;
+        scheduleSendFailureCheck(activeChatId, clientId);
 
         const socket = socketRef.current;
         if (!socket) {
-            clearSendTimer();
+            clearPendingSendTimer(clientId);
             setMessageStore((prev) => markMessageFailedInStore(prev, activeChatId, clientId));
             return;
         }
@@ -627,23 +654,11 @@ export default function Index() {
         };
 
         setMessageStore((prev) => appendOptimisticMessage(prev, convId, optimisticMsg));
-
-        const clearSendTimer = () => {
-            const t = pendingSendTimers.current[clientId];
-            if (t) clearTimeout(t);
-            delete pendingSendTimers.current[clientId];
-        };
-
-        const timer = setTimeout(() => {
-            setMessageStore((prev) => markMessageFailedInStore(prev, convId, clientId));
-            clearSendTimer();
-        }, 8000);
-
-        pendingSendTimers.current[clientId] = timer;
+        scheduleSendFailureCheck(convId, clientId);
 
         const socket = socketRef.current;
         if (!socket) {
-            clearSendTimer();
+            clearPendingSendTimer(clientId);
             setMessageStore((prev) => markMessageFailedInStore(prev, convId, clientId));
             return;
         }
