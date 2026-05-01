@@ -39,7 +39,15 @@ export default function ChatWindow({
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const onReadMessageRef = useRef(onReadMessage);
+    const shouldAutoScrollRef = useRef(true);
+    const lastMessageKeyRef = useRef<string | null>(null);
     onReadMessageRef.current = onReadMessage;
+    const AUTO_SCROLL_THRESHOLD_PX = 80;
+
+    const isNearBottom = useCallback((el: HTMLDivElement) => {
+        const distanceToBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
+        return distanceToBottom <= AUTO_SCROLL_THRESHOLD_PX;
+    }, []);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
         const el = scrollRef.current;
@@ -49,7 +57,21 @@ export default function ChatWindow({
 
     useLayoutEffect(() => {
         scrollToBottom('auto');
-    }, [messages, activeChatId, scrollToBottom]);
+        shouldAutoScrollRef.current = true;
+        lastMessageKeyRef.current = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
+    }, [activeChatId, scrollToBottom]);
+
+    useLayoutEffect(() => {
+        const listEl = scrollRef.current;
+        if (!listEl) return;
+
+        const nextLastMessageKey = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
+        const hasNewMessage = nextLastMessageKey !== lastMessageKeyRef.current;
+        if (hasNewMessage && shouldAutoScrollRef.current) {
+            scrollToBottom('auto');
+        }
+        lastMessageKeyRef.current = nextLastMessageKey;
+    }, [messages, scrollToBottom]);
 
     useEffect(() => {
         if (messages.length === 0 || !activeChatId) {
@@ -93,7 +115,13 @@ return (
                 )}
             </div>
 
-            <div className="message-list" ref={scrollRef}>
+            <div
+                className="message-list"
+                ref={scrollRef}
+                onScroll={(e) => {
+                    shouldAutoScrollRef.current = isNearBottom(e.currentTarget);
+                }}
+            >
                 {messages.map((msg) => {
                     const isSelf = msg.senderId === currentUserId;
                     const senderLabel = (msg.senderUsername ?? '').trim() || `用户${msg.senderId}`;
