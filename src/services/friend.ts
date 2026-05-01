@@ -23,6 +23,16 @@ export interface ReceivedFriendRequestData {
     created_at: string;
 }
 
+/** GET /api/friends/requests/sent — 当前用户发出且仍为 pending 的申请 */
+export interface SentFriendRequestData {
+    request_id: number;
+    to_user: {
+        user_id: number;
+        username: string;
+    };
+    created_at: string;
+}
+
 interface ApiResponse<T> {
     code: number;
     info: string;
@@ -81,6 +91,16 @@ export const getReceivedFriendRequests = async () => {
 
     if (response.code !== 0 || !response.data) {
         throw new Error(response.info || '获取好友请求失败');
+    }
+
+    return response.data;
+};
+
+export const getSentFriendRequests = async () => {
+    const response = await request.get<any, ApiResponse<SentFriendRequestData[]>>('/api/friends/requests/sent');
+
+    if (response.code !== 0 || !response.data) {
+        throw new Error(response.info || '获取已发送好友请求失败');
     }
 
     return response.data;

@@ -4,6 +4,7 @@ import { type User, type Group } from '../types/entity'
 import {
     acceptFriendRequest,
     getReceivedFriendRequests,
+    getSentFriendRequests,
     rejectFriendRequest,
     searchUsersByEmail,
     searchUsers,
@@ -46,7 +47,10 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const [groupSearchResults, setGroupSearchResults] = useState<Group[]>([]);
     const [groupHint, setGroupHint] = useState<string>('');
     const [requestHint, setRequestHint] = useState<string>('');
-    const [sentRequestKeys, setSentRequestKeys] = useState<string[]>([]);
+    /** 已向这些 user_id 发出过 pending 申请（与后端 /api/friends/requests/sent 同步） */
+    const [sentPendingToIds, setSentPendingToIds] = useState<number[]>([]);
+    /** 对方向我发起的 pending 申请中的 from_user_id（避免重复再点「加好友」） */
+    const [incomingRequestFromIds, setIncomingRequestFromIds] = useState<number[]>([]);
     const [receivedRequests, setReceivedRequests] = useState<ReceivedFriendRequestData[]>([]);
     const [requestLoading, setRequestLoading] = useState<boolean>(false);
     const [requestActionId, setRequestActionId] = useState<number | null>(null);
@@ -105,6 +109,35 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         };
     }, [isFriendRequestsOpen]);
 
+    useEffect(() => {
+        if (!isAddFriendOpen) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadSentPending = async () => {
+            try {
+                const [sent, received] = await Promise.all([getSentFriendRequests(), getReceivedFriendRequests()]);
+                if (!cancelled) {
+                    setSentPendingToIds(sent.map((row) => row.to_user.user_id));
+                    setIncomingRequestFromIds(received.map((row) => row.from_user.user_id));
+                }
+            } catch {
+                if (!cancelled) {
+                    setSentPendingToIds([]);
+                    setIncomingRequestFromIds([]);
+                }
+            }
+        };
+
+        void loadSentPending();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAddFriendOpen]);
+
     const filteredFriends = friends.filter(f =>
         f.username.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -118,11 +151,6 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                 ? currentIds.filter((id) => id !== memberId)
                 : [...currentIds, memberId]
         ));
-    };
-
-    const getUserIdentityKey = (user: UserSearchData) => {
-        const normalizedEmail = user.email?.trim().toLowerCase();
-        return normalizedEmail || `uid:${user.user_id}`;
     };
 
     const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -163,17 +191,26 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         }
     };
 
-    const handleSendFriendRequest = async (targetUserId: number, targetUserKey: string) => {
+    const handleSendFriendRequest = async (targetUserId: number) => {
         setSendingFriendId(targetUserId);
         setAddFriendHint('');
 
         try {
             await sendFriendRequest(targetUserId);
-            setSentRequestKeys((current) => (current.includes(targetUserKey) ? current : [...current, targetUserKey]));
+            setSentPendingToIds((current) => [...new Set([...current, targetUserId])]);
             setAddFriendHint('好友请求已发送');
             await onContactsChanged?.();
         } catch (error) {
-            setAddFriendHint(error instanceof Error ? error.message : '发送好友请求失败');
+            const message = error instanceof Error ? error.message : '发送好友请求失败';
+            setAddFriendHint(message);
+            if (message.includes('请求已存在')) {
+                try {
+                    const sent = await getSentFriendRequests();
+                    setSentPendingToIds(sent.map((row) => row.to_user.user_id));
+                } catch {
+                    setSentPendingToIds((current) => [...new Set([...current, targetUserId])]);
+                }
+            }
         } finally {
             setSendingFriendId(null);
         }
@@ -197,6 +234,16 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         setGroupHint(matchedGroups.length === 0 ? '没有找到匹配的群聊' : '');
     };
 
+    const refreshSentAndIncomingIds = async () => {
+        try {
+            const [sent, received] = await Promise.all([getSentFriendRequests(), getReceivedFriendRequests()]);
+            setSentPendingToIds(sent.map((row) => row.to_user.user_id));
+            setIncomingRequestFromIds(received.map((row) => row.from_user.user_id));
+        } catch {
+            /* 列表页仍可用，忽略同步失败 */
+        }
+    };
+
     const handleAcceptRequest = async (requestId: number) => {
         setRequestActionId(requestId);
         setRequestHint('');
@@ -206,6 +253,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             setReceivedRequests((current) => current.filter((request) => request.request_id !== requestId));
             setRequestHint('已接受好友请求');
             await onContactsChanged?.();
+            await refreshSentAndIncomingIds();
         } catch (error) {
             setRequestHint(error instanceof Error ? error.message : '接受好友请求失败');
         } finally {
@@ -222,6 +270,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             setReceivedRequests((current) => current.filter((request) => request.request_id !== requestId));
             setRequestHint('已拒绝好友请求');
             await onContactsChanged?.();
+            await refreshSentAndIncomingIds();
         } catch (error) {
             setRequestHint(error instanceof Error ? error.message : '拒绝好友请求失败');
         } finally {
@@ -230,10 +279,11 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     };
 
     const friendIdSet = new Set(friends.map((friend) => friend.id));
+    const sentPendingSet = new Set(sentPendingToIds);
+    const incomingFromSet = new Set(incomingRequestFromIds);
 
     const getAddFriendButtonText = (user: UserSearchData) => {
         const userId = user.user_id;
-        const userKey = getUserIdentityKey(user);
 
         if (userId === currentUserId) {
             return '自己';
@@ -243,7 +293,11 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             return '已是好友';
         }
 
-        if (sentRequestKeys.includes(userKey)) {
+        if (incomingFromSet.has(userId)) {
+            return '对方已申请';
+        }
+
+        if (sentPendingSet.has(userId)) {
             return '已发送';
         }
 
@@ -252,8 +306,13 @@ export default function ContactList(props: Readonly<ContactsProps>) {
 
     const isAddFriendDisabled = (user: UserSearchData) => {
         const userId = user.user_id;
-        const userKey = getUserIdentityKey(user);
-        return sendingFriendId === userId || userId === currentUserId || friendIdSet.has(userId) || sentRequestKeys.includes(userKey);
+        return (
+            sendingFriendId === userId ||
+            userId === currentUserId ||
+            friendIdSet.has(userId) ||
+            sentPendingSet.has(userId) ||
+            incomingFromSet.has(userId)
+        );
     };
 
     let friendRequestContent: ReactNode;
@@ -355,6 +414,8 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                     setIsSearchGroupOpen(false);
                                     setIsFriendRequestsOpen(false);
                                     setRequestHint('');
+                                    setAddFriendHint('');
+                                    setSearchResults([]);
                                 }}
                             >
                                     添加好友
@@ -476,7 +537,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 <button
                                     type='button'
                                     className={`add-friend-action-button ${isAddFriendDisabled(user) ? 'is-disabled' : ''}`}
-                                    onClick={() => void handleSendFriendRequest(user.user_id, getUserIdentityKey(user))}
+                                    onClick={() => void handleSendFriendRequest(user.user_id)}
                                     disabled={isAddFriendDisabled(user)}
                                 >
                                     {getAddFriendButtonText(user)}
