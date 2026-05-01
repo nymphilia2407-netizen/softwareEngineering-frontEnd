@@ -339,6 +339,9 @@ export default function Index() {
                 setUserName(currentUser.username);
                 const resolvedAvatar = currentUser.avatar && currentUser.avatar.length > 0 ? currentUser.avatar : DEFAULT_AVATAR;
                 setMyAvatar(resolvedAvatar);
+                setProfileBirthday(currentUser.birthday);
+                setProfileAddress(currentUser.address);
+                setProfileSignature(currentUser.signature);
                 persistUserProfile(currentUser.username, resolvedAvatar);
             } catch (error) {
                 console.error('获取当前用户失败:', error);
@@ -789,6 +792,7 @@ export default function Index() {
                     onClick={() => {
                         setIsSettingsOpen(false);
                         setSettingsPanel('menu');
+                        setActiveTab('chat'); // 默认返回到chat
                     }}
                 >
                     <div
@@ -803,6 +807,7 @@ export default function Index() {
                                     onClick={() => {
                                         setIsSettingsOpen(false);
                                         setSettingsPanel('menu');
+                                        setActiveTab('chat');
                                     }}
                                 >
                                     关闭

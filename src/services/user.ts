@@ -5,6 +5,9 @@ export interface CurrentUserData {
     username: string;
     email: string;
     avatar: string;
+    birthday: string;
+    address: string;
+    signature: string;
 }
 
 interface ApiResponse<T> {
