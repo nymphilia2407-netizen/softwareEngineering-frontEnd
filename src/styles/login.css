@@ -23,11 +23,6 @@
     transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.login-form:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
-}
-
 .avatar {
     position: relative;
     width: 80px;
@@ -150,7 +145,7 @@ button[type='submit']:active {
     white-space: nowrap;
     padding: 6px 12px;
     border-radius: 6px;
-    background-color: #8f1d1d;
+    background-color: #e92427;
     color: #fff;
     font-size: 12px;
     box-shadow: 0 4px 10px rgba(143, 29, 29, 0.3);
@@ -197,38 +192,38 @@ button[type='submit']:active {
 }
 
 .strength-meter-fill--invalid {
-    width: 30%;
-    background-color: #ff4d4f;
+    width: 20%;
+    background-color: #e92427;
     box-shadow: 0 0 10px rgba(255, 77, 79, 0.3);
 }
 
 .strength-meter-fill--level-1 {
-    width: 20%;
-    background-color: #ffa940;
+    width: 36%;
+    background-color: #ff9c40;
     box-shadow: 0 0 10px rgba(255, 169, 64, 0.28);
 }
 
 .strength-meter-fill--level-2 {
-    width: 40%;
-    background-color: #ffa940;
+    width: 52%;
+    background-color: #f9c33d;
     box-shadow: 0 0 10px rgba(255, 169, 64, 0.28);
 }
 
 .strength-meter-fill--level-3 {
-    width: 60%;
-    background-color: #8ec5fc;
+    width: 68%;
+    background-color: #9bcbfb;
     box-shadow: 0 0 10px rgba(142, 197, 252, 0.3);
 }
 
 .strength-meter-fill--level-4 {
-    width: 80%;
-    background-color: #a1c4fd;
+    width: 84%;
+    background-color: #5c8be4;
     box-shadow: 0 0 10px rgba(161, 196, 253, 0.3);
 }
 
 .strength-meter-fill--level-5 {
     width: 100%;
-    background-color: #e0c3fc;
+    background-color: #c974ed;
     box-shadow: 0 0 10px rgba(224, 195, 252, 0.3);
 }
 

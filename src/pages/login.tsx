@@ -22,7 +22,7 @@ interface PasswordStrengthMeta {
 }
 
 const PASSWORD_STRENGTH_LEVELS: PasswordStrengthMeta[] = [
-    { label: '弱', meterClass: 'strength-meter-fill--level-1', textClass: 'strength-text--level-1' },
+    { label: '极弱', meterClass: 'strength-meter-fill--level-1', textClass: 'strength-text--level-1' },
     { label: '弱', meterClass: 'strength-meter-fill--level-2', textClass: 'strength-text--level-2' },
     { label: '中', meterClass: 'strength-meter-fill--level-3', textClass: 'strength-text--level-3' },
     { label: '强', meterClass: 'strength-meter-fill--level-4', textClass: 'strength-text--level-4' },

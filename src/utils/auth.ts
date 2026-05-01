@@ -48,7 +48,7 @@ export const checkPasswordStrength = (password: string) => {
         (hasSpecial && !hasAlpha && !hasNum))
         return -1;
 
-    score = 1;
+    score = 0;
 
     /**加分项
      * 长度足够长
