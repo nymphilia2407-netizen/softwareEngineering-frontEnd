@@ -403,6 +403,64 @@
     outline: none;
 }
 
+.create-group-avatar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.create-group-avatar-preview {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    flex-shrink: 0;
+}
+
+.create-group-avatar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+}
+
+.create-group-avatar-upload {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(14, 116, 144, 0.12);
+    color: #0e7490;
+    cursor: pointer;
+}
+
+.create-group-avatar-upload:hover {
+    background: rgba(14, 116, 144, 0.2);
+}
+
+.create-group-avatar-file {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+}
+
+.create-group-avatar-clear {
+    border: none;
+    background: transparent;
+    font-size: 11px;
+    color: #64748b;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+}
+
+.create-group-avatar-clear:hover {
+    color: #0f172a;
+}
+
 .create-group-label-row {
     display: flex;
     justify-content: space-between;

@@ -11,6 +11,8 @@ export interface ChatIncomingMessage {
     id: number;
     conversation_id: number;
     sender_id: number;
+    sender_username?: string;
+    sender_avatar?: string;
     content: string;
     created_at: string;
     client_id?: string;

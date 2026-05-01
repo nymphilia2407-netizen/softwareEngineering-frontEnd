@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import ChatList from '../components/chatList';
 import ChatWindow from '../components/chatWindow';
@@ -9,9 +9,11 @@ import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, type GroupSummaryData } from '../services/group';
 import { getFriendList, type FriendSummaryData } from '../services/friend';
-import { getCurrentUser } from '../services/user';
+import { getCurrentUser, updateUserProfile } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
-import { tokenUtils } from '../utils/auth';
+import { persistUserProfile, tokenUtils } from '../utils/auth';
+import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
+import { resolvedUserAvatar } from '../utils/avatarDisplay';
 import type { Group, Message, User } from '../types/entity';
 import type { ActiveTabType } from '../types/ui';
 
@@ -26,6 +28,7 @@ interface ChatListItem {
     unreadCount: number;
     status?: 'online' | 'offline' | 'busy';
     otherUserId?: number | null;
+    isGroup: boolean;
 }
 
 const decodeTokenPayload = () => {
@@ -62,6 +65,8 @@ const formatIncomingMessage = (message: ChatIncomingMessage): Message => {
         id: message.id,
         convId: message.conversation_id,
         senderId: message.sender_id,
+        senderUsername: message.sender_username,
+        senderAvatar: message.sender_avatar,
         type: 'text',
         status: 'sent',
         content: message.content,
@@ -183,7 +188,7 @@ const updateRoomOnIncomingMessage = (
         return [room, ...remainingRooms];
     }
 
-    return [
+        return [
         {
             id: incomingMessage.convId,
             name: '[新会话]',
@@ -192,6 +197,7 @@ const updateRoomOnIncomingMessage = (
             lastTime: formattedTime,
             unreadCount: fromSelf || isActive ? 0 : 1,
             otherUserId: null,
+            isGroup: false,
         },
         ...rooms,
     ];
@@ -203,7 +209,7 @@ const clearUnreadRoom = (rooms: ChatListItem[], conversationId: number) =>
 const mapFriendSummary = (friend: FriendSummaryData): User => ({
     id: friend.user_id,
     username: friend.username,
-    avatar: friend.avatar ?? DEFAULT_AVATAR,
+    avatar: resolvedUserAvatar(friend.avatar),
     status: friend.status ?? 'online',
     registerTime: Date.now(),
     lastLoginTime: Date.now(),
@@ -216,6 +222,8 @@ const mapHistoryMessage = (roomId: number, message: ChatMessageData): Message =>
         id: message.id,
         convId: message.room_id ?? roomId,
         senderId: message.sender_id,
+        senderUsername: message.sender_username,
+        senderAvatar: message.sender_avatar,
         type: 'text',
         status: 'sent',
         content: message.content,
@@ -228,18 +236,19 @@ const mapHistoryMessage = (roomId: number, message: ChatMessageData): Message =>
 const mapChatRoom = (room: ChatRoomSummaryData): ChatListItem => ({
     id: room.room_id,
     name: room.name,
-    avatar: room.avatar || DEFAULT_AVATAR,
+    avatar: resolvedUserAvatar(room.avatar),
     lastMessage: room.last_message || '[最近暂无消息]',
     lastTime: room.last_time ? new Date(room.last_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '刚刚',
     unreadCount: room.unread_count,
     otherUserId: room.other_user_id ?? null,
     status: undefined,
+    isGroup: room.is_group,
 });
 
 const mapGroupSummary = (group: GroupSummaryData): Group => ({
     id: group.room_id,
     groupname: group.group_name,
-    avatar: group.avatar || DEFAULT_AVATAR,
+    avatar: resolvedUserAvatar(group.avatar),
     ownerId: group.owner_id ?? 0,
     adminIds: [],
     memberCount: group.member_count,
@@ -265,6 +274,8 @@ export default function Index() {
     });
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+    const [settingsPanel, setSettingsPanel] = useState<'menu' | 'profile'>('menu');
+    const [profileAvatarSaving, setProfileAvatarSaving] = useState<boolean>(false);
     const [activeChatId, setActiveChatId] = useState<number>(0);
     const [selectedContact, setSelectedContact] = useState<User | null>(null);
     const [friends, setFriends] = useState<User[]>(MOCK_FRIENDS);
@@ -275,6 +286,8 @@ export default function Index() {
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
     const activeChatIdRef = useRef<number>(activeChatId);
+    const userNameRef = useRef<string>(userName);
+    const myAvatarRef = useRef<string>(myAvatar);
     const pendingSendTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
     /** 乐观消息的临时负数 id，保证同毫秒内多次发送也不与 React key 冲突 */
     const optimisticIdSeqRef = useRef(0);
@@ -286,6 +299,19 @@ export default function Index() {
     useEffect(() => {
         activeChatIdRef.current = activeChatId;
     }, [activeChatId]);
+
+    useEffect(() => {
+        userNameRef.current = userName;
+    }, [userName]);
+
+    useEffect(() => {
+        myAvatarRef.current = myAvatar;
+    }, [myAvatar]);
+
+    const activeChatIsGroup = useMemo(
+        () => chatRooms.find((room) => room.id === activeChatId)?.isGroup ?? false,
+        [chatRooms, activeChatId]
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -300,7 +326,9 @@ export default function Index() {
 
                 setCurrentUserId(currentUser.user_id);
                 setUserName(currentUser.username);
-                setMyAvatar(currentUser.avatar || DEFAULT_AVATAR);
+                const resolvedAvatar = currentUser.avatar && currentUser.avatar.length > 0 ? currentUser.avatar : DEFAULT_AVATAR;
+                setMyAvatar(resolvedAvatar);
+                persistUserProfile(currentUser.username, resolvedAvatar);
             } catch (error) {
                 console.error('获取当前用户失败:', error);
             }
@@ -511,6 +539,8 @@ export default function Index() {
             id: tempId,
             convId: activeChatId,
             senderId: currentUserIdRef.current,
+            senderUsername: userNameRef.current,
+            senderAvatar: myAvatarRef.current,
             type: 'text',
             status: 'sending',
             content,
@@ -567,6 +597,8 @@ export default function Index() {
             id: tempId,
             convId,
             senderId: currentUserIdRef.current,
+            senderUsername: userNameRef.current,
+            senderAvatar: myAvatarRef.current,
             type: 'text',
             status: 'sending',
             content,
@@ -628,11 +660,12 @@ export default function Index() {
         setChatRooms((prev) => prev.map((r) => (r.id === convId ? { ...r, unreadCount: 0 } : r)));
     };
 
-    const handleCreateGroup = async ({ groupName, memberIds }: { groupName: string; memberIds: number[] }) => {
+    const handleCreateGroup = async ({ groupName, memberIds, avatar }: { groupName: string; memberIds: number[]; avatar?: string }) => {
         try {
             const createdGroup = await createGroup({
                 group_name: groupName,
                 member_ids: memberIds,
+                ...(avatar ? { avatar } : {}),
             });
 
             setActiveTab('chat');
@@ -645,11 +678,12 @@ export default function Index() {
                 {
                     id: createdGroup.room_id,
                     name: createdGroup.group_name,
-                    avatar: createdGroup.avatar || DEFAULT_AVATAR,
+                    avatar: resolvedUserAvatar(createdGroup.avatar),
                     lastMessage: '[最近暂无消息]',
                     lastTime: new Date(createdGroup.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     unreadCount: 0,
                     otherUserId: null,
+                    isGroup: true,
                 },
                 ...currentRooms.filter((room) => room.id !== createdGroup.room_id),
             ]);
@@ -663,7 +697,25 @@ export default function Index() {
         <div className="main">
             <aside className="side-bar">
                 <div className="nav-top">
-                    <div className="user-avatar">
+                    <div
+                        className="user-avatar"
+                        title="点击更换头像"
+                        onClick={() => {
+                            setActiveTab('settings');
+                            setSettingsPanel('profile');
+                            setIsSettingsOpen(true);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setActiveTab('settings');
+                                setSettingsPanel('profile');
+                                setIsSettingsOpen(true);
+                            }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                    >
                         <img src={myAvatar} alt="myAvatar" title={userName || '当前用户'} />
                     </div>
                     <nav className="nav-menu">
@@ -689,6 +741,7 @@ export default function Index() {
                         className={`nav-button ${activeTab === 'settings' ? 'active-button' : ''}`}
                         onClick={() => {
                             setActiveTab('settings');
+                            setSettingsPanel('menu');
                             setIsSettingsOpen(true);
                         }}
                     >
@@ -698,17 +751,79 @@ export default function Index() {
             </aside>
 
             {isSettingsOpen && (
-                <div className="overlay">
-                    <div className="config-panel">
-                        <button className="config-button" onClick={() => setIsSettingsOpen(false)}>
-                            关闭
-                        </button>
-                        <button className="config-button">个人资料</button>
-                        <button className="config-button">修改设置</button>
-                        <button className="config-button">切换账号</button>
-                        <button className="config-button log-out-item" onClick={handleLogout}>
-                            退出登录
-                        </button>
+                <div
+                    className="overlay"
+                    onClick={() => {
+                        setIsSettingsOpen(false);
+                        setSettingsPanel('menu');
+                    }}
+                >
+                    <div
+                        className={`config-panel ${settingsPanel === 'profile' ? 'config-panel--profile' : ''}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {settingsPanel === 'menu' ? (
+                            <>
+                                <button
+                                    type="button"
+                                    className="config-button"
+                                    onClick={() => {
+                                        setIsSettingsOpen(false);
+                                        setSettingsPanel('menu');
+                                    }}
+                                >
+                                    关闭
+                                </button>
+                                <button type="button" className="config-button" onClick={() => setSettingsPanel('profile')}>
+                                    个人资料
+                                </button>
+                                <button type="button" className="config-button" onClick={handleLogout}>
+                                    退出登录
+                                </button>
+                            </>
+                        ) : (
+                            <div className="profile-settings">
+                                <div className="profile-settings-title">头像</div>
+                                <div className="profile-settings-avatar-wrap">
+                                    <img src={myAvatar} alt="" className="profile-settings-avatar-preview" />
+                                </div>
+                                <label className="profile-settings-file-label">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="profile-settings-file-input"
+                                        disabled={profileAvatarSaving}
+                                        onChange={(e) => {
+                                            const input = e.target;
+                                            const file = input.files?.[0];
+                                            if (!file) {
+                                                return;
+                                            }
+
+                                            void (async () => {
+                                                try {
+                                                    setProfileAvatarSaving(true);
+                                                    const dataUrl = await readAvatarFileAsDataUrl(file);
+                                                    await updateUserProfile({ avatar: dataUrl });
+                                                    setMyAvatar(dataUrl);
+                                                    persistUserProfile(userName, dataUrl);
+                                                } catch (err) {
+                                                    alert(err instanceof Error ? err.message : '上传失败');
+                                                } finally {
+                                                    setProfileAvatarSaving(false);
+                                                    input.value = '';
+                                                }
+                                            })();
+                                        }}
+                                    />
+                                    {profileAvatarSaving ? '保存中…' : '选择图片并上传'}
+                                </label>
+                                <p className="profile-settings-hint">支持常见图片格式，单张不超过 4MB。</p>
+                                <button type="button" className="config-button" onClick={() => setSettingsPanel('menu')}>
+                                    返回
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -754,6 +869,7 @@ export default function Index() {
                     <ChatWindow
                         activeChatId={activeChatId}
                         activeChatName={activeChatName}
+                        isGroupChat={activeChatIsGroup}
                         messages={messages}
                         currentUserId={currentUserId}
                         onSendMessage={handleSendMessage}

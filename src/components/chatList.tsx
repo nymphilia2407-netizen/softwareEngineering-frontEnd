@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
 
+import { DEFAULT_AVATAR } from '../constants/string';
+
 import '../styles/chatList.css'
 
 interface ChatItem {
@@ -49,7 +51,7 @@ return (
                             onClick={() => onChatClick(chat)}
                         >
                             <div className='item-avatar'>
-                                <img src={chat.avatar || '/default-avatar.png'} alt="avatar" />
+                                <img src={chat.avatar || DEFAULT_AVATAR} alt="avatar" />
                                 {chat.unreadCount > 0 && (
                                     <span className="unread-badge">
                                         {chat.unreadCount > 99 ? '99+' : chat.unreadCount}

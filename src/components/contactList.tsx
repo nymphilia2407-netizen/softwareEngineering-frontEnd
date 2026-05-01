@@ -13,12 +13,16 @@ import {
     type UserSearchData,
 } from '../services/friend'
 import { DEFAULT_AVATAR } from '../constants/string'
+import { readAvatarFileAsDataUrl } from '../utils/avatarFile'
+import { resolvedUserAvatar } from '../utils/avatarDisplay'
 
 import '../styles/contactList.css'
 
 interface CreateGroupFormValues {
     groupName: string;
     memberIds: number[];
+    /** 可选：自定义群头像 data URL */
+    avatar?: string;
 }
 
 interface ContactsProps{
@@ -56,6 +60,8 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const [requestActionId, setRequestActionId] = useState<number | null>(null);
     const [groupName, setGroupName] = useState<string>('');
     const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+    const [groupAvatarPreview, setGroupAvatarPreview] = useState<string>(DEFAULT_AVATAR);
+    const [groupAvatarDataUrl, setGroupAvatarDataUrl] = useState<string | null>(null);
     const actionMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -370,10 +376,13 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         await onCreateGroup({
             groupName: trimmedGroupName,
             memberIds: selectedMemberIds,
+            ...(groupAvatarDataUrl ? { avatar: groupAvatarDataUrl } : {}),
         });
 
         setGroupName('');
         setSelectedMemberIds([]);
+        setGroupAvatarPreview(DEFAULT_AVATAR);
+        setGroupAvatarDataUrl(null);
         setIsCreateGroupOpen(false);
     };
 
@@ -452,6 +461,8 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 className='action-menu-item'
                                 onClick={() => {
                                     setIsActionMenuOpen(false);
+                                    setGroupAvatarPreview(DEFAULT_AVATAR);
+                                    setGroupAvatarDataUrl(null);
                                     setIsCreateGroupOpen(true);
                                     setIsSearchGroupOpen(false);
                                 }}
@@ -476,6 +487,51 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         />
                     </div>
                     <div className='create-group-field'>
+                        <span className='create-group-member-list-label'>群头像（可选）</span>
+                        <div className='create-group-avatar-row'>
+                            <img className='create-group-avatar-preview' src={groupAvatarPreview} alt="" />
+                            <div className='create-group-avatar-actions'>
+                                <label className='create-group-avatar-upload'>
+                                    选择图片
+                                    <input
+                                        type='file'
+                                        accept='image/*'
+                                        className='create-group-avatar-file'
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) {
+                                                return;
+                                            }
+                                            void (async () => {
+                                                try {
+                                                    const dataUrl = await readAvatarFileAsDataUrl(file);
+                                                    setGroupAvatarPreview(dataUrl);
+                                                    setGroupAvatarDataUrl(dataUrl);
+                                                } catch (err) {
+                                                    alert(err instanceof Error ? err.message : '选择图片失败');
+                                                } finally {
+                                                    e.target.value = '';
+                                                }
+                                            })();
+                                        }}
+                                    />
+                                </label>
+                                {groupAvatarDataUrl && (
+                                    <button
+                                        type='button'
+                                        className='create-group-avatar-clear'
+                                        onClick={() => {
+                                            setGroupAvatarPreview(DEFAULT_AVATAR);
+                                            setGroupAvatarDataUrl(null);
+                                        }}
+                                    >
+                                        使用默认
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className='create-group-field'>
                         <div className='create-group-label-row'>
                             <span className='create-group-member-list-label'>选择好友</span>
                             <span>{selectedMemberIds.length} 人已选</span>
@@ -494,7 +550,15 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         </div>
                     </div>
                     <div className='create-group-actions'>
-                        <button type='button' className='create-group-secondary-button' onClick={() => setIsCreateGroupOpen(false)}>
+                        <button
+                            type='button'
+                            className='create-group-secondary-button'
+                            onClick={() => {
+                                setGroupAvatarPreview(DEFAULT_AVATAR);
+                                setGroupAvatarDataUrl(null);
+                                setIsCreateGroupOpen(false);
+                            }}
+                        >
                             取消
                         </button>
                         <button type='button' className='create-group-primary-button' onClick={() => void handleCreateGroup()}>
@@ -528,7 +592,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         {searchResults.map((user) => (
                             <div key={user.user_id} className='add-friend-result-item'>
                                 <div className='add-friend-user-info'>
-                                    <img className='add-friend-user-avatar' src={user.avatar || DEFAULT_AVATAR} alt='avatar' />
+                                    <img className='add-friend-user-avatar' src={resolvedUserAvatar(user.avatar)} alt='avatar' />
                                     <div className='add-friend-user-text'>
                                     <span className='add-friend-user-name'>{user.username}</span>
                                         <span className='add-friend-user-email'>{user.email || '邮箱未公开'}</span>
@@ -587,7 +651,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         {groupSearchResults.map((group) => (
                             <div key={group.id} className='add-friend-result-item'>
                                 <div className='add-friend-user-info'>
-                                    <img className='add-friend-user-avatar' src={group.avatar || DEFAULT_AVATAR} alt='group-avatar' />
+                                    <img className='add-friend-user-avatar' src={resolvedUserAvatar(group.avatar)} alt='group-avatar' />
                                     <div className='add-friend-user-text'>
                                         <span className='add-friend-user-name'>{group.groupname}</span>
                                         <span className='add-friend-user-email'>群聊ID: {group.id}</span>
@@ -645,7 +709,15 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                     {filteredFriends.map(user => (
                         <button key={user.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(user, 'user')}>
                             <div className='item-avatar'>
-                                <img src={user.avatar} alt="avatar" />
+                                <img
+                                    src={resolvedUserAvatar(user.avatar)}
+                                    alt=""
+                                    onError={(e) => {
+                                        const img = e.currentTarget;
+                                        img.onerror = null;
+                                        img.src = DEFAULT_AVATAR;
+                                    }}
+                                />
                                 <span className={`status-badge ${user.status}`} />
                             </div>
                             <div className='item-info'>
@@ -665,7 +737,15 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                     {filteredGroups.map(group => (
                         <button key={group.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(group, 'group')}>
                             <div className='item-avatar'>
-                                <img src={group.avatar} alt="avatar" />
+                                <img
+                                    src={resolvedUserAvatar(group.avatar)}
+                                    alt=""
+                                    onError={(e) => {
+                                        const img = e.currentTarget;
+                                        img.onerror = null;
+                                        img.src = DEFAULT_AVATAR;
+                                    }}
+                                />
                             </div>
                             <div className='item-info'>
                                 <span className="item-name">{group.groupname}</span>

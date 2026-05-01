@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 
+import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
+import { resolvedUserAvatar } from "../utils/avatarDisplay";
 
 import '../styles/chatWindow.css'
 
@@ -11,6 +13,8 @@ function messageRowKey(msg: Message) {
 interface ChatWindowProps{
     activeChatId: number;
     activeChatName: string;
+    /** 群聊时在每条消息旁展示发送者头像与用户名 */
+    isGroupChat?: boolean;
     messages: Message[];
     currentUserId: number;
     onSendMessage: (content: string) => void
@@ -21,6 +25,7 @@ interface ChatWindowProps{
 export default function ChatWindow({
     activeChatId,
     activeChatName,
+    isGroupChat = false,
     messages,
     currentUserId,
     onSendMessage,
@@ -78,24 +83,46 @@ return (
             <div className="message-list" ref={scrollRef}>
                 {messages.map((msg) => {
                     const isSelf = msg.senderId === currentUserId;
+                    const senderLabel = (msg.senderUsername ?? '').trim() || `用户${msg.senderId}`;
+                    const avatarSrc = resolvedUserAvatar(msg.senderAvatar);
+                    const readLabel = msg.isRead ? "已读" : msg.status === "sending" ? "发送中" : msg.status === "failed" ? "失败" : "";
+                    const showSelfMeta = isSelf && (readLabel.length > 0 || (msg.status === "failed" && msg.clientId));
                     return (
                     <div
                         key={messageRowKey(msg)}
-                        className={`message-item ${isSelf ? "self" : "other"}`}
+                        className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}`}
                     >
-                        <div className="message-bubble">
-                            <p className="message-text">{msg.content}</p>
-                            <div className="message-meta">
-                                <span className="msg-time">{msg.time ?? ''}</span>
-                                {isSelf && (
-                                    <>
-                                        <span className="msg-read">
-                                            {msg.isRead ? '已读' : msg.status === 'sending' ? '发送中' : msg.status === 'failed' ? '失败' : ''}
-                                        </span>
-                                        {msg.status === 'failed' && msg.clientId && (
-                                            <button type="button" className="msg-retry" onClick={() => onRetryMessage?.(msg.clientId!)}>重试</button>
-                                        )}
-                                    </>
+                        {isGroupChat && (
+                            <img
+                                className="message-sender-avatar"
+                                src={avatarSrc}
+                                alt=""
+                                onError={(e) => {
+                                    e.currentTarget.onerror = null;
+                                    e.currentTarget.src = DEFAULT_AVATAR;
+                                }}
+                            />
+                        )}
+                        <div className="message-item-main">
+                            <div
+                                className={`message-top-bar${isGroupChat ? " with-sender" : ""}${isSelf ? " self" : " other"}`}
+                            >
+                                {isGroupChat && (
+                                    <span className={`message-sender-name${isSelf ? " self" : ""}`}>{senderLabel}</span>
+                                )}
+                                <span className="msg-time-row">{msg.time ?? ""}</span>
+                            </div>
+                            <div className="message-bubble">
+                                <p className="message-text">{msg.content}</p>
+                                {showSelfMeta && (
+                                    <div className="message-meta">
+                                        {readLabel ? <span className="msg-read">{readLabel}</span> : null}
+                                        {msg.status === "failed" && msg.clientId ? (
+                                            <button type="button" className="msg-retry" onClick={() => onRetryMessage?.(msg.clientId!)}>
+                                                重试
+                                            </button>
+                                        ) : null}
+                                    </div>
                                 )}
                             </div>
                         </div>

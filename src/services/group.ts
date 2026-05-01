@@ -42,6 +42,8 @@ export interface GroupDetailData {
 export interface CreateGroupPayload {
     group_name: string;
     member_ids: number[];
+    /** 可选：群头像 data URL 或外链 */
+    avatar?: string;
 }
 
 export const getGroupList = async () => {

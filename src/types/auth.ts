@@ -3,6 +3,8 @@ export interface RegisterParams {
     username: string;
     email: string;
     password: string;
+    /** 可选：图片 data URL（与 PUT /api/users/me 一致） */
+    avatar?: string;
 }
 
 export interface RegisterResponse {
@@ -12,6 +14,7 @@ export interface RegisterResponse {
         token: string;
         user_id: number;
         username: string;
+        avatar?: string;
     };
 }
 
@@ -28,5 +31,6 @@ export interface LoginResponse {
         token: string;
         user_id: number;
         username: string;
+        avatar?: string;
     };
 }

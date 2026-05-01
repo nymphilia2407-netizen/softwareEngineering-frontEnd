@@ -46,6 +46,15 @@
 .message-item {
     display: flex;
     max-width: 80%;
+    align-items: flex-end;
+    gap: 0;
+}
+
+/* 群聊：头像顶端与顶栏（用户名、时间）齐平 */
+.message-item.group-row {
+    max-width: min(92%, 720px);
+    gap: 10px;
+    align-items: flex-start;
 }
 
 .message-item.self {
@@ -55,6 +64,86 @@
 
 .message-item.other {
     align-self: flex-start;
+}
+
+.message-sender-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1px solid #e6e8eb;
+    background: #fff;
+}
+
+.message-item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    flex: 0 1 auto;
+}
+
+/* 顶栏：时间与用户名同一行，在气泡上方 */
+.message-top-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: baseline;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    line-height: 1.35;
+    padding: 0 2px;
+    box-sizing: border-box;
+}
+
+.message-top-bar.with-sender.other {
+    justify-content: flex-start;
+}
+
+.message-top-bar.with-sender.other .msg-time-row {
+    margin-left: auto;
+}
+
+.message-top-bar.with-sender.self {
+    justify-content: flex-end;
+}
+
+.message-top-bar:not(.with-sender).other {
+    justify-content: flex-start;
+}
+
+.message-top-bar:not(.with-sender).self {
+    justify-content: flex-end;
+}
+
+.msg-time-row {
+    font-size: 13px;
+    font-weight: 500;
+    color: #7a8494;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.message-item.self .message-item-main {
+    align-items: flex-end;
+}
+
+.message-item.other .message-item-main {
+    align-items: flex-start;
+}
+
+.message-sender-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #3d4450;
+    line-height: 1.35;
+    padding: 0;
+    min-width: 0;
+}
+
+.message-sender-name.self {
+    text-align: right;
 }
 
 .message-bubble {
@@ -68,6 +157,10 @@
     flex-direction: column;
     gap: 6px;
     min-width: 0;
+}
+
+.group-row .message-bubble {
+    gap: 4px;
 }
 
 .message-text {
@@ -85,15 +178,15 @@
     justify-content: flex-end;
 }
 
-.other .message-meta {
-    justify-content: flex-start;
-}
-
 .self .message-bubble {
     background-color: #007bff;
     color: #fff;
     border-bottom-right-radius: 2px;
     margin-right: 8px;
+}
+
+.group-row.self .message-bubble {
+    margin-right: 0;
 }
 
 .other .message-bubble {
@@ -104,9 +197,13 @@
     border: 1px solid #e0e0e0;
 }
 
+.group-row.other .message-bubble {
+    margin-left: 0;
+}
+
 .msg-time {
-    font-size: 11px;
-    opacity: 0.75;
+    font-size: 13px;
+    opacity: 0.85;
 }
 
 .self .msg-read {

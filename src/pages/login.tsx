@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 
 import { DEFAULT_AVATAR } from '../constants/string';
 import { loginApi, registerApi } from '../services/auth';
-import { checkPasswordStrength, tokenUtils } from '../utils/auth';
+import { checkPasswordStrength, persistUserProfile, tokenUtils } from '../utils/auth';
+import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
 
 import '../styles/login.css';
 
@@ -49,6 +50,7 @@ interface LoginProps {
 export default function Login({ onLogInSuccess }: LoginProps) {
     const [isLogin, setIsLogin] = useState<boolean>(true);
     const [avatar, setAvatar] = useState<string>(() => getStoredAvatar());
+    const [hasCustomAvatar, setHasCustomAvatar] = useState<boolean>(false);
 
     const {
         register,
@@ -68,18 +70,12 @@ export default function Login({ onLogInSuccess }: LoginProps) {
     const emailInvalid = !!email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
     const passwordInconsistent = !isLogin && !!confirmPassword && password !== confirmPassword;
 
-    const persistProfile = (usernameValue: string, avatarValue: string) => {
-        localStorage.setItem('user_profile', JSON.stringify({
-            username: usernameValue,
-            avatar: avatarValue,
-        }));
-    };
-
     const handleRegister = async (data: LoginFormValues) => {
         const registerResponse = await registerApi({
             username: data.username ?? '',
             email: data.email,
             password: data.password,
+            ...(hasCustomAvatar && avatar.startsWith('data:') ? { avatar } : {}),
         });
 
         if (registerResponse.code !== 0) {
@@ -99,7 +95,8 @@ export default function Login({ onLogInSuccess }: LoginProps) {
 
         alert('注册成功！');
         tokenUtils.setToken(loginResponse.data.token);
-        persistProfile(data.username ?? data.email, avatar);
+        const av = loginResponse.data.avatar || (hasCustomAvatar ? avatar : DEFAULT_AVATAR);
+        persistUserProfile(loginResponse.data.username, av);
         onLogInSuccess();
     };
 
@@ -116,30 +113,34 @@ export default function Login({ onLogInSuccess }: LoginProps) {
 
         alert('登录成功！');
         tokenUtils.setToken(response.data.token);
-        persistProfile(data.email, avatar);
+        const av = response.data.avatar && response.data.avatar.length > 0 ? response.data.avatar : DEFAULT_AVATAR;
+        persistUserProfile(response.data.username, av);
         onLogInSuccess();
     };
 
     const switchForm = () => {
         if (!isLogin) {
             setAvatar(getStoredAvatar());
+            setHasCustomAvatar(false);
         }
         setIsLogin((current) => !current);
     };
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) {
             return;
         }
 
-        if (!file.type.startsWith('image/')) {
-            alert('请选择图片文件');
-            return;
+        try {
+            const dataUrl = await readAvatarFileAsDataUrl(file);
+            setAvatar(dataUrl);
+            setHasCustomAvatar(true);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '选择图片失败');
         }
 
-        const imageUrl = URL.createObjectURL(file);
-        setAvatar(imageUrl);
+        e.target.value = '';
     };
 
     const onSubmit = async (data: LoginFormValues) => {

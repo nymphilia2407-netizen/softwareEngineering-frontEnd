@@ -22,3 +22,21 @@ export const getCurrentUser = async () => {
 
     return response.data;
 };
+
+export interface UpdateProfilePayload {
+    username?: string;
+    avatar?: string;
+    email?: string;
+    password?: string;
+    old_password?: string;
+}
+
+export const updateUserProfile = async (payload: UpdateProfilePayload) => {
+    const response = await request.put<any, ApiResponse<null>>('/api/users/me', payload);
+
+    if (response.code !== 0) {
+        throw new Error(response.info || '更新资料失败');
+    }
+
+    return true;
+};

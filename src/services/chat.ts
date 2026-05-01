@@ -16,6 +16,8 @@ export interface ChatMessageData {
     id: number;
     room_id?: number;
     sender_id: number;
+    sender_username?: string;
+    sender_avatar?: string;
     content: string;
     created_at: string;
     is_read: boolean;

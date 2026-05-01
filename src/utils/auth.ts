@@ -15,8 +15,20 @@ export const tokenUtils = {
 
     // 检测是否已经有token
     isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('token');
-    }
+        return !!localStorage.getItem('token');
+    },
+};
+
+const USER_PROFILE_KEY = 'user_profile';
+
+export function persistUserProfile(username: string, avatar: string) {
+    localStorage.setItem(
+        USER_PROFILE_KEY,
+        JSON.stringify({
+            username,
+            avatar,
+        }),
+    );
 }
 
 export const checkPasswordStrength = (password: string) => {

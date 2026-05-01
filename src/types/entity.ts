@@ -43,6 +43,9 @@ export type Message = {
     id: number;
     convId: number;
     senderId: number;
+    /** 群聊展示用；私聊可不填 */
+    senderUsername?: string;
+    senderAvatar?: string;
     type: MsgType;
     status: MsgStatus;
     content: string;

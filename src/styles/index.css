@@ -50,6 +50,8 @@
     position: relative;
     margin-bottom: 50px;
     margin-left: 5px;
+    cursor: pointer;
+    border-radius: 50%;
 }
 
 .user-avatar img{
@@ -150,4 +152,66 @@
 
 .log-out-item {
     color: #ff3b30;
+}
+
+.config-panel--profile {
+    width: 260px;
+    padding: 14px 12px;
+    cursor: default;
+}
+
+.profile-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+}
+
+.profile-settings-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.profile-settings-avatar-wrap {
+    display: flex;
+    justify-content: center;
+}
+
+.profile-settings-avatar-preview {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.profile-settings-file-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.profile-settings-file-label {
+    display: block;
+    text-align: center;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(0, 123, 255, 0.12);
+    color: #0066cc;
+    cursor: pointer;
+}
+
+.profile-settings-file-label:hover {
+    background: rgba(0, 123, 255, 0.2);
+}
+
+.profile-settings-hint {
+    margin: 0;
+    font-size: 11px;
+    color: #888;
+    line-height: 1.4;
 }
