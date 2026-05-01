@@ -160,8 +160,9 @@ export default function Login({ onLogInSuccess }: LoginProps) {
             await handleRegister(data);
         } catch (error) {
             console.error('请求失败:', error);
-            const requestError = error as { response?: { data?: { info?: string } } };
-            alert(requestError.response?.data?.info || '请求失败');
+            // 响应拦截器已经进行了错误信息提取
+            const message = error instanceof Error ? error.message : '请求失败';
+            alert(message);
         }
     };
 
