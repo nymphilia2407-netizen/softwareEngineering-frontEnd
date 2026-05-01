@@ -11,9 +11,10 @@ export interface ChatRoomSummaryData {
     unread_count: number;
 }
 
+/** 与 GET /api/chat/messages/:roomId/ 单条结构一致（room_id 由后端附带便于映射） */
 export interface ChatMessageData {
     id: number;
-    room_id: number;
+    room_id?: number;
     sender_id: number;
     content: string;
     created_at: string;

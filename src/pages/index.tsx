@@ -42,7 +42,14 @@ const decodeTokenPayload = () => {
     try {
         const normalizedPayload = payload.replaceAll('-', '+').replaceAll('_', '/');
         const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, '=');
-        return JSON.parse(atob(paddedPayload)) as { user_id?: number; username?: string };
+        const parsed = JSON.parse(atob(paddedPayload)) as {
+            data?: { user_id?: number; username?: string };
+            user_id?: number;
+            username?: string;
+        };
+        // 后端 generate_jwt_token 把业务字段放在 payload.data 里
+        const inner = parsed.data ?? parsed;
+        return { user_id: inner.user_id, username: inner.username };
     } catch {
         return null;
     }
@@ -149,7 +156,7 @@ const appendOptimisticMessage = (
     message: Message
 ) => ({
     ...store,
-    [conversationId]: [...(store[conversationId] ?? []), message],
+    [conversationId]: sortMessagesByTime([...(store[conversationId] ?? []), message]),
 });
 
 const updateRoomOnIncomingMessage = (
@@ -202,18 +209,19 @@ const mapFriendSummary = (friend: FriendSummaryData): User => ({
     lastLoginTime: Date.now(),
 });
 
-const mapHistoryMessage = (message: ChatMessageData): Message => {
+const mapHistoryMessage = (roomId: number, message: ChatMessageData): Message => {
     const timestamp = new Date(message.created_at).getTime();
 
     return {
         id: message.id,
-        convId: message.room_id,
+        convId: message.room_id ?? roomId,
         senderId: message.sender_id,
         type: 'text',
         status: 'sent',
         content: message.content,
         timestamp,
         time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isRead: message.is_read,
     };
 };
 
@@ -268,6 +276,8 @@ export default function Index() {
     const currentUserIdRef = useRef<number>(currentUserId);
     const activeChatIdRef = useRef<number>(activeChatId);
     const pendingSendTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
+    /** 乐观消息的临时负数 id，保证同毫秒内多次发送也不与 React key 冲突 */
+    const optimisticIdSeqRef = useRef(0);
 
     useEffect(() => {
         currentUserIdRef.current = currentUserId;
@@ -387,6 +397,10 @@ export default function Index() {
                     setMessageStore((prev) => applyReadReceiptToMessages(prev, event.data, currentUserIdRef.current));
                     setChatRooms((prev) => clearUnreadRoom(prev, event.data.conversation_id));
                 }
+
+                if (event.type === 'error') {
+                    console.error('Chat WebSocket:', event.message);
+                }
             });
 
             const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
@@ -441,9 +455,14 @@ export default function Index() {
                     return;
                 }
 
+                // 后端按时间倒序分页，界面按时间正序展示
+                const chronological = [...history.messages].sort(
+                    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+                );
+
                 setMessageStore((prev) => ({
                     ...prev,
-                    [activeChatId]: history.messages.map(mapHistoryMessage),
+                    [activeChatId]: chronological.map((m) => mapHistoryMessage(history.room_id, m)),
                 }));
             } catch (error) {
                 console.error('获取聊天记录失败:', error);
@@ -479,13 +498,13 @@ export default function Index() {
     };
 
     const handleSendMessage = (content: string) => {
-        if (!socketRef.current || !activeChatId || !content.trim()) {
+        if (!activeChatId || !content.trim()) {
             return;
         }
 
-        // 生成客户端临时 id，并乐观地将消息加入本地列表
-        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const tempId = -Date.now();
+        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        optimisticIdSeqRef.current += 1;
+        const tempId = -optimisticIdSeqRef.current;
         const timestamp = Date.now();
 
         const optimisticMsg: Message = {
@@ -502,21 +521,30 @@ export default function Index() {
         };
 
         setMessageStore((prev) => appendOptimisticMessage(prev, activeChatId, optimisticMsg));
-
-        // 更新会话列表显示
         setChatRooms((prev) => updateRoomOnIncomingMessage(prev, optimisticMsg, currentUserIdRef.current, activeChatId));
 
-        // 设置发送超时，如果在超时时间内未收到服务器回包则标记为失败
+        const clearSendTimer = () => {
+            const t = pendingSendTimers.current[clientId];
+            if (t) clearTimeout(t);
+            delete pendingSendTimers.current[clientId];
+        };
+
         const timer = setTimeout(() => {
             setMessageStore((prev) => markMessageFailedInStore(prev, activeChatId, clientId));
-
-            delete pendingSendTimers.current[clientId];
+            clearSendTimer();
         }, 8000);
 
         pendingSendTimers.current[clientId] = timer;
 
-        // 通过 websocket 发送（包含 client_id）
-        socketRef.current.send({
+        const socket = socketRef.current;
+        if (!socket) {
+            clearSendTimer();
+            setMessageStore((prev) => markMessageFailedInStore(prev, activeChatId, clientId));
+            return;
+        }
+
+        // 未 OPEN 时由客户端入队，连接建立后自动发出，避免与 HTTP 双写
+        socket.send({
             type: 'send_message',
             data: {
                 conversation_id: activeChatId,
@@ -528,10 +556,11 @@ export default function Index() {
 
     // 直接向指定会话发送（用于重试）
     const sendMessageDirect = (convId: number, content: string) => {
-        if (!socketRef.current || !convId || !content.trim()) return;
+        if (!convId || !content.trim()) return;
 
-        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        const tempId = -Date.now();
+        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        optimisticIdSeqRef.current += 1;
+        const tempId = -optimisticIdSeqRef.current;
         const timestamp = Date.now();
 
         const optimisticMsg: Message = {
@@ -547,21 +576,29 @@ export default function Index() {
             clientId,
         };
 
-        setMessageStore((prev) => {
-            const roomMessages = prev[convId] ? [...prev[convId]] : [];
-            return { ...prev, [convId]: [...roomMessages, optimisticMsg] };
-        });
+        setMessageStore((prev) => appendOptimisticMessage(prev, convId, optimisticMsg));
 
-        // 设置超时
+        const clearSendTimer = () => {
+            const t = pendingSendTimers.current[clientId];
+            if (t) clearTimeout(t);
+            delete pendingSendTimers.current[clientId];
+        };
+
         const timer = setTimeout(() => {
             setMessageStore((prev) => markMessageFailedInStore(prev, convId, clientId));
-
-            delete pendingSendTimers.current[clientId];
+            clearSendTimer();
         }, 8000);
 
         pendingSendTimers.current[clientId] = timer;
 
-        socketRef.current.send({ type: 'send_message', data: { conversation_id: convId, content, client_id: clientId } });
+        const socket = socketRef.current;
+        if (!socket) {
+            clearSendTimer();
+            setMessageStore((prev) => markMessageFailedInStore(prev, convId, clientId));
+            return;
+        }
+
+        socket.send({ type: 'send_message', data: { conversation_id: convId, content, client_id: clientId } });
     };
 
     const handleRetryMessage = (clientId: string) => {
@@ -699,14 +736,12 @@ export default function Index() {
                                 setSelectedContact(userItem);
                                 const matchedRoom = chatRooms.find((room) => room.otherUserId === userItem.id);
                                 setActiveChatId(matchedRoom?.id ?? 0);
-                                setActiveTab('chat');
                                 return;
                             }
 
                             const groupItem = item as { id: number };
                             setSelectedContact(null);
                             setActiveChatId(groupItem.id);
-                            setActiveTab('chat');
                         }}
                         onCreateGroup={handleCreateGroup}
                         onContactsChanged={refreshFriendsAndRooms}
