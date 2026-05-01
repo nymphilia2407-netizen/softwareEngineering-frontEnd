@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import ChatList from '../components/chatList';
+import ChatSessionDetail from '../components/chatSessionDetail';
 import ChatWindow from '../components/chatWindow';
 import ContactList from '../components/contactList';
 
@@ -282,6 +283,7 @@ export default function Index() {
     const [groups, setGroups] = useState<Group[]>(MOCK_GROUPS);
     const [chatRooms, setChatRooms] = useState<ChatListItem[]>([]);
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
+    const [chatSessionInfoOpen, setChatSessionInfoOpen] = useState<boolean>(false);
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -298,6 +300,12 @@ export default function Index() {
 
     useEffect(() => {
         activeChatIdRef.current = activeChatId;
+    }, [activeChatId]);
+
+    useEffect(() => {
+        if (!activeChatId) {
+            setChatSessionInfoOpen(false);
+        }
     }, [activeChatId]);
 
     useEffect(() => {
@@ -875,16 +883,27 @@ export default function Index() {
 
             <main className="chat-area">
                 {activeChatName ? (
-                    <ChatWindow
-                        activeChatId={activeChatId}
-                        activeChatName={activeChatName}
-                        isGroupChat={activeChatIsGroup}
-                        messages={messages}
-                        currentUserId={currentUserId}
-                        onSendMessage={handleSendMessage}
-                        onReadMessage={handleReadMessage}
-                        onRetryMessage={handleRetryMessage}
-                    />
+                    chatSessionInfoOpen ? (
+                        <ChatSessionDetail
+                            roomId={activeChatId}
+                            displayName={activeChatName}
+                            isGroup={activeChatIsGroup}
+                            otherUserId={activeChat?.otherUserId ?? null}
+                            onBack={() => setChatSessionInfoOpen(false)}
+                        />
+                    ) : (
+                        <ChatWindow
+                            activeChatId={activeChatId}
+                            activeChatName={activeChatName}
+                            isGroupChat={activeChatIsGroup}
+                            messages={messages}
+                            currentUserId={currentUserId}
+                            onSendMessage={handleSendMessage}
+                            onReadMessage={handleReadMessage}
+                            onRetryMessage={handleRetryMessage}
+                            onOpenSessionInfo={() => setChatSessionInfoOpen(true)}
+                        />
+                    )
                 ) : (
                     <div className="empty-chat-placeholder">
                         <p>选择一个联系人开始聊天</p>

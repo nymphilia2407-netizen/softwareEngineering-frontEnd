@@ -1,0 +1,100 @@
+.chat-session-detail {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background: #f5f7f9;
+    color: #1a1a1a;
+}
+
+.chat-session-detail-header {
+    flex-shrink: 0;
+    height: 56px;
+    padding: 0 12px 0 8px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border-bottom: 1px solid #e6e8eb;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.chat-session-detail-back {
+    border: none;
+    background: transparent;
+    color: #007bff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 10px;
+}
+
+.chat-session-detail-back:hover {
+    background: rgba(0, 123, 255, 0.08);
+}
+
+.chat-session-detail-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.chat-session-detail-header-spacer {
+    width: 52px;
+}
+
+.chat-session-detail-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 20px;
+}
+
+.chat-session-detail-name {
+    margin: 0 0 20px;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.chat-session-detail-meta {
+    margin: 0;
+    padding: 16px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid #e6e8eb;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.chat-session-detail-meta > div {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 8px 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.chat-session-detail-meta > div:last-child {
+    border-bottom: none;
+}
+
+.chat-session-detail-meta dt {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.chat-session-detail-meta dd {
+    margin: 0;
+    font-size: 14px;
+    color: #1a1a1a;
+}
+
+.chat-session-detail-placeholder {
+    margin: 20px 0 0;
+    font-size: 14px;
+    color: #64748b;
+    line-height: 1.5;
+}

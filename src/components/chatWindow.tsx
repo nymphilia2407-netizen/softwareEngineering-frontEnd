@@ -20,6 +20,8 @@ interface ChatWindowProps{
     onSendMessage: (content: string) => void
     onReadMessage: (convId: number, lastMsgId: number) => void;
     onRetryMessage?: (clientId: string) => void;
+    /** 右上角「…」打开好友/群聊资料（由父级处理路由或占位页） */
+    onOpenSessionInfo?: () => void;
 }
 
 export default function ChatWindow({
@@ -30,7 +32,8 @@ export default function ChatWindow({
     currentUserId,
     onSendMessage,
     onReadMessage,
-    onRetryMessage
+    onRetryMessage,
+    onOpenSessionInfo,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,6 +81,16 @@ return (
         <div className="chat-window">
             <div className="window-header">
                 <span className="chat-title">{activeChatName}</span>
+                {onOpenSessionInfo && (
+                    <button
+                        type="button"
+                        className="chat-header-more"
+                        aria-label="查看会话详情"
+                        onClick={onOpenSessionInfo}
+                    >
+                        ...
+                    </button>
+                )}
             </div>
 
             <div className="message-list" ref={scrollRef}>
@@ -86,7 +99,12 @@ return (
                     const senderLabel = (msg.senderUsername ?? '').trim() || `用户${msg.senderId}`;
                     const avatarSrc = resolvedUserAvatar(msg.senderAvatar);
                     const readLabel = msg.isRead ? "已读" : msg.status === "sending" ? "发送中" : msg.status === "failed" ? "失败" : "";
-                    const showSelfMeta = isSelf && (readLabel.length > 0 || (msg.status === "failed" && msg.clientId));
+                    /** 群聊不展示已读/未读；仍保留发送中、失败与重试 */
+                    const showSelfMeta =
+                        isSelf &&
+                        (isGroupChat
+                            ? msg.status === "sending" || msg.status === "failed"
+                            : readLabel.length > 0 || (msg.status === "failed" && msg.clientId));
                     return (
                     <div
                         key={messageRowKey(msg)}
@@ -116,7 +134,13 @@ return (
                                 <p className="message-text">{msg.content}</p>
                                 {showSelfMeta && (
                                     <div className="message-meta">
-                                        {readLabel ? <span className="msg-read">{readLabel}</span> : null}
+                                        {isGroupChat ? (
+                                            (msg.status === "sending" || msg.status === "failed") && (
+                                                <span className="msg-read">{msg.status === "sending" ? "发送中" : "失败"}</span>
+                                            )
+                                        ) : (
+                                            readLabel ? <span className="msg-read">{readLabel}</span> : null
+                                        )}
                                         {msg.status === "failed" && msg.clientId ? (
                                             <button type="button" className="msg-retry" onClick={() => onRetryMessage?.(msg.clientId!)}>
                                                 重试
