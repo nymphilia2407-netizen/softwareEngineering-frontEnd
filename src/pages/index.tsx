@@ -292,6 +292,7 @@ export default function Index() {
     const [profileBirthday, setProfileBirthday] = useState<string>('');
     const [profileAddress, setProfileAddress] = useState<string>('');
     const [profileSignature, setProfileSignature] = useState<string>('');
+    const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -300,6 +301,7 @@ export default function Index() {
     const myAvatarRef = useRef<string>(myAvatar);
     const pendingSendTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
     const messageStoreRef = useRef<Record<number, Message[]>>(messageStore);
+    const roomUnreadHintBaselineRef = useRef<Record<number, number>>({});
     /** 乐观消息的临时负数 id，保证同毫秒内多次发送也不与 React key 冲突 */
     const optimisticIdSeqRef = useRef(0);
 
@@ -495,6 +497,18 @@ export default function Index() {
     const messages = messageStore[activeChatId] ?? [];
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
+
+    const getEntryUnreadHintForRoom = (roomId: number) => {
+        if (!roomId) return 0;
+        const room = chatRooms.find((item) => item.id === roomId);
+        if (!room) return 0;
+
+        const currentUnread = Math.max(0, room.unreadCount || 0);
+        const baseline = roomUnreadHintBaselineRef.current[roomId] ?? 0;
+        const hintCount = Math.max(0, currentUnread - baseline);
+        roomUnreadHintBaselineRef.current[roomId] = currentUnread;
+        return hintCount;
+    };
 
     useEffect(() => {
         if (!activeChatId) {
@@ -703,6 +717,7 @@ export default function Index() {
 
             setActiveTab('chat');
             setSelectedContact(null);
+            setEntryUnreadHintCount(0);
             setActiveChatId(createdGroup.room_id);
 
             const mappedGroup = mapGroupSummary(createdGroup);
@@ -938,6 +953,7 @@ export default function Index() {
                         chats={chatListData}
                         activeId={activeChatId}
                         onChatClick={(chat) => {
+                            setEntryUnreadHintCount(getEntryUnreadHintForRoom(chat.id));
                             setActiveChatId(chat.id);
                             setSelectedContact(null);
                             setActiveTab('chat');
@@ -954,12 +970,15 @@ export default function Index() {
                                 const userItem = item as User;
                                 setSelectedContact(userItem);
                                 const matchedRoom = chatRooms.find((room) => room.otherUserId === userItem.id);
-                                setActiveChatId(matchedRoom?.id ?? 0);
+                                const roomId = matchedRoom?.id ?? 0;
+                                setEntryUnreadHintCount(getEntryUnreadHintForRoom(roomId));
+                                setActiveChatId(roomId);
                                 return;
                             }
 
                             const groupItem = item as { id: number };
                             setSelectedContact(null);
+                            setEntryUnreadHintCount(getEntryUnreadHintForRoom(groupItem.id));
                             setActiveChatId(groupItem.id);
                         }}
                         onCreateGroup={handleCreateGroup}
@@ -984,6 +1003,7 @@ export default function Index() {
                             activeChatName={activeChatName}
                             isGroupChat={activeChatIsGroup}
                             messages={messages}
+                            initialUnreadCount={entryUnreadHintCount}
                             currentUserId={currentUserId}
                             onSendMessage={handleSendMessage}
                             onReadMessage={handleReadMessage}

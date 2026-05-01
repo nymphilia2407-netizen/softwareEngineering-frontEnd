@@ -54,6 +54,37 @@
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 
+.chat-header-unread,
+.unread-jump-button {
+    border: none;
+    border-radius: 18px;
+    background: #007bff;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    height: 36px;
+    padding: 0 14px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0, 123, 255, 0.28);
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.chat-header-unread {
+    flex-shrink: 0;
+}
+
+.chat-header-unread:hover,
+.unread-jump-button:hover {
+    background: #0062cc;
+    transform: translateY(-1px);
+}
+
+.chat-header-unread:focus-visible,
+.unread-jump-button:focus-visible {
+    outline: 2px solid rgba(0, 123, 255, 0.35);
+    outline-offset: 2px;
+}
+
 .chat-header-more:hover {
     background: rgba(15, 23, 42, 0.06);
     color: #0f172a;
@@ -285,27 +316,6 @@
     right: 20px;
     bottom: 86px;
     z-index: 20;
-    height: 36px;
-    padding: 0 14px;
-    border: none;
-    border-radius: 18px;
-    background: #007bff;
-    color: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    box-shadow: 0 8px 20px rgba(0, 123, 255, 0.28);
-    cursor: pointer;
-    transition: transform 0.15s ease, background-color 0.15s ease;
-}
-
-.unread-jump-button:hover {
-    background: #0062cc;
-    transform: translateY(-1px);
-}
-
-.unread-jump-button:focus-visible {
-    outline: 2px solid rgba(0, 123, 255, 0.35);
-    outline-offset: 2px;
 }
 
 .window-footer textarea {

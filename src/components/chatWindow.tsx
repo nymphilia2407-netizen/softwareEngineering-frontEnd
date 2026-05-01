@@ -16,6 +16,7 @@ interface ChatWindowProps{
     /** 群聊时在每条消息旁展示发送者头像与用户名 */
     isGroupChat?: boolean;
     messages: Message[];
+    initialUnreadCount?: number;
     currentUserId: number;
     onSendMessage: (content: string) => void
     onReadMessage: (convId: number, lastMsgId: number) => void;
@@ -29,6 +30,7 @@ export default function ChatWindow({
     activeChatName,
     isGroupChat = false,
     messages,
+    initialUnreadCount = 0,
     currentUserId,
     onSendMessage,
     onReadMessage,
@@ -37,12 +39,18 @@ export default function ChatWindow({
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     const [unreadFloatingCount, setUnreadFloatingCount] = useState(0);
+    const [headerUnreadCount, setHeaderUnreadCount] = useState(0);
+    const [showHeaderUnreadButton, setShowHeaderUnreadButton] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const onReadMessageRef = useRef(onReadMessage);
     const shouldAutoScrollRef = useRef(true);
     const lastMessageKeyRef = useRef<string | null>(null);
-    const pendingUnreadKeysRef = useRef<string[]>([]);
+    const headerUnreadKeysRef = useRef<string[]>([]);
+    const floatingUnreadKeysRef = useRef<string[]>([]);
+    const hasSeededRoomUnreadRef = useRef(false);
+    const roomEntryUnreadCountRef = useRef(0);
+    const canConsumeUnreadRef = useRef(false);
     onReadMessageRef.current = onReadMessage;
     const AUTO_SCROLL_THRESHOLD_PX = 80;
     const SHOW_UNREAD_DISTANCE_BASE_PX = 220;
@@ -53,52 +61,84 @@ export default function ChatWindow({
         const nearBottom = distanceToBottom <= AUTO_SCROLL_THRESHOLD_PX;
         shouldAutoScrollRef.current = nearBottom;
 
-        if (nearBottom) {
-            pendingUnreadKeysRef.current = [];
-            setUnreadFloatingCount(0);
-            return;
+        if (canConsumeUnreadRef.current) {
+            const viewportTop = el.scrollTop;
+            const viewportBottom = el.scrollTop + el.clientHeight;
+            const isUnreadStillHidden = (key: string) => {
+                const node = el.querySelector<HTMLElement>(`[data-message-key="${key}"]`);
+                if (!node) {
+                    return false;
+                }
+                const nodeTop = node.offsetTop;
+                const nodeBottom = nodeTop + node.offsetHeight;
+                const isVisible = nodeBottom > viewportTop && nodeTop < viewportBottom;
+                return !isVisible;
+            };
+            headerUnreadKeysRef.current = headerUnreadKeysRef.current.filter(isUnreadStillHidden);
+            floatingUnreadKeysRef.current = floatingUnreadKeysRef.current.filter(isUnreadStillHidden);
         }
-
-        const viewportBottom = el.scrollTop + el.clientHeight;
-        pendingUnreadKeysRef.current = pendingUnreadKeysRef.current.filter((key) => {
-            const node = el.querySelector<HTMLElement>(`[data-message-key="${key}"]`);
-            if (!node) {
-                return false;
-            }
-            return node.offsetTop > viewportBottom;
-        });
+        setHeaderUnreadCount(headerUnreadKeysRef.current.length);
 
         const showThreshold = Math.max(el.clientHeight * SHOW_UNREAD_DISTANCE_RATIO, SHOW_UNREAD_DISTANCE_BASE_PX);
-        setUnreadFloatingCount(distanceToBottom >= showThreshold ? pendingUnreadKeysRef.current.length : 0);
+        setUnreadFloatingCount(
+            distanceToBottom >= showThreshold ? floatingUnreadKeysRef.current.length : 0
+        );
     }, []);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
         const el = scrollRef.current;
         if (!el) return;
+        if (behavior === 'auto') {
+            const previousBehavior = el.style.scrollBehavior;
+            el.style.scrollBehavior = 'auto';
+            el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+            el.style.scrollBehavior = previousBehavior;
+            return;
+        }
         el.scrollTo({ top: el.scrollHeight, behavior });
     }, []);
 
     useLayoutEffect(() => {
-        scrollToBottom('auto');
         shouldAutoScrollRef.current = true;
-        lastMessageKeyRef.current = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
-        pendingUnreadKeysRef.current = [];
+        lastMessageKeyRef.current = null;
+        headerUnreadKeysRef.current = [];
+        floatingUnreadKeysRef.current = [];
+        hasSeededRoomUnreadRef.current = false;
+        roomEntryUnreadCountRef.current = Math.max(0, initialUnreadCount);
+        canConsumeUnreadRef.current = false;
         setUnreadFloatingCount(0);
-    }, [activeChatId, scrollToBottom]);
+        setHeaderUnreadCount(0);
+        setShowHeaderUnreadButton(true);
+        scrollToBottom('auto');
+    }, [activeChatId, initialUnreadCount, scrollToBottom]);
 
     useLayoutEffect(() => {
         const listEl = scrollRef.current;
         if (!listEl) return;
 
         const nextLastMessageKey = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
+        if (lastMessageKeyRef.current === null) {
+            if (!hasSeededRoomUnreadRef.current && messages.length > 0) {
+                const incomingMessageKeys = messages
+                    .filter((msg) => msg.senderId !== currentUserId)
+                    .map((msg) => messageRowKey(msg));
+                const takeCount = Math.min(roomEntryUnreadCountRef.current, incomingMessageKeys.length);
+                headerUnreadKeysRef.current = takeCount > 0 ? incomingMessageKeys.slice(-takeCount) : [];
+                hasSeededRoomUnreadRef.current = true;
+            }
+            lastMessageKeyRef.current = nextLastMessageKey;
+            syncUnreadFloatingVisibility(listEl);
+            return;
+        }
+
         const hasNewMessage = nextLastMessageKey !== lastMessageKeyRef.current;
         if (hasNewMessage) {
             const latestMessage = messages[messages.length - 1];
             if (shouldAutoScrollRef.current) {
                 scrollToBottom('auto');
             } else if (latestMessage && latestMessage.senderId !== currentUserId) {
-                if (nextLastMessageKey && !pendingUnreadKeysRef.current.includes(nextLastMessageKey)) {
-                    pendingUnreadKeysRef.current.push(nextLastMessageKey);
+                if (nextLastMessageKey && !floatingUnreadKeysRef.current.includes(nextLastMessageKey)) {
+                    floatingUnreadKeysRef.current.push(nextLastMessageKey);
                 }
             }
         }
@@ -106,11 +146,11 @@ export default function ChatWindow({
         syncUnreadFloatingVisibility(listEl);
     }, [messages, scrollToBottom, currentUserId, syncUnreadFloatingVisibility]);
 
-    const handleJumpToFirstUnread = () => {
+    const jumpToFirstUnreadFromKeys = (unreadKeys: string[]) => {
         const listEl = scrollRef.current;
         if (!listEl) return;
 
-        const targetKey = pendingUnreadKeysRef.current[0];
+        const targetKey = unreadKeys[0];
         if (!targetKey) {
             scrollToBottom('smooth');
             return;
@@ -119,8 +159,10 @@ export default function ChatWindow({
         const targetElement = listEl.querySelector<HTMLElement>(`[data-message-key="${targetKey}"]`);
         if (!targetElement) {
             scrollToBottom('smooth');
-            pendingUnreadKeysRef.current = [];
+            headerUnreadKeysRef.current = [];
+            floatingUnreadKeysRef.current = [];
             setUnreadFloatingCount(0);
+            setHeaderUnreadCount(0);
             return;
         }
 
@@ -133,6 +175,17 @@ export default function ChatWindow({
 
         // 点击后不直接清零，保留未读并在后续滚动/到底时根据可视区动态扣减。
         syncUnreadFloatingVisibility(listEl);
+    };
+
+    const handleHeaderJumpToUnread = () => {
+        setShowHeaderUnreadButton(false);
+        canConsumeUnreadRef.current = true;
+        jumpToFirstUnreadFromKeys(headerUnreadKeysRef.current);
+    };
+
+    const handleFloatingJumpToUnread = () => {
+        canConsumeUnreadRef.current = true;
+        jumpToFirstUnreadFromKeys(floatingUnreadKeysRef.current);
     };
 
     useEffect(() => {
@@ -165,6 +218,16 @@ return (
         <div className="chat-window">
             <div className="window-header">
                 <span className="chat-title">{activeChatName}</span>
+                {showHeaderUnreadButton && headerUnreadCount > 0 ? (
+                    <button
+                        type="button"
+                        className="chat-header-unread"
+                        onClick={handleHeaderJumpToUnread}
+                        aria-label={`跳转到第一条未读消息，当前 ${headerUnreadCount} 条`}
+                    >
+                        未读 {headerUnreadCount > 99 ? '99+' : headerUnreadCount}
+                    </button>
+                ) : null}
                 {onOpenSessionInfo && (
                     <button
                         type="button"
@@ -180,6 +243,15 @@ return (
             <div
                 className="message-list"
                 ref={scrollRef}
+                onWheel={() => {
+                    canConsumeUnreadRef.current = true;
+                }}
+                onTouchMove={() => {
+                    canConsumeUnreadRef.current = true;
+                }}
+                onPointerDown={() => {
+                    canConsumeUnreadRef.current = true;
+                }}
                 onScroll={(e) => {
                     syncUnreadFloatingVisibility(e.currentTarget);
                 }}
@@ -250,7 +322,7 @@ return (
                 <button
                     type="button"
                     className="unread-jump-button"
-                    onClick={handleJumpToFirstUnread}
+                    onClick={handleFloatingJumpToUnread}
                     aria-label={`跳转到第一条未读消息，当前 ${unreadFloatingCount} 条`}
                 >
                     {unreadFloatingCount > 99 ? '99+' : unreadFloatingCount} 条未读
