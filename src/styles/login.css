@@ -124,7 +124,7 @@ button[type='submit']:active {
     background: rgba(0, 0, 0, 0.72);
     color: #f8fafc;
     font-size: 12px;
-    opacity: 0;
+    opacity: 50%;
     transition: opacity 0.3s ease;
 }
 

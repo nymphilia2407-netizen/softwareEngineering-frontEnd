@@ -194,7 +194,7 @@ export default function Login({ onLogInSuccess }: LoginProps) {
                         <img src={avatar} alt="User Avatar" />
                         {!isLogin && (
                             <div className="avatar-change">
-                                <span>更换头像</span>
+                                <span>上传头像</span>
                             </div>
                         )}
                     </div>
