@@ -10,7 +10,7 @@ import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, type GroupSummaryData } from '../services/group';
 import { getFriendList, type FriendSummaryData } from '../services/friend';
-import { getCurrentUser, updateUserProfile } from '../services/user';
+import { getCurrentUser, updateUserProfile, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
@@ -724,6 +724,25 @@ export default function Index() {
         }
     };
 
+    const handleDelete = async () => {
+        const isConfirmed = globalThis.confirm('确认要注销账号吗？此操作无法撤销！');
+        if (!isConfirmed) {
+            return;
+        }
+
+        const success = await deleteUser();
+    
+        if (success) {
+            alert('账号已注销');
+            localStorage.clear(); // 清空本地存储
+            socketRef.current?.disconnect();
+            tokenUtils.removeToken();
+            globalThis.location.reload();
+        } else {
+            alert('注销失败，请稍后重试');
+        }
+    }
+
     return (
         <div className="main">
             <aside className="side-bar">
@@ -817,6 +836,9 @@ export default function Index() {
                                 </button>
                                 <button type="button" className="config-button" onClick={handleLogout}>
                                     退出登录
+                                </button>
+                                <button type="button" className="config-button" style={{ color: '#ff4d4f' }} onClick={handleDelete}>
+                                    注销账号
                                 </button>
                             </>
                         ) : (

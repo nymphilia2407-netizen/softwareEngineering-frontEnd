@@ -46,3 +46,12 @@ export const updateUserProfile = async (payload: UpdateProfilePayload) => {
 
     return true;
 };
+
+export const deleteUser = async (): Promise<boolean> => {
+    try {
+        await request.delete('/users/me');
+        return true;
+    } catch {
+        return false;
+    }
+};
