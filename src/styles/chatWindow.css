@@ -3,6 +3,7 @@
     flex-direction: column;
     height: 100%;
     width: 100%;
+    position: relative;
     background-color: #f5f7f9;
     color: #333;
 }
@@ -277,6 +278,34 @@
     display: flex;
     align-items: flex-end; 
     gap: 12px;
+}
+
+.unread-jump-button {
+    position: absolute;
+    right: 20px;
+    bottom: 86px;
+    z-index: 20;
+    height: 36px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 18px;
+    background: #007bff;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 8px 20px rgba(0, 123, 255, 0.28);
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.unread-jump-button:hover {
+    background: #0062cc;
+    transform: translateY(-1px);
+}
+
+.unread-jump-button:focus-visible {
+    outline: 2px solid rgba(0, 123, 255, 0.35);
+    outline-offset: 2px;
 }
 
 .window-footer textarea {

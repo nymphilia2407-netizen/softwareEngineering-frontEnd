@@ -36,17 +36,40 @@ export default function ChatWindow({
     onOpenSessionInfo,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
+    const [unreadFloatingCount, setUnreadFloatingCount] = useState(0);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const onReadMessageRef = useRef(onReadMessage);
     const shouldAutoScrollRef = useRef(true);
     const lastMessageKeyRef = useRef<string | null>(null);
+    const pendingUnreadKeysRef = useRef<string[]>([]);
     onReadMessageRef.current = onReadMessage;
     const AUTO_SCROLL_THRESHOLD_PX = 80;
+    const SHOW_UNREAD_DISTANCE_BASE_PX = 220;
+    const SHOW_UNREAD_DISTANCE_RATIO = 0.6;
 
-    const isNearBottom = useCallback((el: HTMLDivElement) => {
+    const syncUnreadFloatingVisibility = useCallback((el: HTMLDivElement) => {
         const distanceToBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
-        return distanceToBottom <= AUTO_SCROLL_THRESHOLD_PX;
+        const nearBottom = distanceToBottom <= AUTO_SCROLL_THRESHOLD_PX;
+        shouldAutoScrollRef.current = nearBottom;
+
+        if (nearBottom) {
+            pendingUnreadKeysRef.current = [];
+            setUnreadFloatingCount(0);
+            return;
+        }
+
+        const viewportBottom = el.scrollTop + el.clientHeight;
+        pendingUnreadKeysRef.current = pendingUnreadKeysRef.current.filter((key) => {
+            const node = el.querySelector<HTMLElement>(`[data-message-key="${key}"]`);
+            if (!node) {
+                return false;
+            }
+            return node.offsetTop > viewportBottom;
+        });
+
+        const showThreshold = Math.max(el.clientHeight * SHOW_UNREAD_DISTANCE_RATIO, SHOW_UNREAD_DISTANCE_BASE_PX);
+        setUnreadFloatingCount(distanceToBottom >= showThreshold ? pendingUnreadKeysRef.current.length : 0);
     }, []);
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -59,6 +82,8 @@ export default function ChatWindow({
         scrollToBottom('auto');
         shouldAutoScrollRef.current = true;
         lastMessageKeyRef.current = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
+        pendingUnreadKeysRef.current = [];
+        setUnreadFloatingCount(0);
     }, [activeChatId, scrollToBottom]);
 
     useLayoutEffect(() => {
@@ -67,11 +92,48 @@ export default function ChatWindow({
 
         const nextLastMessageKey = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
         const hasNewMessage = nextLastMessageKey !== lastMessageKeyRef.current;
-        if (hasNewMessage && shouldAutoScrollRef.current) {
-            scrollToBottom('auto');
+        if (hasNewMessage) {
+            const latestMessage = messages[messages.length - 1];
+            if (shouldAutoScrollRef.current) {
+                scrollToBottom('auto');
+            } else if (latestMessage && latestMessage.senderId !== currentUserId) {
+                if (nextLastMessageKey && !pendingUnreadKeysRef.current.includes(nextLastMessageKey)) {
+                    pendingUnreadKeysRef.current.push(nextLastMessageKey);
+                }
+            }
         }
         lastMessageKeyRef.current = nextLastMessageKey;
-    }, [messages, scrollToBottom]);
+        syncUnreadFloatingVisibility(listEl);
+    }, [messages, scrollToBottom, currentUserId, syncUnreadFloatingVisibility]);
+
+    const handleJumpToFirstUnread = () => {
+        const listEl = scrollRef.current;
+        if (!listEl) return;
+
+        const targetKey = pendingUnreadKeysRef.current[0];
+        if (!targetKey) {
+            scrollToBottom('smooth');
+            return;
+        }
+
+        const targetElement = listEl.querySelector<HTMLElement>(`[data-message-key="${targetKey}"]`);
+        if (!targetElement) {
+            scrollToBottom('smooth');
+            pendingUnreadKeysRef.current = [];
+            setUnreadFloatingCount(0);
+            return;
+        }
+
+        const distanceToBottomFromUnread = listEl.scrollHeight - targetElement.offsetTop;
+        if (distanceToBottomFromUnread <= listEl.clientHeight) {
+            scrollToBottom('smooth');
+        } else {
+            listEl.scrollTo({ top: Math.max(targetElement.offsetTop - 12, 0), behavior: 'smooth' });
+        }
+
+        // 点击后不直接清零，保留未读并在后续滚动/到底时根据可视区动态扣减。
+        syncUnreadFloatingVisibility(listEl);
+    };
 
     useEffect(() => {
         if (messages.length === 0 || !activeChatId) {
@@ -119,10 +181,11 @@ return (
                 className="message-list"
                 ref={scrollRef}
                 onScroll={(e) => {
-                    shouldAutoScrollRef.current = isNearBottom(e.currentTarget);
+                    syncUnreadFloatingVisibility(e.currentTarget);
                 }}
             >
                 {messages.map((msg) => {
+                    const msgKey = messageRowKey(msg);
                     const isSelf = msg.senderId === currentUserId;
                     const senderLabel = (msg.senderUsername ?? '').trim() || `用户${msg.senderId}`;
                     const avatarSrc = resolvedUserAvatar(msg.senderAvatar);
@@ -135,7 +198,8 @@ return (
                             : readLabel.length > 0 || (msg.status === "failed" && msg.clientId));
                     return (
                     <div
-                        key={messageRowKey(msg)}
+                        key={msgKey}
+                        data-message-key={msgKey}
                         className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}`}
                     >
                         {isGroupChat && (
@@ -182,6 +246,16 @@ return (
                     );
                 })}
             </div>
+            {unreadFloatingCount > 0 && (
+                <button
+                    type="button"
+                    className="unread-jump-button"
+                    onClick={handleJumpToFirstUnread}
+                    aria-label={`跳转到第一条未读消息，当前 ${unreadFloatingCount} 条`}
+                >
+                    {unreadFloatingCount > 99 ? '99+' : unreadFloatingCount} 条未读
+                </button>
+            )}
 
             <div className="window-footer">
                 <textarea
