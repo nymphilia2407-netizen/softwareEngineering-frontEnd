@@ -536,24 +536,105 @@
 }
 
 
-.section-container {
+/* 占满侧栏剩余高度，内部顺序排版；滚动条在此层，避免「群聊」被 flex 顶到底部 */
+.contact-sections-scroll {
     flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
-    min-height: 0; 
+    padding-bottom: 12px;
 }
 
-.section-title {
-    font-size: 12px;
-    color: #999;
-    padding: 12px 16px 6px;
-    font-weight: 600;
+.contact-sections-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.contact-sections-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.section-container {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+/* 群聊区块与上方联系人列表留出一点空隙 */
+.section-groups {
+    margin-top: 10px;
+    padding-top: 4px;
+}
+
+.section-header-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 12px 16px 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    flex-shrink: 0;
+    border-radius: 0;
+    transition: background-color 0.15s ease;
+}
+
+.section-header-toggle:hover {
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.section-header-toggle:focus-visible {
+    outline: 2px solid rgba(15, 23, 42, 0.25);
+    outline-offset: -2px;
+}
+
+.section-header-label {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 700;
+    min-width: 0;
+    flex: 1;
+    letter-spacing: 0.02em;
+}
+
+.section-header-chevron {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    line-height: 1;
+    color: #475569;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 10px;
+    box-sizing: border-box;
+    transition: transform 0.2s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.section-header-toggle:hover .section-header-chevron {
+    background: rgba(255, 255, 255, 0.95);
+    color: #0f172a;
+}
+
+.section-container.is-expanded .section-header-chevron {
+    color: #0e7490;
+    border-color: rgba(14, 116, 144, 0.25);
 }
 
 .list-render-area {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 8px;
+    flex: 0 0 auto;
+    padding: 0 8px 4px;
 }
 
 .contact-item {
@@ -619,12 +700,4 @@
     font-size: 12px;
     color: #999;
     margin-top: 2px;
-}
-
-.list-render-area::-webkit-scrollbar {
-    width: 4px;
-}
-.list-render-area::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
 }

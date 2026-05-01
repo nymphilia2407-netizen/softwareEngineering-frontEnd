@@ -62,6 +62,9 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
     const [groupAvatarPreview, setGroupAvatarPreview] = useState<string>(DEFAULT_AVATAR);
     const [groupAvatarDataUrl, setGroupAvatarDataUrl] = useState<string | null>(null);
+    /** 刚进入页面时列表折叠，点击标题栏展开 */
+    const [friendsExpanded, setFriendsExpanded] = useState<boolean>(false);
+    const [groupsExpanded, setGroupsExpanded] = useState<boolean>(false);
     const actionMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -702,57 +705,87 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                 </div>
             )}
 
-            {/* 好友部分 */}
-            <div className='section-container'>
-                <div className='section-title'>联系人 ({filteredFriends.length})</div>
-                <div className='list-render-area'>
-                    {filteredFriends.map(user => (
-                        <button key={user.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(user, 'user')}>
-                            <div className='item-avatar'>
-                                <img
-                                    src={resolvedUserAvatar(user.avatar)}
-                                    alt=""
-                                    onError={(e) => {
-                                        const img = e.currentTarget;
-                                        img.onerror = null;
-                                        img.src = DEFAULT_AVATAR;
-                                    }}
-                                />
-                                <span className={`status-badge ${user.status}`} />
-                            </div>
-                            <div className='item-info'>
-                                <span className="item-name">{user.username}</span>
-                                <span className={`item-meta status-${user.status}`}>
-                                    {user.status === 'online' ? '在线' : '离线'}
-                                </span>
-                            </div>
-                        </button>
-                    ))}
+            {/* 联系人 + 群聊：同一滚动区顺序排列，群聊紧跟在联系人列表下方 */}
+            <div className='contact-sections-scroll'>
+                <div className={`section-container section-friends${friendsExpanded ? ' is-expanded' : ' is-collapsed'}`}>
+                    <button
+                        type='button'
+                        className='section-header-toggle'
+                        aria-expanded={friendsExpanded}
+                        aria-controls='contact-list-friends'
+                        id='contact-section-friends-heading'
+                        onClick={() => setFriendsExpanded((v) => !v)}
+                    >
+                        <span className='section-header-label'>联系人 ({filteredFriends.length})</span>
+                        <span className='section-header-chevron' aria-hidden>
+                            {friendsExpanded ? '▼' : '▶'}
+                        </span>
+                    </button>
+                    {friendsExpanded && (
+                        <div id='contact-list-friends' className='list-render-area' role='region' aria-labelledby='contact-section-friends-heading'>
+                            {filteredFriends.map((user) => (
+                                <button key={user.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(user, 'user')}>
+                                    <div className='item-avatar'>
+                                        <img
+                                            src={resolvedUserAvatar(user.avatar)}
+                                            alt=''
+                                            onError={(e) => {
+                                                const img = e.currentTarget;
+                                                img.onerror = null;
+                                                img.src = DEFAULT_AVATAR;
+                                            }}
+                                        />
+                                        <span className={`status-badge ${user.status}`} />
+                                    </div>
+                                    <div className='item-info'>
+                                        <span className='item-name'>{user.username}</span>
+                                        <span className={`item-meta status-${user.status}`}>
+                                            {user.status === 'online' ? '在线' : '离线'}
+                                        </span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
-            </div>
 
-            <div className='section-container'>
-                <div className='section-title'>群聊 ({filteredGroups.length})</div>
-                <div className='list-render-area'>
-                    {filteredGroups.map(group => (
-                        <button key={group.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(group, 'group')}>
-                            <div className='item-avatar'>
-                                <img
-                                    src={resolvedUserAvatar(group.avatar)}
-                                    alt=""
-                                    onError={(e) => {
-                                        const img = e.currentTarget;
-                                        img.onerror = null;
-                                        img.src = DEFAULT_AVATAR;
-                                    }}
-                                />
-                            </div>
-                            <div className='item-info'>
-                                <span className="item-name">{group.groupname}</span>
-                                <span className="item-meta">{group.memberCount} 人</span>
-                            </div>
-                        </button>
-                    ))}
+                <div className={`section-container section-groups${groupsExpanded ? ' is-expanded' : ' is-collapsed'}`}>
+                    <button
+                        type='button'
+                        className='section-header-toggle'
+                        aria-expanded={groupsExpanded}
+                        aria-controls='contact-list-groups'
+                        id='contact-section-groups-heading'
+                        onClick={() => setGroupsExpanded((v) => !v)}
+                    >
+                        <span className='section-header-label'>群聊 ({filteredGroups.length})</span>
+                        <span className='section-header-chevron' aria-hidden>
+                            {groupsExpanded ? '▼' : '▶'}
+                        </span>
+                    </button>
+                    {groupsExpanded && (
+                        <div id='contact-list-groups' className='list-render-area' role='region' aria-labelledby='contact-section-groups-heading'>
+                            {filteredGroups.map((group) => (
+                                <button key={group.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(group, 'group')}>
+                                    <div className='item-avatar'>
+                                        <img
+                                            src={resolvedUserAvatar(group.avatar)}
+                                            alt=''
+                                            onError={(e) => {
+                                                const img = e.currentTarget;
+                                                img.onerror = null;
+                                                img.src = DEFAULT_AVATAR;
+                                            }}
+                                        />
+                                    </div>
+                                    <div className='item-info'>
+                                        <span className='item-name'>{group.groupname}</span>
+                                        <span className='item-meta'>{group.memberCount} 人</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
