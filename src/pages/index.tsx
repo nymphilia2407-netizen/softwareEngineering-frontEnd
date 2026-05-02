@@ -31,6 +31,9 @@ interface ChatListItem {
     isGroup: boolean;
 }
 
+/** 与 ChatWindow.isOtherMemberMessage 一致：避免 senderId / currentUserId 类型不一致或短暂为 0 时误判己方消息 */
+const sameUserId = (a: number, b: number) => Number(a) === Number(b);
+
 const decodeTokenPayload = () => {
     const token = tokenUtils.getToken();
     if (!token) {
@@ -111,7 +114,7 @@ const replaceOrAppendIncomingMessage = (
             ...store,
             [conversationId]: sortMessagesByTime([...roomMessages, incomingMessage]),
         },
-        fromSelf: incomingMessage.senderId === currentUserId,
+        fromSelf: sameUserId(incomingMessage.senderId, currentUserId),
     };
 };
 
@@ -131,11 +134,11 @@ const applyReadReceiptToMessages = (
             return message;
         }
 
-        if (receipt.reader_id === currentUserId) {
-            return message.senderId === currentUserId ? message : { ...message, isRead: true };
+        if (sameUserId(receipt.reader_id, currentUserId)) {
+            return sameUserId(message.senderId, currentUserId) ? message : { ...message, isRead: true };
         }
 
-        return message.senderId === currentUserId ? { ...message, isRead: true } : message;
+        return sameUserId(message.senderId, currentUserId) ? { ...message, isRead: true } : message;
     });
 
     return {
@@ -173,7 +176,7 @@ const updateRoomOnIncomingMessage = (
     activeChatId: number
 ) => {
     const formattedTime = new Date(incomingMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const fromSelf = incomingMessage.senderId === currentUserId;
+    const fromSelf = sameUserId(incomingMessage.senderId, currentUserId);
     const isActive = activeChatId === incomingMessage.convId;
     const index = rooms.findIndex((room) => room.id === incomingMessage.convId);
 
