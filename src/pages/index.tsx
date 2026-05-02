@@ -274,7 +274,8 @@ const groupSummariesFromRoomList = (roomList: ChatRoomSummaryData[]): Group[] =>
             }),
         );
 
-const SEND_ACK_TIMEOUT_MS = 15000;
+/** 收不到 WS 回执时的等待上限；过长易被当成卡死，过短易误判弱网失败 */
+const SEND_ACK_TIMEOUT_MS = 8000;
 const SEND_ACK_GRACE_MS = 2000;
 
 export default function Index() {
@@ -320,6 +321,8 @@ export default function Index() {
     const messageStoreRef = useRef<Record<number, Message[]>>(messageStore);
     /** 乐观消息的临时负数 id，保证同毫秒内多次发送也不与 React key 冲突 */
     const optimisticIdSeqRef = useRef(0);
+    /** 已在 WS 上 subscribe_room 的会话；新建私聊在连接之后才出现，必须补订阅才能收到发消息回执 */
+    const subscribedWsRoomsRef = useRef<Set<number>>(new Set());
 
     useEffect(() => {
         currentUserIdRef.current = currentUserId;
@@ -382,6 +385,16 @@ export default function Index() {
             data: { conversation_id: conversationId },
         });
     }, []);
+
+    useEffect(() => {
+        for (const room of chatRooms) {
+            if (!room.id || subscribedWsRoomsRef.current.has(room.id)) {
+                continue;
+            }
+            subscribedWsRoomsRef.current.add(room.id);
+            subscribeWsRoom(room.id);
+        }
+    }, [chatRooms, subscribeWsRoom]);
 
     useEffect(() => {
         if (!groupSyncToast) {
