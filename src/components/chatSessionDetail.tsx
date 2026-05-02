@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getGroupDetail } from '../services/group';
-import { getFriendDetail } from '../services/friend';
+import { getFriendDetail, deleteFriend } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 import type { GroupDetailData } from '../services/group';
 
@@ -12,9 +12,10 @@ export interface ChatSessionDetailProps {
     /** 私聊时对端用户 id；群聊为 null */
     otherUserId: number | null;
     onBack: () => void;
+    onDeleted?: () => void;
 }
 
-export default function ChatSessionDetail({ roomId, isGroup, otherUserId, onBack }: ChatSessionDetailProps) {
+export default function ChatSessionDetail({ roomId, isGroup, otherUserId, onBack, onDeleted }: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -111,6 +112,28 @@ export default function ChatSessionDetail({ roomId, isGroup, otherUserId, onBack
                                 </div>
                             )}
                         </dl>
+
+                        <div className="chat-session-detail-footer">
+                            <button type="button"
+                                className="delete-friend-button"
+                                onClick={async () => {
+                                    if (!otherUserId) return;
+                                    const confirmed = globalThis.confirm('确认删除该好友？');
+                                    if (!confirmed) return;
+
+                                    try {
+                                        await deleteFriend(otherUserId);
+                                        alert('已删除');
+                                        onBack();
+                                        onDeleted?.();
+                                    } catch (err) {
+                                        alert(err instanceof Error ? err.message : '删除失败');
+                                    }
+                                }}
+                            >
+                                删除好友
+                            </button>
+                        </div>
                     </>
                 )}
             </div>

@@ -942,6 +942,24 @@ export default function Index() {
         }
     }
 
+    const handleChatDeleted = useCallback(() => {
+        const convId = activeChatIdRef.current;
+        setChatSessionInfoOpen(false);
+        setActiveChatId(0);
+        setSelectedContact(null);
+        
+        // 清除该会话，并删除本地存储的消息（目前无效，因为后端返回conversation里还是有老的好友）
+        setChatRooms(prev => prev.filter(room => room.id !== convId));
+        setMessageStore(prev => {
+            const next = { ...prev };
+            delete next[convId];
+            return next;
+        });
+
+        // 刷新列表
+        void refreshFriendsAndRooms();
+    }, [refreshFriendsAndRooms]);
+
     return (
         <div className="main">
             {groupSyncToast ? (
@@ -1186,6 +1204,7 @@ export default function Index() {
                             isGroup={activeChatIsGroup}
                             otherUserId={activeChat?.otherUserId ?? null}
                             onBack={() => setChatSessionInfoOpen(false)}
+                            onDeleted={handleChatDeleted}
                         />
                     ) : (
                         <ChatWindow

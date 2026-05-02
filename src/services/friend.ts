@@ -147,3 +147,9 @@ export const getFriendDetail = async (friendId: number): Promise<FriendDetail> =
 
     return response.data;
 };
+
+// 删除好友
+export const deleteFriend = async (friendId: number): Promise<boolean> => {
+    await request.delete<any, void>(`/api/friends/${friendId}/`);
+    return true;
+};

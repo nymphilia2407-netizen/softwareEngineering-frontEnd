@@ -109,3 +109,23 @@
 .member-row + .member-row {
     border-top: 1px solid #eee;
 }
+
+.chat-session-detail-footer {
+    margin-top: 24px;
+    text-align: center;
+}
+
+.delete-friend-button {
+    padding: 8px 24px;
+    border: 1px solid #ff4d4f;
+    border-radius: 6px;
+    background: #fff;
+    color: #ff4d4f;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.delete-friend-button:hover {
+    background: #ff4d4f;
+    color: #fff;
+}
