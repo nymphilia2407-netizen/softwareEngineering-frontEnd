@@ -1183,7 +1183,6 @@ export default function Index() {
                     chatSessionInfoOpen ? (
                         <ChatSessionDetail
                             roomId={activeChatId}
-                            displayName={activeChatName}
                             isGroup={activeChatIsGroup}
                             otherUserId={activeChat?.otherUserId ?? null}
                             onBack={() => setChatSessionInfoOpen(false)}

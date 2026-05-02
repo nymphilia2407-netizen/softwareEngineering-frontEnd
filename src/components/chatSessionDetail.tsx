@@ -1,30 +1,39 @@
 import { useEffect, useState } from 'react';
 import { getGroupDetail } from '../services/group';
+import { getFriendDetail } from '../services/friend';
+import type { FriendDetail } from '../services/friend';
 import type { GroupDetailData } from '../services/group';
 
 import '../styles/chatSessionDetail.css';
 
 export interface ChatSessionDetailProps {
     roomId: number;
-    displayName: string;
     isGroup: boolean;
     /** 私聊时对端用户 id；群聊为 null */
     otherUserId: number | null;
     onBack: () => void;
 }
 
-export default function ChatSessionDetail({ roomId, displayName, isGroup, otherUserId, onBack }: ChatSessionDetailProps) {
+export default function ChatSessionDetail({ roomId, isGroup, otherUserId, onBack }: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
+    const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // 私聊信息需要等后端接口完善
-        if (!isGroup) return;
+        setError(null);
+        setGroupDetail(null);
+        setFriendDetail(null);
 
-        getGroupDetail(roomId)
-            .then(setGroupDetail)
-            .catch(err => setError(err.message || '获取群信息失败'))
-    }, [roomId, isGroup]);
+        if (isGroup) {
+            getGroupDetail(roomId)
+                .then(setGroupDetail)
+                .catch(err => setError(err.message || '获取群信息失败'));
+        } else if (otherUserId != null) {
+            getFriendDetail(otherUserId)
+                .then(setFriendDetail)
+                .catch(err => setError(err.message || '获取好友信息失败'));
+        }
+    }, [roomId, isGroup, otherUserId]);
     
     return (
         <div className="chat-session-detail">
@@ -71,22 +80,37 @@ export default function ChatSessionDetail({ roomId, displayName, isGroup, otherU
                     </>
                 )}
 
-                {!isGroup && (
+                {!isGroup && friendDetail && (
                     <>
-                        <p className="chat-session-detail-name">{displayName}</p>
+                        <p className="chat-session-detail-name">{friendDetail.username}</p>
                         <dl className="chat-session-detail-meta">
                             <div>
                                 <dt>会话类型</dt>
                                 <dd>私聊</dd>
                             </div>
-                            {otherUserId != null && (
+                            <div>
+                                <dt>邮箱</dt>
+                                <dd>{friendDetail.email}</dd>
+                            </div>
+                            {friendDetail.birthday && (
                                 <div>
-                                    <dt>对方用户 ID</dt>
-                                    <dd>{otherUserId}</dd>
+                                    <dt>生日</dt>
+                                    <dd>{friendDetail.birthday}</dd>
+                                </div>
+                            )}
+                            {friendDetail.address && (
+                                <div>
+                                    <dt>地址</dt>
+                                    <dd>{friendDetail.address}</dd>
+                                </div>
+                            )}
+                            {friendDetail.signature && (
+                                <div>
+                                    <dt>个性签名</dt>
+                                    <dd>{friendDetail.signature}</dd>
                                 </div>
                             )}
                         </dl>
-                        <p className="chat-session-detail-placeholder">正在施工中。</p>
                     </>
                 )}
             </div>

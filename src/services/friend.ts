@@ -33,6 +33,17 @@ export interface SentFriendRequestData {
     created_at: string;
 }
 
+// GET /api/friends/<friend_id>/info
+export interface FriendDetail {
+    user_id: number;
+    username: string;
+    email: string;
+    avatar: string;
+    birthday: string;
+    address: string;
+    signature: string;
+}
+
 interface ApiResponse<T> {
     code: number;
     info: string;
@@ -124,4 +135,15 @@ export const rejectFriendRequest = async (requestId: number) => {
     }
 
     return true;
+};
+
+// GET /api/friends/<friend_id>/info 获取好友信息
+export const getFriendDetail = async (friendId: number): Promise<FriendDetail> => {
+    const response = await request.get<any, ApiResponse<FriendDetail>>(`/api/friends/${friendId}/info/`);
+
+    if (response.code !== 0 || !response.data) {
+        throw new Error(response.info || '获取好友信息失败');
+    }
+
+    return response.data;
 };
