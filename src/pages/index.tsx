@@ -1133,6 +1133,7 @@ export default function Index() {
                             setChatRooms((prev) => clearUnreadRoom(prev, chat.id));
                             setActiveChatId(chat.id);
                             setSelectedContact(null);
+                            setChatSessionInfoOpen(false);
                             setActiveTab('chat');
                         }}
                     />
@@ -1154,6 +1155,7 @@ export default function Index() {
                                 const roomId = matchedRoom?.id ?? 0;
                                 const hint = matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0;
                                 setEntryUnreadHintCount(hint);
+                                setChatSessionInfoOpen(false);
                                 if (roomId) {
                                     setChatRooms((prev) => clearUnreadRoom(prev, roomId));
                                 }
@@ -1168,6 +1170,7 @@ export default function Index() {
                             setEntryUnreadHintCount(hint);
                             setChatRooms((prev) => clearUnreadRoom(prev, groupItem.id));
                             setActiveChatId(groupItem.id);
+                            setChatSessionInfoOpen(false);
                         }}
                         onCreateGroup={handleCreateGroup}
                         onContactsChanged={refreshFriendsAndRooms}
