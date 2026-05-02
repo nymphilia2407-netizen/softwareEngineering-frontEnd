@@ -6,7 +6,6 @@ import ChatWindow from '../components/chatWindow';
 import ContactList from '../components/contactList';
 
 import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
-import { MOCK_FRIENDS, MOCK_GROUPS } from '../mockData/contactListMock';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, type GroupSummaryData } from '../services/group';
 import { getFriendList, type FriendSummaryData } from '../services/friend';
@@ -284,8 +283,8 @@ export default function Index() {
     const [profileAvatarSaving, setProfileAvatarSaving] = useState<boolean>(false);
     const [activeChatId, setActiveChatId] = useState<number>(0);
     const [selectedContact, setSelectedContact] = useState<User | null>(null);
-    const [friends, setFriends] = useState<User[]>(MOCK_FRIENDS);
-    const [groups, setGroups] = useState<Group[]>(MOCK_GROUPS);
+    const [friends, setFriends] = useState<User[]>([]);
+    const [groups, setGroups] = useState<Group[]>([]);
     const [chatRooms, setChatRooms] = useState<ChatListItem[]>([]);
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
     const [chatSessionInfoOpen, setChatSessionInfoOpen] = useState<boolean>(false);
@@ -301,7 +300,6 @@ export default function Index() {
     const myAvatarRef = useRef<string>(myAvatar);
     const pendingSendTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
     const messageStoreRef = useRef<Record<number, Message[]>>(messageStore);
-    const roomUnreadHintBaselineRef = useRef<Record<number, number>>({});
     /** 乐观消息的临时负数 id，保证同毫秒内多次发送也不与 React key 冲突 */
     const optimisticIdSeqRef = useRef(0);
 
@@ -371,7 +369,7 @@ export default function Index() {
                 setFriends(friendList.map(mapFriendSummary));
             } catch (error) {
                 console.error('获取好友列表失败:', error);
-                setFriends(MOCK_FRIENDS);
+                setFriends([]);
             }
         };
 
@@ -403,7 +401,7 @@ export default function Index() {
                 setGroups(groupList.map(mapGroupSummary));
             } catch (error) {
                 console.error('获取群聊列表失败:', error);
-                setGroups(MOCK_GROUPS);
+                setGroups([]);
             }
         };
 
@@ -497,18 +495,6 @@ export default function Index() {
     const messages = messageStore[activeChatId] ?? [];
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
-
-    const getEntryUnreadHintForRoom = (roomId: number) => {
-        if (!roomId) return 0;
-        const room = chatRooms.find((item) => item.id === roomId);
-        if (!room) return 0;
-
-        const currentUnread = Math.max(0, room.unreadCount || 0);
-        const baseline = roomUnreadHintBaselineRef.current[roomId] ?? 0;
-        const hintCount = Math.max(0, currentUnread - baseline);
-        roomUnreadHintBaselineRef.current[roomId] = currentUnread;
-        return hintCount;
-    };
 
     useEffect(() => {
         if (!activeChatId) {
@@ -698,13 +684,16 @@ export default function Index() {
     };
 
     const handleReadMessage = (convId: number, lastMsgId: number) => {
-        socketRef.current?.send({
-            type: 'read_message',
-            data: { conversation_id: convId, last_message_id: lastMsgId },
-        });
+        if (lastMsgId > 0) {
+            socketRef.current?.send({
+                type: 'read_message',
+                data: { conversation_id: convId, last_read_message_id: lastMsgId },
+            });
+        }
 
         // 乐观设置该会话为已读（前端显示）
         setChatRooms((prev) => prev.map((r) => (r.id === convId ? { ...r, unreadCount: 0 } : r)));
+        /** 不在此处立刻 getChatRooms：服务端 last_read 可能尚未落库，拉列表会把角标又刷回非 0 */
     };
 
     const handleCreateGroup = async ({ groupName, memberIds, avatar }: { groupName: string; memberIds: number[]; avatar?: string }) => {
@@ -953,7 +942,10 @@ export default function Index() {
                         chats={chatListData}
                         activeId={activeChatId}
                         onChatClick={(chat) => {
-                            setEntryUnreadHintCount(getEntryUnreadHintForRoom(chat.id));
+                            const hint = Math.max(0, chat.unreadCount || 0);
+                            setEntryUnreadHintCount(hint);
+                            /** 与消息窗口内未读提示同源：点进会话即清列表角标，窗口内仍用 hint 跟踪直到读完 */
+                            setChatRooms((prev) => clearUnreadRoom(prev, chat.id));
                             setActiveChatId(chat.id);
                             setSelectedContact(null);
                             setActiveTab('chat');
@@ -971,14 +963,21 @@ export default function Index() {
                                 setSelectedContact(userItem);
                                 const matchedRoom = chatRooms.find((room) => room.otherUserId === userItem.id);
                                 const roomId = matchedRoom?.id ?? 0;
-                                setEntryUnreadHintCount(getEntryUnreadHintForRoom(roomId));
+                                const hint = matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0;
+                                setEntryUnreadHintCount(hint);
+                                if (roomId) {
+                                    setChatRooms((prev) => clearUnreadRoom(prev, roomId));
+                                }
                                 setActiveChatId(roomId);
                                 return;
                             }
 
                             const groupItem = item as { id: number };
                             setSelectedContact(null);
-                            setEntryUnreadHintCount(getEntryUnreadHintForRoom(groupItem.id));
+                            const groupRoom = chatRooms.find((room) => room.id === groupItem.id);
+                            const hint = groupRoom ? Math.max(0, groupRoom.unreadCount || 0) : 0;
+                            setEntryUnreadHintCount(hint);
+                            setChatRooms((prev) => clearUnreadRoom(prev, groupItem.id));
                             setActiveChatId(groupItem.id);
                         }}
                         onCreateGroup={handleCreateGroup}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from "react";
 
 import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
@@ -8,6 +8,11 @@ import '../styles/chatWindow.css'
 
 function messageRowKey(msg: Message) {
     return msg.clientId ? `client:${msg.clientId}` : `id:${msg.id}`;
+}
+
+/** 群聊里 senderId 可能与 currentUserId 类型不一致（number / string），统一比较 */
+function isOtherMemberMessage(msg: Message, currentUserId: number) {
+    return Number(msg.senderId) !== Number(currentUserId);
 }
 
 interface ChatWindowProps{
@@ -38,7 +43,9 @@ export default function ChatWindow({
     onOpenSessionInfo,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
+    /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
     const [unreadFloatingCount, setUnreadFloatingCount] = useState(0);
+    /** 顶栏「上方未读」= 进会话时按 initialUnread 种下的对方消息，上滑读历史时递减 */
     const [headerUnreadCount, setHeaderUnreadCount] = useState(0);
     const [showHeaderUnreadButton, setShowHeaderUnreadButton] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -51,39 +58,126 @@ export default function ChatWindow({
     const hasSeededRoomUnreadRef = useRef(false);
     const roomEntryUnreadCountRef = useRef(0);
     const canConsumeUnreadRef = useRef(false);
+    const hasConfirmedReadRef = useRef(false);
+    const messagesRef = useRef<Message[]>(messages);
+    /** 用户是否已与消息列表发生过滚动/手势交互（避免首帧布局尚未稳定就 finalize） */
+    const listInteractionRef = useRef(false);
+    /** 滚动后延后一帧再算可见性，避免 flex/图片未撑开导致上滑时计数不减 */
+    const scrollSyncRafRef = useRef<number | null>(null);
     onReadMessageRef.current = onReadMessage;
     const AUTO_SCROLL_THRESHOLD_PX = 80;
     const SHOW_UNREAD_DISTANCE_BASE_PX = 220;
     const SHOW_UNREAD_DISTANCE_RATIO = 0.6;
+    const MIN_VISIBLE_OVERLAP_PX = 1;
 
-    const syncUnreadFloatingVisibility = useCallback((el: HTMLDivElement) => {
-        const distanceToBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
-        const nearBottom = distanceToBottom <= AUTO_SCROLL_THRESHOLD_PX;
-        shouldAutoScrollRef.current = nearBottom;
+    const resolveReadCursorId = useCallback((msgs: Message[]) => {
+        for (let i = msgs.length - 1; i >= 0; i -= 1) {
+            if (msgs[i].id > 0) {
+                return msgs[i].id;
+            }
+        }
+        return 0;
+    }, []);
 
-        if (canConsumeUnreadRef.current) {
-            const viewportTop = el.scrollTop;
-            const viewportBottom = el.scrollTop + el.clientHeight;
-            const isUnreadStillHidden = (key: string) => {
-                const node = el.querySelector<HTMLElement>(`[data-message-key="${key}"]`);
+    const tryFinalizeSessionRead = useCallback(() => {
+        if (!activeChatId || hasConfirmedReadRef.current || !hasSeededRoomUnreadRef.current) {
+            return;
+        }
+        const msgs = messagesRef.current;
+        hasConfirmedReadRef.current = true;
+        headerUnreadKeysRef.current = [];
+        floatingUnreadKeysRef.current = [];
+        setHeaderUnreadCount(0);
+        setUnreadFloatingCount(0);
+        onReadMessageRef.current(activeChatId, resolveReadCursorId(msgs));
+    }, [activeChatId, resolveReadCursorId]);
+
+    const syncUnreadFloatingVisibility = useCallback(
+        (el: HTMLDivElement) => {
+            const distanceToBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
+            const nearBottom = distanceToBottom <= AUTO_SCROLL_THRESHOLD_PX;
+            shouldAutoScrollRef.current = nearBottom;
+
+            const listRect = el.getBoundingClientRect();
+            const BELOW_VIEWPORT_EPS = 2;
+
+            /**
+             * 顶栏「上方未读」：与列表有重叠则视为已看到；整行在列表可视区域之下（上滑后最新几条滑出底边）
+             * 也视为已读过，否则会一直把「在视口下方」误判成「仍隐藏」导致上滑计数不减。
+             */
+            const keepHeaderUnreadKey = (key: string) => {
+                const node = el.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(key)}"]`);
                 if (!node) {
+                    return true;
+                }
+                const r = node.getBoundingClientRect();
+                if (r.width <= 0 || r.height <= 0) {
+                    return true;
+                }
+                const overlap = Math.min(r.bottom, listRect.bottom) - Math.max(r.top, listRect.top);
+                if (overlap > MIN_VISIBLE_OVERLAP_PX) {
                     return false;
                 }
-                const nodeTop = node.offsetTop;
-                const nodeBottom = nodeTop + node.offsetHeight;
-                const isVisible = nodeBottom > viewportTop && nodeTop < viewportBottom;
-                return !isVisible;
+                if (r.top >= listRect.bottom - BELOW_VIEWPORT_EPS) {
+                    return false;
+                }
+                return true;
             };
-            headerUnreadKeysRef.current = headerUnreadKeysRef.current.filter(isUnreadStillHidden);
-            floatingUnreadKeysRef.current = floatingUnreadKeysRef.current.filter(isUnreadStillHidden);
-        }
-        setHeaderUnreadCount(headerUnreadKeysRef.current.length);
 
-        const showThreshold = Math.max(el.clientHeight * SHOW_UNREAD_DISTANCE_RATIO, SHOW_UNREAD_DISTANCE_BASE_PX);
-        setUnreadFloatingCount(
-            distanceToBottom >= showThreshold ? floatingUnreadKeysRef.current.length : 0
-        );
-    }, []);
+            /** 底部「新消息」：仅在进入列表可视区时消掉；在视口下方表示还没滚到底，必须保留 */
+            const keepFloatingUnreadKey = (key: string) => {
+                const node = el.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(key)}"]`);
+                if (!node) {
+                    return true;
+                }
+                const r = node.getBoundingClientRect();
+                if (r.width <= 0 || r.height <= 0) {
+                    return true;
+                }
+                const overlap = Math.min(r.bottom, listRect.bottom) - Math.max(r.top, listRect.top);
+                return overlap <= MIN_VISIBLE_OVERLAP_PX;
+            };
+
+            headerUnreadKeysRef.current = headerUnreadKeysRef.current.filter(keepHeaderUnreadKey);
+            floatingUnreadKeysRef.current = floatingUnreadKeysRef.current.filter(keepFloatingUnreadKey);
+
+            setHeaderUnreadCount(headerUnreadKeysRef.current.length);
+
+            const showThreshold = Math.max(el.clientHeight * SHOW_UNREAD_DISTANCE_RATIO, SHOW_UNREAD_DISTANCE_BASE_PX);
+            /** 仅「下方」新消息未读；上滑远离底部时不要混入上方历史未读，避免诡异重复计数 */
+            setUnreadFloatingCount(
+                distanceToBottom >= showThreshold ? floatingUnreadKeysRef.current.length : 0,
+            );
+
+            const noTracked =
+                headerUnreadKeysRef.current.length === 0 && floatingUnreadKeysRef.current.length === 0;
+            if (
+                noTracked &&
+                hasSeededRoomUnreadRef.current &&
+                !hasConfirmedReadRef.current &&
+                (nearBottom || listInteractionRef.current)
+            ) {
+                tryFinalizeSessionRead();
+            }
+        },
+        [tryFinalizeSessionRead],
+    );
+
+    const scheduleSyncUnreadAfterScroll = useCallback(
+        (el: HTMLDivElement) => {
+            if (scrollSyncRafRef.current !== null) {
+                cancelAnimationFrame(scrollSyncRafRef.current);
+            }
+            scrollSyncRafRef.current = requestAnimationFrame(() => {
+                scrollSyncRafRef.current = null;
+                syncUnreadFloatingVisibility(el);
+                requestAnimationFrame(() => {
+                    syncUnreadFloatingVisibility(el);
+                });
+            });
+        },
+        [syncUnreadFloatingVisibility],
+    );
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
         const el = scrollRef.current;
@@ -106,25 +200,45 @@ export default function ChatWindow({
         hasSeededRoomUnreadRef.current = false;
         roomEntryUnreadCountRef.current = Math.max(0, initialUnreadCount);
         canConsumeUnreadRef.current = false;
+        hasConfirmedReadRef.current = false;
+        listInteractionRef.current = false;
         setUnreadFloatingCount(0);
         setHeaderUnreadCount(0);
         setShowHeaderUnreadButton(true);
+        if (scrollSyncRafRef.current !== null) {
+            cancelAnimationFrame(scrollSyncRafRef.current);
+            scrollSyncRafRef.current = null;
+        }
         scrollToBottom('auto');
     }, [activeChatId, initialUnreadCount, scrollToBottom]);
 
     useLayoutEffect(() => {
+        messagesRef.current = messages;
         const listEl = scrollRef.current;
         if (!listEl) return;
 
         const nextLastMessageKey = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
         if (lastMessageKeyRef.current === null) {
-            if (!hasSeededRoomUnreadRef.current && messages.length > 0) {
-                const incomingMessageKeys = messages
-                    .filter((msg) => msg.senderId !== currentUserId)
-                    .map((msg) => messageRowKey(msg));
-                const takeCount = Math.min(roomEntryUnreadCountRef.current, incomingMessageKeys.length);
-                headerUnreadKeysRef.current = takeCount > 0 ? incomingMessageKeys.slice(-takeCount) : [];
+            if (!hasSeededRoomUnreadRef.current) {
+                if (messages.length > 0) {
+                    const incomingMessageKeys = messages
+                        .filter((msg) => isOtherMemberMessage(msg, currentUserId))
+                        .map((msg) => messageRowKey(msg));
+                    /** 只跟踪「当前页里、且至多 initialUnread 条」对方消息，条数与顶栏 N 严格一致 */
+                    const takeCount = Math.min(roomEntryUnreadCountRef.current, incomingMessageKeys.length);
+                    headerUnreadKeysRef.current = takeCount > 0 ? incomingMessageKeys.slice(-takeCount) : [];
+                    setHeaderUnreadCount(headerUnreadKeysRef.current.length);
+                }
                 hasSeededRoomUnreadRef.current = true;
+                /** 等 scrollToBottom 与布局稳定后再同步一次可见性，减少首帧误删 key */
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        const inner = scrollRef.current;
+                        if (inner) {
+                            syncUnreadFloatingVisibility(inner);
+                        }
+                    });
+                });
             }
             lastMessageKeyRef.current = nextLastMessageKey;
             syncUnreadFloatingVisibility(listEl);
@@ -133,10 +247,11 @@ export default function ChatWindow({
 
         const hasNewMessage = nextLastMessageKey !== lastMessageKeyRef.current;
         if (hasNewMessage) {
+            hasConfirmedReadRef.current = false;
             const latestMessage = messages[messages.length - 1];
             if (shouldAutoScrollRef.current) {
                 scrollToBottom('auto');
-            } else if (latestMessage && latestMessage.senderId !== currentUserId) {
+            } else if (latestMessage && isOtherMemberMessage(latestMessage, currentUserId)) {
                 if (nextLastMessageKey && !floatingUnreadKeysRef.current.includes(nextLastMessageKey)) {
                     floatingUnreadKeysRef.current.push(nextLastMessageKey);
                 }
@@ -145,6 +260,70 @@ export default function ChatWindow({
         lastMessageKeyRef.current = nextLastMessageKey;
         syncUnreadFloatingVisibility(listEl);
     }, [messages, scrollToBottom, currentUserId, syncUnreadFloatingVisibility]);
+
+    /** 群聊 flex + 头像异步撑高时，仅靠 scroll 同步 getBoundingClientRect 易漏判；用 IO 判定「已进入列表可视区」 */
+    useEffect(() => {
+        const root = scrollRef.current;
+        if (!root || !hasSeededRoomUnreadRef.current) {
+            return;
+        }
+
+        const keySet = new Set([...headerUnreadKeysRef.current, ...floatingUnreadKeysRef.current]);
+        if (keySet.size === 0) {
+            return;
+        }
+
+        const io = new IntersectionObserver(
+            (entries) => {
+                let changed = false;
+                for (const entry of entries) {
+                    if (!entry.isIntersecting) {
+                        continue;
+                    }
+                    const elmt = entry.target as HTMLElement;
+                    const key = elmt.getAttribute('data-message-key');
+                    if (!key || !keySet.has(key)) {
+                        continue;
+                    }
+                    const beforeH = headerUnreadKeysRef.current.length;
+                    const beforeF = floatingUnreadKeysRef.current.length;
+                    headerUnreadKeysRef.current = headerUnreadKeysRef.current.filter((k) => k !== key);
+                    floatingUnreadKeysRef.current = floatingUnreadKeysRef.current.filter((k) => k !== key);
+                    if (headerUnreadKeysRef.current.length !== beforeH || floatingUnreadKeysRef.current.length !== beforeF) {
+                        changed = true;
+                        keySet.delete(key);
+                    }
+                }
+                if (changed && scrollRef.current) {
+                    scheduleSyncUnreadAfterScroll(scrollRef.current);
+                }
+            },
+            { root, rootMargin: '24px 0px 24px 0px', threshold: [0, 0.001, 0.05, 0.2, 0.5, 1] },
+        );
+
+        for (const key of keySet) {
+            const node = root.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(key)}"]`);
+            if (node) {
+                try {
+                    io.observe(node);
+                } catch {
+                    /* root 非祖先等极端情况 */
+                }
+            }
+        }
+
+        return () => io.disconnect();
+    }, [messages, activeChatId, currentUserId, initialUnreadCount, scheduleSyncUnreadAfterScroll]);
+
+    const orderKeysByMessageTop = (keys: readonly string[]) => {
+        const msgs = messagesRef.current;
+        const keyIndex = (key: string) => msgs.findIndex((m) => messageRowKey(m) === key);
+        return [...new Set(keys)].sort((a, b) => {
+            const ia = keyIndex(a);
+            const ib = keyIndex(b);
+            return (ia === -1 ? Number.MAX_SAFE_INTEGER : ia) - (ib === -1 ? Number.MAX_SAFE_INTEGER : ib);
+        });
+    };
 
     const jumpToFirstUnreadFromKeys = (unreadKeys: string[]) => {
         const listEl = scrollRef.current;
@@ -156,7 +335,7 @@ export default function ChatWindow({
             return;
         }
 
-        const targetElement = listEl.querySelector<HTMLElement>(`[data-message-key="${targetKey}"]`);
+        const targetElement = listEl.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(targetKey)}"]`);
         if (!targetElement) {
             scrollToBottom('smooth');
             headerUnreadKeysRef.current = [];
@@ -173,30 +352,23 @@ export default function ChatWindow({
             listEl.scrollTo({ top: Math.max(targetElement.offsetTop - 12, 0), behavior: 'smooth' });
         }
 
-        // 点击后不直接清零，保留未读并在后续滚动/到底时根据可视区动态扣减。
         syncUnreadFloatingVisibility(listEl);
     };
 
     const handleHeaderJumpToUnread = () => {
-        setShowHeaderUnreadButton(false);
         canConsumeUnreadRef.current = true;
-        jumpToFirstUnreadFromKeys(headerUnreadKeysRef.current);
+        jumpToFirstUnreadFromKeys(orderKeysByMessageTop(headerUnreadKeysRef.current));
     };
 
     const handleFloatingJumpToUnread = () => {
         canConsumeUnreadRef.current = true;
-        jumpToFirstUnreadFromKeys(floatingUnreadKeysRef.current);
-    };
-
-    useEffect(() => {
-        if (messages.length === 0 || !activeChatId) {
+        const ordered = orderKeysByMessageTop(floatingUnreadKeysRef.current);
+        if (ordered.length === 0) {
+            scrollToBottom('smooth');
             return;
         }
-        const lastMsg = messages[messages.length - 1];
-        if (lastMsg.senderId !== currentUserId) {
-            onReadMessageRef.current(activeChatId, lastMsg.id);
-        }
-    }, [messages, activeChatId, currentUserId]);
+        jumpToFirstUnreadFromKeys(ordered);
+    };
 
     const handleSend = () => {
         if(!inputText.trim()) return;
@@ -223,9 +395,9 @@ return (
                         type="button"
                         className="chat-header-unread"
                         onClick={handleHeaderJumpToUnread}
-                        aria-label={`跳转到第一条未读消息，当前 ${headerUnreadCount} 条`}
+                        aria-label={`跳转到最早一条上方未读，当前 ${headerUnreadCount} 条`}
                     >
-                        未读 {headerUnreadCount > 99 ? '99+' : headerUnreadCount}
+                        上方未读 {headerUnreadCount > 99 ? '99+' : headerUnreadCount}
                     </button>
                 ) : null}
                 {onOpenSessionInfo && (
@@ -245,20 +417,25 @@ return (
                 ref={scrollRef}
                 onWheel={() => {
                     canConsumeUnreadRef.current = true;
+                    listInteractionRef.current = true;
                 }}
                 onTouchMove={() => {
                     canConsumeUnreadRef.current = true;
+                    listInteractionRef.current = true;
                 }}
                 onPointerDown={() => {
                     canConsumeUnreadRef.current = true;
+                    listInteractionRef.current = true;
                 }}
                 onScroll={(e) => {
-                    syncUnreadFloatingVisibility(e.currentTarget);
+                    canConsumeUnreadRef.current = true;
+                    listInteractionRef.current = true;
+                    scheduleSyncUnreadAfterScroll(e.currentTarget);
                 }}
             >
                 {messages.map((msg) => {
                     const msgKey = messageRowKey(msg);
-                    const isSelf = msg.senderId === currentUserId;
+                    const isSelf = !isOtherMemberMessage(msg, currentUserId);
                     const senderLabel = (msg.senderUsername ?? '').trim() || `用户${msg.senderId}`;
                     const avatarSrc = resolvedUserAvatar(msg.senderAvatar);
                     const readLabel = msg.isRead ? "已读" : msg.status === "sending" ? "发送中" : msg.status === "failed" ? "失败" : "";
@@ -323,9 +500,9 @@ return (
                     type="button"
                     className="unread-jump-button"
                     onClick={handleFloatingJumpToUnread}
-                    aria-label={`跳转到第一条未读消息，当前 ${unreadFloatingCount} 条`}
+                    aria-label={`跳转到底部新消息，当前 ${unreadFloatingCount} 条`}
                 >
-                    {unreadFloatingCount > 99 ? '99+' : unreadFloatingCount} 条未读
+                    下方新消息 {unreadFloatingCount > 99 ? '99+' : unreadFloatingCount}
                 </button>
             )}
 

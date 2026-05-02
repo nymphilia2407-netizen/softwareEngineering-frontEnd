@@ -24,6 +24,42 @@ export interface ChatReadReceiptData {
     last_message_id: number;
 }
 
+/** Django ChatConsumer.chat_message 推送的 data 形状 */
+interface BackendNewMessagePayload {
+    message_id: number;
+    conversation_id: number;
+    sender?: { user_id: number; username: string; avatar?: string };
+    content: string;
+    timestamp: string;
+    client_id?: string | null;
+}
+
+function normalizeSocketEvent(message: ChatSocketEvent): ChatSocketEvent {
+    if (message.type !== 'new_message') {
+        return message;
+    }
+
+    const raw = message.data as unknown;
+    if (raw && typeof raw === 'object' && 'message_id' in raw) {
+        const b = raw as BackendNewMessagePayload;
+        return {
+            type: 'new_message',
+            data: {
+                id: b.message_id,
+                conversation_id: b.conversation_id,
+                sender_id: b.sender?.user_id ?? 0,
+                sender_username: b.sender?.username,
+                sender_avatar: b.sender?.avatar,
+                content: b.content,
+                created_at: b.timestamp,
+                client_id: b.client_id ?? undefined,
+            },
+        };
+    }
+
+    return message;
+}
+
 export type ChatSocketEvent =
     | {
           type: 'new_message';
@@ -89,7 +125,7 @@ export class ChatWebSocketClient {
         socket.onmessage = (event) => {
             try {
                 const message = JSON.parse(event.data) as ChatSocketEvent;
-                this.emitMessage(message);
+                this.emitMessage(normalizeSocketEvent(message));
             } catch {
                 this.emitStatus('error');
             }

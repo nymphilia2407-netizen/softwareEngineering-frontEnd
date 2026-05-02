@@ -58,7 +58,8 @@ export type Message = {
 // 上行消息格式 (Client -> Server)
 export type WsAction = 
     | { type: 'send_message'; data: { conversation_id: number; content: string; client_id?: string } }
-    | { type: 'read_message'; data: { conversation_id: number; last_message_id: number } };
+    /** 与 Django ChatConsumer.handle_read_message 一致：last_read_message_id */
+    | { type: 'read_message'; data: { conversation_id: number; last_read_message_id: number } };
 
 // 下行消息格式 (Server -> Client)
 export type WsResponse = 

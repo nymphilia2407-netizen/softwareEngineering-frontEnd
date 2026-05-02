@@ -24,9 +24,9 @@ export interface SendMessagePayload {
   content: string;
 }
 
-// 标记已读的数据结构（上行）
+// 标记已读的数据结构（上行，与 WebSocket read_message 一致）
 export interface ReadMessagePayload {
   conversation_id: number;
-  last_message_id: number;
+  last_read_message_id: number;
 }
 

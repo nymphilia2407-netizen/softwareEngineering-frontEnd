@@ -187,10 +187,16 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             const users = shouldSearchByEmail
                 ? await searchUsersByEmail(keyword)
                 : await searchUsers(keyword);
-            setSearchResults(users);
+            const existingFriendIds = new Set(friends.map((f) => f.id));
+            const visible = users.filter(
+                (u) => u.user_id !== currentUserId && !existingFriendIds.has(u.user_id),
+            );
+            setSearchResults(visible);
 
-            if (users.length === 0) {
-                setAddFriendHint('没有找到匹配的用户');
+            if (visible.length === 0) {
+                setAddFriendHint(
+                    users.length === 0 ? '没有找到匹配的用户' : '没有可添加的用户（已隐藏本人与已是好友的用户）',
+                );
             }
         } catch (error) {
             setSearchResults([]);

@@ -75,7 +75,7 @@ export const searchUsersByEmail = async (email: string) => {
 };
 
 export const sendFriendRequest = async (targetUserId: number) => {
-    const response = await request.post<any, ApiResponse<null>>('/api/friends/requests/send', {
+    const response = await request.post<any, ApiResponse<null>>('/api/friends/requests', {
         target_user_id: targetUserId,
     });
 
