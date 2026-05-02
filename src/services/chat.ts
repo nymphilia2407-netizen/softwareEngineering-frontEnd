@@ -44,7 +44,7 @@ interface BackendConversationRow {
 /** 后端 GET /api/conversations/:id/messages 单条 */
 interface BackendMessageRow {
     message_id: number;
-    sender: { user_id: number; username: string } | null;
+    sender: { user_id: number; username: string; avatar?: string } | null;
     content: string;
     timestamp: string;
     reply_to?: unknown;
@@ -67,12 +67,13 @@ function mapConversationRow(row: BackendConversationRow): ChatRoomSummaryData {
 
 function mapMessageRow(convId: number, row: BackendMessageRow): ChatMessageData {
     const sender = row.sender;
+    const rawAvatar = sender?.avatar?.trim();
     return {
         id: row.message_id,
         room_id: convId,
         sender_id: sender?.user_id ?? 0,
         sender_username: sender?.username,
-        sender_avatar: undefined,
+        sender_avatar: rawAvatar && rawAvatar.length > 0 ? rawAvatar : undefined,
         content: row.content,
         created_at: row.timestamp,
         is_read: false,
