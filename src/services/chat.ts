@@ -39,6 +39,8 @@ interface BackendConversationRow {
     last_message: { content: string; timestamp: string } | null;
     name: string;
     avatar: string;
+    /** 私聊时对方用户 id，供联系人列表打开已有会话 */
+    other_user_id?: number;
 }
 
 /** 后端 GET /api/conversations/:id/messages 单条 */
@@ -53,12 +55,14 @@ interface BackendMessageRow {
 
 function mapConversationRow(row: BackendConversationRow): ChatRoomSummaryData {
     const last = row.last_message;
+    const otherId = row.other_user_id;
     return {
         room_id: row.conversation_id,
         is_group: row.type === 'group',
         name: row.name,
         avatar: row.avatar || '',
-        other_user_id: null,
+        other_user_id:
+            row.type === 'private' && typeof otherId === 'number' && Number.isFinite(otherId) ? otherId : null,
         last_message: last?.content ?? '',
         last_time: last?.timestamp ?? '',
         unread_count: row.unread_count,

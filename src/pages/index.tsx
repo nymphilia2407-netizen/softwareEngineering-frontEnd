@@ -1146,7 +1146,11 @@ export default function Index() {
                             if (type === 'user') {
                                 const userItem = item as User;
                                 setSelectedContact(userItem);
-                                const matchedRoom = chatRooms.find((room) => room.otherUserId === userItem.id);
+                                const matchedRoom =
+                                    chatRooms.find((room) => room.otherUserId === userItem.id) ??
+                                    chatRooms.find(
+                                        (room) => !room.isGroup && room.name === userItem.username,
+                                    );
                                 const roomId = matchedRoom?.id ?? 0;
                                 const hint = matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0;
                                 setEntryUnreadHintCount(hint);
