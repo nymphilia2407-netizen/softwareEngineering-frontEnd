@@ -43,19 +43,23 @@ export interface GroupDetailData {
 export interface CreateGroupPayload {
     group_name: string;
     member_ids: number[];
-    /** 可选：群头像 data URL 或外链（后端当前创建接口未持久化头像，仅用于前端展示兜底） */
+    /** 可选：群头像 data URL（写入 Conversation.avatar） */
     avatar?: string;
+    /** 与单次打开「新建群聊」弹窗绑定，用于防抖重复创建 */
+    client_request_id?: string;
 }
 
 /** 后端 POST /api/groups/ 返回的 data */
 interface CreateGroupResponseData {
     conversation_id: number;
     group_name: string;
+    avatar?: string;
 }
 
 /** 后端 GET /api/groups/:id 的 data */
 interface BackendGroupDetailData {
     group_name: string;
+    avatar?: string;
     members: Array<{ user_id: number; username: string; role: string }>;
     announcements: Array<{
         author_username: string;
@@ -82,7 +86,18 @@ export const getGroupList = async () => {
 };
 
 export const createGroup = async (payload: CreateGroupPayload) => {
-    const response = await request.post<any, ApiResponse<CreateGroupResponseData>>('/api/groups/', payload);
+    const body: Record<string, unknown> = {
+        group_name: payload.group_name,
+        member_ids: payload.member_ids,
+    };
+    if (payload.avatar) {
+        body.avatar = payload.avatar;
+    }
+    if (payload.client_request_id) {
+        body.client_request_id = payload.client_request_id;
+    }
+
+    const response = await request.post<any, ApiResponse<CreateGroupResponseData>>('/api/groups/', body);
 
     if (response.code !== 0 || !response.data) {
         throw new Error(response.info || '创建群聊失败');
@@ -92,7 +107,7 @@ export const createGroup = async (payload: CreateGroupPayload) => {
     return {
         room_id: d.conversation_id,
         group_name: d.group_name,
-        avatar: payload.avatar || '',
+        avatar: d.avatar ?? payload.avatar ?? '',
         owner_id: null as number | null,
         member_count: 1 + (payload.member_ids?.length ?? 0),
         created_at: new Date().toISOString(),
@@ -112,7 +127,7 @@ export const getGroupDetail = async (roomId: number) => {
     const mapped: GroupDetailData = {
         room_id: roomId,
         group_name: raw.group_name,
-        avatar: '',
+        avatar: raw.avatar ?? '',
         owner_id: ownerMember?.user_id ?? null,
         member_count: raw.members.length,
         created_at: raw.announcements[0]?.created_at ?? new Date().toISOString(),

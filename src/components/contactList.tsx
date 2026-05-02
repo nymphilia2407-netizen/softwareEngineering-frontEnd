@@ -23,6 +23,8 @@ interface CreateGroupFormValues {
     memberIds: number[];
     /** 可选：自定义群头像 data URL */
     avatar?: string;
+    /** 单次打开新建群聊弹窗内固定，用于后端幂等与前端防重复提交 */
+    clientRequestId: string;
 }
 
 interface ContactsProps{
@@ -62,10 +64,14 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
     const [groupAvatarPreview, setGroupAvatarPreview] = useState<string>(DEFAULT_AVATAR);
     const [groupAvatarDataUrl, setGroupAvatarDataUrl] = useState<string | null>(null);
+    const [isCreateGroupSubmitting, setIsCreateGroupSubmitting] = useState<boolean>(false);
     /** 刚进入页面时列表折叠，点击标题栏展开 */
     const [friendsExpanded, setFriendsExpanded] = useState<boolean>(false);
     const [groupsExpanded, setGroupsExpanded] = useState<boolean>(false);
     const actionMenuRef = useRef<HTMLDivElement | null>(null);
+    /** 每次打开「新建群聊」弹窗生成一次，关闭弹窗后下次打开会换新 */
+    const createGroupClientRequestIdRef = useRef<string>('');
+    const createGroupInFlightRef = useRef<boolean>(false);
 
     useEffect(() => {
         const handleDocumentClick = (event: MouseEvent) => {
@@ -84,6 +90,17 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             document.removeEventListener('mousedown', handleDocumentClick);
         };
     }, []);
+
+    useEffect(() => {
+        if (!isCreateGroupOpen) {
+            return;
+        }
+
+        createGroupClientRequestIdRef.current =
+            typeof globalThis.crypto !== 'undefined' && 'randomUUID' in globalThis.crypto
+                ? globalThis.crypto.randomUUID()
+                : `cg_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+    }, [isCreateGroupOpen]);
 
     useEffect(() => {
         if (!isFriendRequestsOpen) {
@@ -370,6 +387,10 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     }
 
     const handleCreateGroup = async () => {
+        if (createGroupInFlightRef.current) {
+            return;
+        }
+
         const trimmedGroupName = groupName.trim();
 
         if (!trimmedGroupName) {
@@ -382,17 +403,32 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             return;
         }
 
-        await onCreateGroup({
-            groupName: trimmedGroupName,
-            memberIds: selectedMemberIds,
-            ...(groupAvatarDataUrl ? { avatar: groupAvatarDataUrl } : {}),
-        });
+        const clientRequestId = createGroupClientRequestIdRef.current;
+        if (!clientRequestId) {
+            globalThis.alert('请关闭弹窗后重试');
+            return;
+        }
 
-        setGroupName('');
-        setSelectedMemberIds([]);
-        setGroupAvatarPreview(DEFAULT_AVATAR);
-        setGroupAvatarDataUrl(null);
-        setIsCreateGroupOpen(false);
+        createGroupInFlightRef.current = true;
+        setIsCreateGroupSubmitting(true);
+
+        try {
+            await onCreateGroup({
+                groupName: trimmedGroupName,
+                memberIds: selectedMemberIds,
+                clientRequestId,
+                ...(groupAvatarDataUrl ? { avatar: groupAvatarDataUrl } : {}),
+            });
+
+            setGroupName('');
+            setSelectedMemberIds([]);
+            setGroupAvatarPreview(DEFAULT_AVATAR);
+            setGroupAvatarDataUrl(null);
+            setIsCreateGroupOpen(false);
+        } finally {
+            createGroupInFlightRef.current = false;
+            setIsCreateGroupSubmitting(false);
+        }
     };
 
     const handleFriendSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -570,8 +606,13 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         >
                             取消
                         </button>
-                        <button type='button' className='create-group-primary-button' onClick={() => void handleCreateGroup()}>
-                            创建群聊
+                        <button
+                            type='button'
+                            className='create-group-primary-button'
+                            onClick={() => void handleCreateGroup()}
+                            disabled={isCreateGroupSubmitting}
+                        >
+                            {isCreateGroupSubmitting ? '创建中…' : '创建群聊'}
                         </button>
                     </div>
                 </div>

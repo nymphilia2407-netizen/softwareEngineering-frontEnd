@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ChatList from '../components/chatList';
 import ChatSessionDetail from '../components/chatSessionDetail';
@@ -334,6 +334,53 @@ export default function Index() {
         [chatRooms, activeChatId]
     );
 
+    const refreshFriendsAndRooms = useCallback(async () => {
+        try {
+            const [friendList, roomList] = await Promise.all([getFriendList(), getChatRooms()]);
+            setFriends(friendList.map(mapFriendSummary));
+            setChatRooms(roomList.map(mapChatRoom));
+        } catch (error) {
+            console.error('刷新好友或会话失败:', error);
+        }
+    }, []);
+
+    /** 对方同意好友请求后发起方无推送：切到联系人或回到前台时同步列表 */
+    useEffect(() => {
+        if (activeTab !== 'contacts') {
+            return;
+        }
+
+        void refreshFriendsAndRooms();
+    }, [activeTab, refreshFriendsAndRooms]);
+
+    useEffect(() => {
+        let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') {
+                return;
+            }
+
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
+
+            debounceTimer = setTimeout(() => {
+                void refreshFriendsAndRooms();
+                debounceTimer = null;
+            }, 400);
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
+        };
+    }, [refreshFriendsAndRooms]);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -543,16 +590,6 @@ export default function Index() {
         globalThis.location.reload();
     };
 
-    const refreshFriendsAndRooms = async () => {
-        try {
-            const [friendList, roomList] = await Promise.all([getFriendList(), getChatRooms()]);
-            setFriends(friendList.map(mapFriendSummary));
-            setChatRooms(roomList.map(mapChatRoom));
-        } catch (error) {
-            console.error('刷新好友或会话失败:', error);
-        }
-    };
-
     const clearPendingSendTimer = (clientId: string) => {
         const timer = pendingSendTimers.current[clientId];
         if (timer) {
@@ -696,11 +733,22 @@ export default function Index() {
         /** 不在此处立刻 getChatRooms：服务端 last_read 可能尚未落库，拉列表会把角标又刷回非 0 */
     };
 
-    const handleCreateGroup = async ({ groupName, memberIds, avatar }: { groupName: string; memberIds: number[]; avatar?: string }) => {
+    const handleCreateGroup = async ({
+        groupName,
+        memberIds,
+        avatar,
+        clientRequestId,
+    }: {
+        groupName: string;
+        memberIds: number[];
+        avatar?: string;
+        clientRequestId: string;
+    }) => {
         try {
             const createdGroup = await createGroup({
                 group_name: groupName,
                 member_ids: memberIds,
+                client_request_id: clientRequestId,
                 ...(avatar ? { avatar } : {}),
             });
 
