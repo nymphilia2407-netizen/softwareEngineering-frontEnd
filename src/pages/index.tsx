@@ -7,7 +7,7 @@ import ContactList from '../components/contactList';
 
 import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
-import { createGroup, getGroupList, type GroupSummaryData } from '../services/group';
+import { createGroup, getGroupList, updateGroupAvatar, type GroupSummaryData } from '../services/group';
 import { getFriendList, type FriendSummaryData } from '../services/friend';
 import { getCurrentUser, updateUserProfile, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
@@ -257,6 +257,20 @@ const mapGroupSummary = (group: GroupSummaryData): Group => ({
     createdTime: new Date(group.created_at).getTime(),
 });
 
+const groupSummariesFromRoomList = (roomList: ChatRoomSummaryData[]): Group[] =>
+    roomList
+        .filter((r) => r.is_group)
+        .map((r) =>
+            mapGroupSummary({
+                room_id: r.room_id,
+                group_name: r.name,
+                avatar: r.avatar || '',
+                owner_id: null,
+                member_count: 0,
+                created_at: r.last_time && r.last_time.length > 0 ? r.last_time : new Date().toISOString(),
+            }),
+        );
+
 const SEND_ACK_TIMEOUT_MS = 15000;
 const SEND_ACK_GRACE_MS = 2000;
 
@@ -292,6 +306,7 @@ export default function Index() {
     const [profileAddress, setProfileAddress] = useState<string>('');
     const [profileSignature, setProfileSignature] = useState<string>('');
     const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
+    const [groupSyncToast, setGroupSyncToast] = useState<string | null>(null);
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -343,6 +358,36 @@ export default function Index() {
             console.error('刷新好友或会话失败:', error);
         }
     }, []);
+
+    const syncChatRoomsAndGroups = useCallback(async () => {
+        try {
+            const roomList = await getChatRooms();
+            setChatRooms(roomList.map(mapChatRoom));
+            setGroups(groupSummariesFromRoomList(roomList));
+        } catch (error) {
+            console.error('同步群会话列表失败:', error);
+        }
+    }, []);
+
+    const subscribeWsRoom = useCallback((conversationId: number) => {
+        if (!conversationId) {
+            return;
+        }
+
+        socketRef.current?.send({
+            type: 'subscribe_room',
+            data: { conversation_id: conversationId },
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!groupSyncToast) {
+            return;
+        }
+
+        const timer = globalThis.setTimeout(() => setGroupSyncToast(null), 4800);
+        return () => globalThis.clearTimeout(timer);
+    }, [groupSyncToast]);
 
     /** 对方同意好友请求后发起方无推送：切到联系人或回到前台时同步列表 */
     useEffect(() => {
@@ -500,6 +545,65 @@ export default function Index() {
                 if (event.type === 'error') {
                     console.error('Chat WebSocket:', event.message);
                 }
+
+                if (event.type === 'group_sync') {
+                    const d = event.data;
+                    subscribeWsRoom(d.conversation_id);
+
+                    if (d.action === 'created') {
+                        const displayName = d.group_name?.trim() || '群聊';
+                        const creator = d.creator_username?.trim();
+                        const selfName = userNameRef.current?.trim();
+                        if (creator && creator === selfName) {
+                            setGroupSyncToast(`群聊「${displayName}」已创建，成员将同步收到`);
+                        } else {
+                            const suffix = creator ? `（${creator} 创建）` : '';
+                            setGroupSyncToast(`新群聊「${displayName}」已加入会话与联系人${suffix}`);
+                        }
+
+                        setChatRooms((prev) => {
+                            if (prev.some((r) => r.id === d.conversation_id)) {
+                                return prev;
+                            }
+
+                            const row: ChatListItem = {
+                                id: d.conversation_id,
+                                name: displayName,
+                                avatar: resolvedUserAvatar(d.avatar || ''),
+                                lastMessage: '[最近暂无消息]',
+                                lastTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                                unreadCount: 0,
+                                otherUserId: null,
+                                isGroup: true,
+                            };
+
+                            return [row, ...prev];
+                        });
+
+                        setGroups((prev) => {
+                            if (prev.some((g) => g.id === d.conversation_id)) {
+                                return prev;
+                            }
+
+                            const next: Group = {
+                                id: d.conversation_id,
+                                groupname: displayName,
+                                avatar: resolvedUserAvatar(d.avatar || ''),
+                                ownerId: 0,
+                                adminIds: [],
+                                memberCount: 0,
+                                createdTime: Date.now(),
+                            };
+
+                            return [next, ...prev];
+                        });
+                    } else if (d.action === 'avatar_updated') {
+                        const displayName = d.group_name?.trim() || '群聊';
+                        setGroupSyncToast(`「${displayName}」群头像已更新`);
+                    }
+
+                    void syncChatRoomsAndGroups();
+                }
             });
 
             const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
@@ -532,7 +636,7 @@ export default function Index() {
             });
             pendingSendTimers.current = {};
         };
-    }, []);
+    }, [syncChatRoomsAndGroups, subscribeWsRoom]);
 
     const chatListData: ChatListItem[] = chatRooms;
     const totalUnreadCount = useMemo(
@@ -749,21 +853,33 @@ export default function Index() {
                 group_name: groupName,
                 member_ids: memberIds,
                 client_request_id: clientRequestId,
-                ...(avatar ? { avatar } : {}),
             });
+
+            const optimisticAvatar = resolvedUserAvatar(avatar ?? createdGroup.avatar);
+
+            if (avatar) {
+                void updateGroupAvatar(createdGroup.room_id, avatar).catch((err) => {
+                    console.error('群头像上传失败:', err);
+                });
+            }
+
+            subscribeWsRoom(createdGroup.room_id);
 
             setActiveTab('chat');
             setSelectedContact(null);
             setEntryUnreadHintCount(0);
             setActiveChatId(createdGroup.room_id);
 
-            const mappedGroup = mapGroupSummary(createdGroup);
+            const mappedGroup = mapGroupSummary({
+                ...createdGroup,
+                avatar: optimisticAvatar,
+            });
             setGroups((currentGroups) => [mappedGroup, ...currentGroups.filter((group) => group.id !== mappedGroup.id)]);
             setChatRooms((currentRooms) => [
                 {
                     id: createdGroup.room_id,
                     name: createdGroup.group_name,
-                    avatar: resolvedUserAvatar(createdGroup.avatar),
+                    avatar: optimisticAvatar,
                     lastMessage: '[最近暂无消息]',
                     lastTime: new Date(createdGroup.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     unreadCount: 0,
@@ -812,6 +928,11 @@ export default function Index() {
 
     return (
         <div className="main">
+            {groupSyncToast ? (
+                <div className="group-sync-toast" role="status" aria-live="polite">
+                    {groupSyncToast}
+                </div>
+            ) : null}
             <aside className="side-bar">
                 <div className="nav-top">
                     <div

@@ -43,8 +43,6 @@ export interface GroupDetailData {
 export interface CreateGroupPayload {
     group_name: string;
     member_ids: number[];
-    /** 可选：群头像 data URL（写入 Conversation.avatar） */
-    avatar?: string;
     /** 与单次打开「新建群聊」弹窗绑定，用于防抖重复创建 */
     client_request_id?: string;
 }
@@ -90,9 +88,6 @@ export const createGroup = async (payload: CreateGroupPayload) => {
         group_name: payload.group_name,
         member_ids: payload.member_ids,
     };
-    if (payload.avatar) {
-        body.avatar = payload.avatar;
-    }
     if (payload.client_request_id) {
         body.client_request_id = payload.client_request_id;
     }
@@ -107,11 +102,25 @@ export const createGroup = async (payload: CreateGroupPayload) => {
     return {
         room_id: d.conversation_id,
         group_name: d.group_name,
-        avatar: d.avatar ?? payload.avatar ?? '',
+        avatar: d.avatar ?? '',
         owner_id: null as number | null,
         member_count: 1 + (payload.member_ids?.length ?? 0),
         created_at: new Date().toISOString(),
     } satisfies GroupSummaryData;
+};
+
+/** 群主单独上传群头像（与 POST /api/groups/ 分离以降低建群延时） */
+export const updateGroupAvatar = async (roomId: number, avatar: string) => {
+    const response = await request.put<any, ApiResponse<{ conversation_id: number; avatar: string }>>(
+        `/api/groups/${roomId}/avatar`,
+        { avatar },
+    );
+
+    if (response.code !== 0 || !response.data) {
+        throw new Error(response.info || '上传群头像失败');
+    }
+
+    return response.data;
 };
 
 export const getGroupDetail = async (roomId: number) => {

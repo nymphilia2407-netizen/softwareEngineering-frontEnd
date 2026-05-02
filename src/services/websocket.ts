@@ -24,6 +24,16 @@ export interface ChatReadReceiptData {
     last_message_id: number;
 }
 
+/** Django ChatConsumer.group_sync 推送的 data */
+export interface GroupSyncEventData {
+    action: 'created' | 'avatar_updated';
+    conversation_id: number;
+    group_name?: string;
+    avatar?: string;
+    /** 建群时由后端附带，用于提示文案 */
+    creator_username?: string;
+}
+
 /** Django ChatConsumer.chat_message 推送的 data 形状 */
 interface BackendNewMessagePayload {
     message_id: number;
@@ -78,6 +88,14 @@ export type ChatSocketEvent =
           data: {
               message: string;
           };
+      }
+    | {
+          type: 'group_sync';
+          data: GroupSyncEventData;
+      }
+    | {
+          type: 'room_subscribed';
+          data: { conversation_id: number };
       };
 
 type MessageListener = (message: ChatSocketEvent) => void;

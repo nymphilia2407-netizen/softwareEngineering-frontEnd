@@ -59,7 +59,9 @@ export type Message = {
 export type WsAction = 
     | { type: 'send_message'; data: { conversation_id: number; content: string; client_id?: string } }
     /** 与 Django ChatConsumer.handle_read_message 一致：last_read_message_id */
-    | { type: 'read_message'; data: { conversation_id: number; last_read_message_id: number } };
+    | { type: 'read_message'; data: { conversation_id: number; last_read_message_id: number } }
+    /** 建群/入群后加入 room_<id>，无需整页刷新即可收 new_message */
+    | { type: 'subscribe_room'; data: { conversation_id: number } };
 
 // 下行消息格式 (Server -> Client)
 export type WsResponse = 
