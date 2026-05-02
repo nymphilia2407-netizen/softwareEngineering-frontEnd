@@ -54,7 +54,7 @@ interface CreateGroupResponseData {
     avatar?: string;
 }
 
-/** 后端 GET /api/groups/:id 的 data */
+/** 后端 GET /api/groups/:id/ 的 data */
 interface BackendGroupDetailData {
     group_name: string;
     avatar?: string;
@@ -112,7 +112,7 @@ export const createGroup = async (payload: CreateGroupPayload) => {
 /** 群主单独上传群头像（与 POST /api/groups/ 分离以降低建群延时） */
 export const updateGroupAvatar = async (roomId: number, avatar: string) => {
     const response = await request.put<any, ApiResponse<{ conversation_id: number; avatar: string }>>(
-        `/api/groups/${roomId}/avatar`,
+        `/api/groups/${roomId}/avatar/`,
         { avatar },
     );
 
@@ -124,7 +124,7 @@ export const updateGroupAvatar = async (roomId: number, avatar: string) => {
 };
 
 export const getGroupDetail = async (roomId: number) => {
-    const response = await request.get<any, ApiResponse<BackendGroupDetailData>>(`/api/groups/${roomId}`);
+    const response = await request.get<any, ApiResponse<BackendGroupDetailData>>(`/api/groups/${roomId}/`);
 
     if (response.code !== 0 || !response.data) {
         throw new Error(response.info || '获取群聊详情失败');

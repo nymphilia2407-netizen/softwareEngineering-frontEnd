@@ -17,7 +17,7 @@ interface ApiResponse<T> {
 }
 
 export const getCurrentUser = async () => {
-    const response = await request.get<any, ApiResponse<CurrentUserData>>('/api/users/me');
+    const response = await request.get<any, ApiResponse<CurrentUserData>>('/api/users/me/');
 
     if (response.code !== 0 || !response.data) {
         throw new Error(response.info || '获取当前用户失败');
@@ -38,7 +38,7 @@ export interface UpdateProfilePayload {
 }
 
 export const updateUserProfile = async (payload: UpdateProfilePayload) => {
-    const response = await request.put<any, ApiResponse<null>>('/api/users/me', payload);
+    const response = await request.put<any, ApiResponse<null>>('/api/users/me/', payload);
 
     if (response.code !== 0) {
         throw new Error(response.info || '更新资料失败');
@@ -49,7 +49,7 @@ export const updateUserProfile = async (payload: UpdateProfilePayload) => {
 
 export const deleteUser = async (): Promise<boolean> => {
     try {
-        await request.delete('/api/users/me');
+        await request.delete('/api/users/me/');
         return true;
     } catch {
         return false;

@@ -53,7 +53,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const [groupSearchResults, setGroupSearchResults] = useState<Group[]>([]);
     const [groupHint, setGroupHint] = useState<string>('');
     const [requestHint, setRequestHint] = useState<string>('');
-    /** 已向这些 user_id 发出过 pending 申请（与后端 /api/friends/requests/sent 同步） */
+    /** 已向这些 user_id 发出过 pending 申请（与后端 /api/friends/requests/sent/ 同步） */
     const [sentPendingToIds, setSentPendingToIds] = useState<number[]>([]);
     /** 对方向我发起的 pending 申请中的 from_user_id（避免重复再点「加好友」） */
     const [incomingRequestFromIds, setIncomingRequestFromIds] = useState<number[]>([]);

@@ -23,7 +23,7 @@ export interface ReceivedFriendRequestData {
     created_at: string;
 }
 
-/** GET /api/friends/requests/sent — 当前用户发出且仍为 pending 的申请 */
+/** GET /api/friends/requests/sent/ — 当前用户发出且仍为 pending 的申请 */
 export interface SentFriendRequestData {
     request_id: number;
     to_user: {
@@ -51,7 +51,7 @@ export const getFriendList = async () => {
 };
 
 export const searchUsers = async (keyword: string) => {
-    const response = await request.get<any, ApiResponse<UserSearchData[]>>('/api/users/search', {
+    const response = await request.get<any, ApiResponse<UserSearchData[]>>('/api/users/search/', {
         params: { q: keyword },
     });
 
@@ -63,7 +63,7 @@ export const searchUsers = async (keyword: string) => {
 };
 
 export const searchUsersByEmail = async (email: string) => {
-    const response = await request.get<any, ApiResponse<UserSearchData[]>>('/api/users/search', {
+    const response = await request.get<any, ApiResponse<UserSearchData[]>>('/api/users/search/', {
         params: { email },
     });
 
@@ -75,7 +75,7 @@ export const searchUsersByEmail = async (email: string) => {
 };
 
 export const sendFriendRequest = async (targetUserId: number) => {
-    const response = await request.post<any, ApiResponse<null>>('/api/friends/requests', {
+    const response = await request.post<any, ApiResponse<null>>('/api/friends/requests/', {
         target_user_id: targetUserId,
     });
 
@@ -87,7 +87,7 @@ export const sendFriendRequest = async (targetUserId: number) => {
 };
 
 export const getReceivedFriendRequests = async () => {
-    const response = await request.get<any, ApiResponse<ReceivedFriendRequestData[]>>('/api/friends/requests');
+    const response = await request.get<any, ApiResponse<ReceivedFriendRequestData[]>>('/api/friends/requests/');
 
     if (response.code !== 0 || !response.data) {
         throw new Error(response.info || '获取好友请求失败');
@@ -97,7 +97,7 @@ export const getReceivedFriendRequests = async () => {
 };
 
 export const getSentFriendRequests = async () => {
-    const response = await request.get<any, ApiResponse<SentFriendRequestData[]>>('/api/friends/requests/sent');
+    const response = await request.get<any, ApiResponse<SentFriendRequestData[]>>('/api/friends/requests/sent/');
 
     if (response.code !== 0 || !response.data) {
         throw new Error(response.info || '获取已发送好友请求失败');
@@ -107,7 +107,7 @@ export const getSentFriendRequests = async () => {
 };
 
 export const acceptFriendRequest = async (requestId: number) => {
-    const response = await request.post<any, ApiResponse<null>>(`/api/friends/requests/${requestId}/accept`);
+    const response = await request.post<any, ApiResponse<null>>(`/api/friends/requests/${requestId}/accept/`);
 
     if (response.code !== 0) {
         throw new Error(response.info || '接受好友请求失败');
@@ -117,7 +117,7 @@ export const acceptFriendRequest = async (requestId: number) => {
 };
 
 export const rejectFriendRequest = async (requestId: number) => {
-    const response = await request.post<any, ApiResponse<null>>(`/api/friends/requests/${requestId}/reject`);
+    const response = await request.post<any, ApiResponse<null>>(`/api/friends/requests/${requestId}/reject/`);
 
     if (response.code !== 0) {
         throw new Error(response.info || '拒绝好友请求失败');

@@ -3,7 +3,7 @@ export interface RegisterParams {
     username: string;
     email: string;
     password: string;
-    /** 可选：图片 data URL（与 PUT /api/users/me 一致） */
+    /** 可选：图片 data URL（与 PUT /api/users/me/ 一致） */
     avatar?: string;
 }
 

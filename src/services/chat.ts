@@ -43,7 +43,7 @@ interface BackendConversationRow {
     other_user_id?: number;
 }
 
-/** 后端 GET /api/conversations/:id/messages 单条 */
+/** 后端 GET /api/conversations/:id/messages/ 单条 */
 interface BackendMessageRow {
     message_id: number;
     sender: { user_id: number; username: string; avatar?: string } | null;
@@ -98,7 +98,7 @@ export const getChatMessages = async (roomId: number, limit = 50, offset = 0) =>
     const page = Math.floor(offset / limit) + 1;
     const pageSize = limit;
     const response = await request.get<any, ApiResponse<{ messages: BackendMessageRow[]; total_pages: number; current_page: number }>>(
-        `/api/conversations/${roomId}/messages`,
+        `/api/conversations/${roomId}/messages/`,
         { params: { page, page_size: pageSize } },
     );
 
