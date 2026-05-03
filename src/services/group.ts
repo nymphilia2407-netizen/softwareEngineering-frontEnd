@@ -20,7 +20,7 @@ export interface GroupMemberData {
     user_id: number;
     username: string;
     avatar: string;
-    is_owner: boolean;
+    role: 'owner' | 'admin' | 'member';
 }
 
 export interface GroupDetailData {
@@ -144,7 +144,7 @@ export const getGroupDetail = async (roomId: number) => {
             user_id: m.user_id,
             username: m.username,
             avatar: '',
-            is_owner: m.role === 'owner',
+            role: m.role as 'owner' | 'admin' | 'member',
         })),
         announcements: raw.announcements.map((a, index) => ({
             id: index + 1,
@@ -156,4 +156,20 @@ export const getGroupDetail = async (roomId: number) => {
     };
 
     return mapped;
+};
+
+/** 退出群聊（非群主） */
+export const leaveGroup = async (groupId: number): Promise<void> => {
+    const response = await request.delete<any, ApiResponse<null>>(`/api/groups/${groupId}/members/me/`);
+    if (response.code !== 0) {
+        throw new Error(response.info || '退群失败');
+    }
+};
+
+/** 解散群聊（仅群主） */
+export const dissolveGroup = async (groupId: number): Promise<void> => {
+    const response = await request.delete<any, ApiResponse<null>>(`/api/groups/${groupId}/`);
+    if (response.code !== 0) {
+        throw new Error(response.info || '解散群聊失败');
+    }
 };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getGroupDetail } from '../services/group';
+import { getGroupDetail, dissolveGroup, leaveGroup } from '../services/group';
 import { getFriendDetail, deleteFriend } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 import type { GroupDetailData } from '../services/group';
@@ -9,16 +9,20 @@ import '../styles/chatSessionDetail.css';
 export interface ChatSessionDetailProps {
     roomId: number;
     isGroup: boolean;
+    currentUserId: number;
     /** 私聊时对端用户 id；群聊为 null */
     otherUserId: number | null;
     onBack: () => void;
     onDeleted?: () => void;
 }
 
-export default function ChatSessionDetail({ roomId, isGroup, otherUserId, onBack, onDeleted }: ChatSessionDetailProps) {
+export default function ChatSessionDetail({ roomId, isGroup, currentUserId, otherUserId, onBack, onDeleted }: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
+        const currentUserRole = groupDetail?.members.find(
+        m => m.user_id === currentUserId
+    )?.role;  // 'owner' | 'admin' | 'member'
 
     useEffect(() => {
         setError(null);
@@ -62,7 +66,9 @@ export default function ChatSessionDetail({ roomId, isGroup, otherUserId, onBack
                                     {groupDetail.members.map(m => (
                                         <div key={m.user_id} className="member-row">
                                             <span className="member-name">
-                                                {m.username}{m.is_owner ? ' (群主)' : ''}
+                                                {m.username}
+                                                {m.role === 'owner' && ' (群主)'}
+                                                {m.role === 'admin' && ' (管理员)'}
                                             </span>
                                             <span className="member-actions">
                                                 {/* 按钮预留位 */}
@@ -78,6 +84,48 @@ export default function ChatSessionDetail({ roomId, isGroup, otherUserId, onBack
                                 </div>
                             )}
                         </dl>
+                    </>
+                )}
+
+                {isGroup && groupDetail && (
+                    <>
+                        <div className="chat-session-detail-footer">
+                            {currentUserRole === 'owner' ? (
+                                <button type="button"
+                                    className="danger-button"
+                                    onClick={async () => {
+                                        const confirmed = globalThis.confirm('确认解散该群聊？所有成员将被移除。');
+                                        if (!confirmed) return;
+                                        try {
+                                            await dissolveGroup(roomId);
+                                            alert('群聊已解散');
+                                            onDeleted?.();
+                                        } catch (err) {
+                                            alert(err instanceof Error ? err.message : '解散失败');
+                                        }
+                                    }}
+                                >
+                                    解散群聊
+                                </button>
+                            ) : (
+                                <button type="button"
+                                    className="danger-button"
+                                    onClick={async () => {
+                                        const confirmed = globalThis.confirm('确认退出该群聊？');
+                                        if (!confirmed) return;
+                                        try {
+                                            await leaveGroup(roomId);
+                                            alert('已退出群聊');
+                                            onDeleted?.();
+                                        } catch (err) {
+                                            alert(err instanceof Error ? err.message : '退群失败');
+                                        }
+                                    }}
+                                >
+                                    退出群聊
+                                </button>
+                            )}
+                        </div>
                     </>
                 )}
 

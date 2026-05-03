@@ -442,6 +442,16 @@ export default function Index() {
         };
     }, [refreshFriendsAndRooms]);
 
+    const syncGroupList = async () => {
+        try {
+            const groupList = await getGroupList();
+            setGroups(groupList.map(mapGroupSummary));
+        } catch (error) {
+            console.error('获取群聊列表失败:', error);
+            setGroups([]);
+        }
+    };
+
     useEffect(() => {
         let cancelled = false;
 
@@ -495,21 +505,6 @@ export default function Index() {
             } catch (error) {
                 console.error('获取会话列表失败:', error);
                 setChatRooms([]);
-            }
-        };
-
-        const syncGroupList = async () => {
-            try {
-                const groupList = await getGroupList();
-
-                if (cancelled) {
-                    return;
-                }
-
-                setGroups(groupList.map(mapGroupSummary));
-            } catch (error) {
-                console.error('获取群聊列表失败:', error);
-                setGroups([]);
             }
         };
 
@@ -948,7 +943,7 @@ export default function Index() {
         setActiveChatId(0);
         setSelectedContact(null);
         
-        // 清除该会话，并删除本地存储的消息（目前无效，因为后端返回conversation里还是有老的好友）
+        // 清除该会话，并删除本地存储的消息（目前只能实现一侧的，另一侧需要手动刷新）
         setChatRooms(prev => prev.filter(room => room.id !== convId));
         setMessageStore(prev => {
             const next = { ...prev };
@@ -958,7 +953,8 @@ export default function Index() {
 
         // 刷新列表
         void refreshFriendsAndRooms();
-    }, [refreshFriendsAndRooms]);
+        void syncGroupList();
+    }, [refreshFriendsAndRooms, syncGroupList]);
 
     return (
         <div className="main">
@@ -1202,6 +1198,7 @@ export default function Index() {
                         <ChatSessionDetail
                             roomId={activeChatId}
                             isGroup={activeChatIsGroup}
+                            currentUserId={currentUserId}
                             otherUserId={activeChat?.otherUserId ?? null}
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
