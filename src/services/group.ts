@@ -173,3 +173,14 @@ export const dissolveGroup = async (groupId: number): Promise<void> => {
         throw new Error(response.info || '解散群聊失败');
     }
 };
+
+/** 发布群公告 */
+export const publishAnnouncement = async (groupId: number, content: string): Promise<void> => {
+    const response = await request.post<any, ApiResponse<null>>(
+        `/api/groups/${groupId}/announcements/`,
+        { content }
+    );
+    if (response.code !== 0) {
+        throw new Error(response.info || '发布公告失败');
+    }
+};

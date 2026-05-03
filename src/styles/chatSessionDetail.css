@@ -115,7 +115,7 @@
     text-align: center;
 }
 
-.delete-friend-button {
+.danger-button {
     padding: 8px 24px;
     border: 1px solid #ff4d4f;
     border-radius: 6px;
@@ -125,7 +125,69 @@
     font-size: 14px;
 }
 
-.delete-friend-button:hover {
+.danger-button:hover {
     background: #ff4d4f;
     color: #fff;
+}
+
+.announcement-section {
+    margin-top: 16px;
+}
+
+.announcement-toggle-button {
+    width: 100%;
+    padding: 8px;
+    border: 1px dashed #aaa;
+    border-radius: 6px;
+    background: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.announcement-toggle-button:hover {
+    border-color: #1890ff;
+    color: #1890ff;
+}
+
+.announcement-editor {
+    margin-top: 8px;
+}
+
+.announcement-input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #d9d9d9;
+    border-radius: 6px;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.announcement-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.announcement-cancel-button {
+    padding: 6px 16px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.announcement-submit-button {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 4px;
+    background: #1890ff;
+    color: #fff;
+    cursor: pointer;
+}
+
+.announcement-submit-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getGroupDetail, dissolveGroup, leaveGroup } from '../services/group';
+import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement } from '../services/group';
 import { getFriendDetail, deleteFriend } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 import type { GroupDetailData } from '../services/group';
@@ -20,9 +20,13 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
-        const currentUserRole = groupDetail?.members.find(
+    const currentUserRole = groupDetail?.members.find(
         m => m.user_id === currentUserId
     )?.role;  // 'owner' | 'admin' | 'member'
+    const canPostAnnouncement = currentUserRole === 'owner' || currentUserRole === 'admin';
+    const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
+    const [announcementContent, setAnnouncementContent] = useState('');
+    const [announcementSubmitting, setAnnouncementSubmitting] = useState(false);
 
     useEffect(() => {
         setError(null);
@@ -89,6 +93,66 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
 
                 {isGroup && groupDetail && (
                     <>
+                        {canPostAnnouncement && (
+                            <div className="announcement-section">
+                                {!isAnnouncementOpen ? (
+                                    <button
+                                        type="button"
+                                        className="announcement-toggle-button"
+                                        onClick={() => setIsAnnouncementOpen(true)}
+                                    >
+                                        发布群公告
+                                    </button>
+                                ) : (
+                                    <div className="announcement-editor">
+                                        <textarea
+                                            className="announcement-input"
+                                            placeholder="输入公告内容"
+                                            value={announcementContent}
+                                            onChange={(e) => setAnnouncementContent(e.target.value)}
+                                            rows={3}
+                                        />
+                                        <div className="announcement-editor-actions">
+                                            <button
+                                                type="button"
+                                                className="announcement-cancel-button"
+                                                onClick={() => {
+                                                    setIsAnnouncementOpen(false);
+                                                    setAnnouncementContent('');
+                                                }}
+                                            >
+                                                取消
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="announcement-submit-button"
+                                                disabled={!announcementContent.trim() || announcementSubmitting}
+                                                onClick={async () => {
+                                                    if (!announcementContent.trim()) return;
+                                                    setAnnouncementSubmitting(true);
+                                                    try {
+                                                        await publishAnnouncement(roomId, announcementContent.trim());
+                                                        alert('公告已发布');
+                                                        setAnnouncementContent('');
+                                                        setIsAnnouncementOpen(false);
+                                                        // 重新加载群详情以显示新公告
+                                                        const detail = await getGroupDetail(roomId);
+                                                        setGroupDetail(detail);
+                                                    } catch (err) {
+                                                        alert(err instanceof Error ? err.message : '发布失败');
+                                                    } finally {
+                                                        setAnnouncementSubmitting(false);
+                                                    }
+                                                }}
+                                            >
+                                                {announcementSubmitting ? '发布中...' : '发布'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         <div className="chat-session-detail-footer">
                             {currentUserRole === 'owner' ? (
                                 <button type="button"
@@ -163,7 +227,7 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
 
                         <div className="chat-session-detail-footer">
                             <button type="button"
-                                className="delete-friend-button"
+                                className="danger-button"
                                 onClick={async () => {
                                     if (!otherUserId) return;
                                     const confirmed = globalThis.confirm('确认删除该好友？');
