@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole } from '../services/group';
+import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole, muteMember } from '../services/group';
 import { getFriendDetail, deleteFriend } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 import type { GroupDetailData } from '../services/group';
@@ -22,8 +22,11 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
     const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
     const [announcementContent, setAnnouncementContent] = useState('');
     const [announcementSubmitting, setAnnouncementSubmitting] = useState(false);
+
     const [roleMenuOpenFor, setRoleMenuOpenFor] = useState<number | null>(null);
     const roleMenuRef = useRef<HTMLDivElement | null>(null); // 点击其它位置的时候让菜单缩回
+    const [muteMenuOpenFor, setMuteMenuOpenFor] = useState<number | null>(null);
+    const muteMenuRef = useRef<HTMLDivElement | null>(null);
 
     const currentMember = groupDetail?.members.find(m => m.user_id === currentUserId);
     const currentUserRole = currentMember?.role;
@@ -46,8 +49,13 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
-            if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+            if (
+                (roleMenuRef.current && !roleMenuRef.current.contains(target)) ||
+                (muteMenuRef.current && !muteMenuRef.current.contains(target))
+            ) {
                 setRoleMenuOpenFor(null);
+                setMuteMenuOpenFor(null);
             }
         };
         document.addEventListener('mousedown', handleClick);
@@ -68,6 +76,28 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
             await refreshGroupDetail();
         } catch (err) {
             alert(err instanceof Error ? err.message : `${label}失败`);
+        }
+    };
+
+    const muteOptions = [
+        { label: '禁言 5 分钟', value: 5 * 60 },
+        { label: '禁言 30 分钟', value: 30 * 60 },
+        { label: '禁言 1 小时', value: 60 * 60 },
+        { label: '禁言 12 小时', value: 12 * 60 * 60 },
+        { label: '禁言 1 天', value: 24 * 60 * 60 },
+        { label: '解除禁言', value: null },
+    ];
+
+    const handleMute = async (userId: number, seconds: number | null) => {
+        setMuteMenuOpenFor(null);
+        try {
+            const mutedUntil = seconds !== null
+                ? new Date(Date.now() + seconds * 1000).toISOString()
+                : null;
+            await muteMember(roomId, userId, mutedUntil);
+            await refreshGroupDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '操作失败');
         }
     };
     
@@ -153,6 +183,37 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
                                                             )}
                                                         </div>
                                                     )}
+
+                                                    {(currentUserRole === 'owner' || currentUserRole === 'admin') &&
+                                                        m.role !== 'owner' &&
+                                                        !(currentUserRole === 'admin' && m.role === 'admin') && (
+                                                            <div className="role-menu-wrapper">
+                                                                <button
+                                                                    type="button"
+                                                                    className="member-action-button"
+                                                                    onClick={() => setMuteMenuOpenFor(muteMenuOpenFor === m.user_id ? null : m.user_id)}
+                                                                >
+                                                                    禁言
+                                                                </button>
+                                                                {muteMenuOpenFor === m.user_id && (
+                                                                    <div
+                                                                        className="role-menu-dropdown"
+                                                                        ref={muteMenuOpenFor === m.user_id ? muteMenuRef : undefined}
+                                                                    >
+                                                                        {muteOptions.map(opt => (
+                                                                            <button
+                                                                                key={opt.label}
+                                                                                type="button"
+                                                                                className="role-menu-item"
+                                                                                onClick={() => handleMute(m.user_id, opt.value)}
+                                                                            >
+                                                                                {opt.label}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                 </span>
                                             </div>
                                         );

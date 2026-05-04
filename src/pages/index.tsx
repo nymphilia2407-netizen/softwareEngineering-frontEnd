@@ -555,6 +555,9 @@ export default function Index() {
 
                 if (event.type === 'error') {
                     console.error('Chat WebSocket:', event.message);
+                    if (event.message?.toLowerCase().includes('muted') || event.message?.includes('禁言')) {
+                        setGroupSyncToast('你已被禁言，暂时无法发送消息');
+                    }
                 }
 
                 if (event.type === 'group_sync') {

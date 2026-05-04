@@ -199,3 +199,18 @@ export const updateMemberRole = async (
         throw new Error(response.info || '操作失败');
     }
 };
+
+// 禁言功能
+export const muteMember = async (
+    groupId: number,
+    userId: number,
+    mutedUntil: string | null
+): Promise<void> => {
+    const response = await request.patch<any, ApiResponse<null>>(
+        `/api/groups/${groupId}/members/${userId}/mute/`,
+        { muted_until: mutedUntil }
+    );
+    if (response.code !== 0) {
+        throw new Error(response.info || '操作失败');
+    }
+};
