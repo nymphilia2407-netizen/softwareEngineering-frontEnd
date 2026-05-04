@@ -184,3 +184,18 @@ export const publishAnnouncement = async (groupId: number, content: string): Pro
         throw new Error(response.info || '发布公告失败');
     }
 };
+
+/** 更新成员角色（转让群主 / 设管理员 / 取消管理员） */
+export const updateMemberRole = async (
+    groupId: number,
+    userId: number,
+    role: 'owner' | 'admin' | 'member'
+): Promise<void> => {
+    const response = await request.put<any, ApiResponse<null>>(
+        `/api/groups/${groupId}/members/`,
+        { user_id: userId, role }
+    );
+    if (response.code !== 0) {
+        throw new Error(response.info || '操作失败');
+    }
+};
