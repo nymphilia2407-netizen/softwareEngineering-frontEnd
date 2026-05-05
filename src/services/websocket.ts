@@ -96,7 +96,15 @@ export type ChatSocketEvent =
     | {
           type: 'room_subscribed';
           data: { conversation_id: number };
-      };
+      }
+    | {
+        type: 'friend_request';
+        data: {
+            request_id: number;
+            from_user_id: number;
+            from_username: string;
+        };
+    };
 
 type MessageListener = (message: ChatSocketEvent) => void;
 type StatusListener = (status: 'connecting' | 'open' | 'closed' | 'error') => void;

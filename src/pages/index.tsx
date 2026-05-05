@@ -8,7 +8,7 @@ import ContactList from '../components/contactList';
 import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar, type GroupSummaryData } from '../services/group';
-import { getFriendList, type FriendSummaryData } from '../services/friend';
+import { getFriendList, getReceivedFriendRequests, type FriendSummaryData } from '../services/friend';
 import { getCurrentUser, updateUserProfile, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
@@ -311,6 +311,7 @@ export default function Index() {
     const [profileSignature, setProfileSignature] = useState<string>('');
     const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
     const [groupSyncToast, setGroupSyncToast] = useState<string | null>(null);
+    const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0);
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -491,6 +492,10 @@ export default function Index() {
             }
         };
 
+        getReceivedFriendRequests().then(requests => {
+            if (!cancelled) setPendingFriendRequestCount(requests.length);
+        }).catch(() => {});
+
         const syncChatRooms = async () => {
             try {
                 const roomList = await getChatRooms();
@@ -617,6 +622,10 @@ export default function Index() {
                     }
 
                     void syncChatRoomsAndGroups();
+                }
+
+                if (event.type === 'friend_request') {
+                    setPendingFriendRequestCount(prev => prev + 1);
                 }
             });
 
@@ -1009,6 +1018,11 @@ export default function Index() {
                             onClick={() => setActiveTab('contacts')}
                         >
                             <img src={CONTACTICON} alt="contact-icon" />
+                            {pendingFriendRequestCount > 0 && (
+                                <span className="nav-unread-badge">
+                                    {pendingFriendRequestCount > 99 ? '99+' : pendingFriendRequestCount}
+                                </span>
+                            )}
                         </button>
                     </nav>
                 </div>
@@ -1191,6 +1205,8 @@ export default function Index() {
                         }}
                         onCreateGroup={handleCreateGroup}
                         onContactsChanged={refreshFriendsAndRooms}
+                        pendingFriendRequestCount={pendingFriendRequestCount}
+                        onClearFriendRequests={() => setPendingFriendRequestCount(0)}
                     />
                 )}
             </div>
