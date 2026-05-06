@@ -37,6 +37,19 @@
     z-index: 10;
 }
 
+.nav-top,
+.nav-bottom,
+.nav-menu{
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.nav-menu{
+    gap: 12px;
+}
+
 .list-area {
     width: 300px;
     flex-shrink: 0;
@@ -99,16 +112,26 @@
 
 .user-avatar{
     position: relative;
-    margin-bottom: 50px;
-    margin-left: 5px;
+    margin: 0 auto 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
     cursor: pointer;
+    border: none;
     border-radius: 50%;
+    overflow: hidden;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .user-avatar img{
-    width: 40px;
-    height: 40px;
-    border-radius: 40px;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    display: block;
+    object-fit: cover;
     cursor: pointer;
     transition: transform 0.2s;
 }
@@ -127,17 +150,18 @@
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    margin: 12px 0;
-    padding: 10px;
+    margin: 12px auto;
+    padding: 0;
     position: relative;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-button img{
-    width: 100%;
-    height: 100%;
+    width: 28px;
+    height: 28px;
     outline: none;
     object-fit: contain;
+    display: block;
     mix-blend-mode: multiply;
     filter: brightness(1.3);
 }
