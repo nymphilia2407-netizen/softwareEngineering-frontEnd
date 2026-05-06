@@ -34,10 +34,12 @@ interface ContactsProps{
     readonly onItemClick: (item: User | Group, type: 'user' | 'group') => void;
     readonly onCreateGroup: (values: CreateGroupFormValues) => Promise<void> | void;
     readonly onContactsChanged?: () => Promise<void> | void;
+    readonly pendingFriendRequestCount?: number;
+    readonly onClearFriendRequests?: () => void;
 }
 
 export default function ContactList(props: Readonly<ContactsProps>) {
-    const { friends, groups, currentUserId, onItemClick, onCreateGroup, onContactsChanged } = props;
+    const { friends, groups, currentUserId, onItemClick, onCreateGroup, onContactsChanged, pendingFriendRequestCount, onClearFriendRequests } = props;
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<boolean>(false);
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState<boolean>(false);
@@ -497,6 +499,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                     setIsAddFriendOpen(false);
                                     setIsSearchGroupOpen(false);
                                     setAddFriendHint('');
+                                    onClearFriendRequests?.();
                                 }}
                             >
                                 好友请求

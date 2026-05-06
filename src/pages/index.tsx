@@ -9,8 +9,8 @@ import ContactList from '../components/contactList';
 import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar, type GroupSummaryData } from '../services/group';
-import { getFriendList, type FriendSummaryData } from '../services/friend';
-import { getCurrentUser, deleteUser } from '../services/user';
+import { getFriendList, getReceivedFriendRequests, type FriendSummaryData } from '../services/friend';
+import { getCurrentUser, updateUserProfile, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import { resolvedUserAvatar } from '../utils/avatarDisplay';
@@ -309,6 +309,7 @@ export default function Index() {
     const [profileSignature, setProfileSignature] = useState<string>('');
     const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
     const [groupSyncToast, setGroupSyncToast] = useState<string | null>(null);
+    const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0);
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -440,6 +441,16 @@ export default function Index() {
         };
     }, [refreshFriendsAndRooms]);
 
+    const syncGroupList = async () => {
+        try {
+            const groupList = await getGroupList();
+            setGroups(groupList.map(mapGroupSummary));
+        } catch (error) {
+            console.error('获取群聊列表失败:', error);
+            setGroups([]);
+        }
+    };
+
     useEffect(() => {
         let cancelled = false;
 
@@ -479,6 +490,10 @@ export default function Index() {
             }
         };
 
+        getReceivedFriendRequests().then(requests => {
+            if (!cancelled) setPendingFriendRequestCount(requests.length);
+        }).catch(() => {});
+
         const syncChatRooms = async () => {
             try {
                 const roomList = await getChatRooms();
@@ -493,21 +508,6 @@ export default function Index() {
             } catch (error) {
                 console.error('获取会话列表失败:', error);
                 setChatRooms([]);
-            }
-        };
-
-        const syncGroupList = async () => {
-            try {
-                const groupList = await getGroupList();
-
-                if (cancelled) {
-                    return;
-                }
-
-                setGroups(groupList.map(mapGroupSummary));
-            } catch (error) {
-                console.error('获取群聊列表失败:', error);
-                setGroups([]);
             }
         };
 
@@ -558,6 +558,9 @@ export default function Index() {
 
                 if (event.type === 'error') {
                     console.error('Chat WebSocket:', event.message);
+                    if (event.message?.toLowerCase().includes('muted') || event.message?.includes('禁言')) {
+                        setGroupSyncToast('你已被禁言，暂时无法发送消息');
+                    }
                 }
 
                 if (event.type === 'group_sync') {
@@ -617,6 +620,10 @@ export default function Index() {
                     }
 
                     void syncChatRoomsAndGroups();
+                }
+
+                if (event.type === 'friend_request') {
+                    setPendingFriendRequestCount(prev => prev + 1);
                 }
             });
 
@@ -903,7 +910,7 @@ export default function Index() {
         setActiveChatId(0);
         setSelectedContact(null);
         
-        // 清除该会话，并删除本地存储的消息（目前无效，因为后端返回conversation里还是有老的好友）
+        // 清除该会话，并删除本地存储的消息（目前只能实现一侧的，另一侧需要手动刷新）
         setChatRooms(prev => prev.filter(room => room.id !== convId));
         setMessageStore(prev => {
             const next = { ...prev };
@@ -913,7 +920,8 @@ export default function Index() {
 
         // 刷新列表
         void refreshFriendsAndRooms();
-    }, [refreshFriendsAndRooms]);
+        void syncGroupList();
+    }, [refreshFriendsAndRooms, syncGroupList]);
 
     const handleLogout = () => {
         const isConfirmed = globalThis.confirm('确认要退出登录吗？');
@@ -980,6 +988,11 @@ export default function Index() {
                             onClick={() => setActiveTab('contacts')}
                         >
                             <img src={CONTACTICON} alt="contact-icon" />
+                            {pendingFriendRequestCount > 0 && (
+                                <span className="nav-unread-badge">
+                                    {pendingFriendRequestCount > 99 ? '99+' : pendingFriendRequestCount}
+                                </span>
+                            )}
                         </button>
                     </nav>
                 </div>
@@ -1083,6 +1096,8 @@ export default function Index() {
                         }}
                         onCreateGroup={handleCreateGroup}
                         onContactsChanged={refreshFriendsAndRooms}
+                        pendingFriendRequestCount={pendingFriendRequestCount}
+                        onClearFriendRequests={() => setPendingFriendRequestCount(0)}
                     />
                 )}
                 {/* settings 页面现在在主区域呈现（与聊天窗口平级），因此移除此处的渲染 */}
@@ -1112,6 +1127,7 @@ export default function Index() {
                         <ChatSessionDetail
                             roomId={activeChatId}
                             isGroup={activeChatIsGroup}
+                            currentUserId={currentUserId}
                             otherUserId={activeChat?.otherUserId ?? null}
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
