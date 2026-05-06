@@ -46,6 +46,40 @@
     flex-direction: column;
 }
 
+.list-actions {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.list-action-button {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(15,23,42,0.06);
+    background: rgba(255,255,255,0.9);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.list-action-button.active,
+.list-action-button:focus,
+.list-action-button:hover {
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+}
+
+.list-action-button--danger {
+    color: #ff4d4f;
+    border-color: rgba(255,77,79,0.12);
+}
+
 .chat-area {
     flex: 1; 
     height: 100%;

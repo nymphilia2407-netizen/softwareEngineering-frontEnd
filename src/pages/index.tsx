@@ -996,7 +996,41 @@ export default function Index() {
                 </div>
             </aside>
 
-            <div className="list-area">
+                <div className="list-area">
+                {activeTab === 'settings' && (
+                <div className="list-actions">
+                    <button
+                        className={`list-action-button ${activeTab === 'settings' && settingsPanel === 'profile' ? 'active' : ''}`}
+                        onClick={() => {
+                            setActiveTab('settings');
+                            setSettingsPanel('profile');
+                        }}
+                        title="个人资料"
+                    >
+                        个人资料
+                    </button>
+
+                    <button
+                        className="list-action-button"
+                        onClick={() => handleLogout()}
+                        title="退出登录"
+                    >
+                        退出登录
+                    </button>
+
+                    <button
+                        className="list-action-button list-action-button--danger"
+                        onClick={async () => {
+                            const confirmed = globalThis.confirm('确认要注销账号吗？此操作无法撤销！');
+                            if (!confirmed) return;
+                            await handleDeleteAccount();
+                        }}
+                        title="注销账号"
+                    >
+                        注销账号
+                    </button>
+                </div>
+                )}
                 {activeTab === 'chat' && (
                     <ChatList
                         chats={chatListData}
@@ -1051,10 +1085,15 @@ export default function Index() {
                         onContactsChanged={refreshFriendsAndRooms}
                     />
                 )}
-                {activeTab === 'settings' && (
+                {/* settings 页面现在在主区域呈现（与聊天窗口平级），因此移除此处的渲染 */}
+            </div>
+
+            <main className="chat-area">
+                {activeTab === 'settings' ? (
                     <ConfigNav
                         isOpen
                         initialView={settingsPanel}
+                        showMenuInMain={false}
                         onClose={() => setActiveTab('chat')}
                         currentUser={{
                             userId: currentUserId,
@@ -1068,11 +1107,7 @@ export default function Index() {
                         onLogout={handleLogout}
                         onDeleteAccount={handleDeleteAccount}
                     />
-                )}
-            </div>
-
-            <main className="chat-area">
-                {activeChatName ? (
+                ) : activeChatName ? (
                     chatSessionInfoOpen ? (
                         <ChatSessionDetail
                             roomId={activeChatId}

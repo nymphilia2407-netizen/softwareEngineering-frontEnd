@@ -6,10 +6,13 @@ import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
 
 import '../styles/configNav.css';
 
+
 interface ConfigNavProps {
 	isOpen: boolean;
 	onClose: () => void;
 	initialView: PanelView;
+	/** 是否在主区域显示 menu 视图，默认为 false（避免重复显示列表区操作按钮） */
+	showMenuInMain?: boolean;
 	currentUser: {
 		userId: number;
 		username: string;
@@ -29,6 +32,7 @@ export default function ConfigNav({
 	isOpen,
 	onClose,
 	initialView,
+	showMenuInMain = false,
 	currentUser,
 	onAvatarUpdated,
 	onLogout,
@@ -130,7 +134,7 @@ export default function ConfigNav({
 			</header>
 
 			<div className="config-nav-body">
-				{panelView === 'menu' ? (
+				{panelView === 'menu' && showMenuInMain ? (
 					<div className="config-nav-menu">
 						<button type="button" className="config-nav-button" onClick={() => setPanelView('profile')}>
 							个人资料
