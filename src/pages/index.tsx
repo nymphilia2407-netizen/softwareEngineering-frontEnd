@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ChatList from '../components/chatList';
-import ConfigPanel from '../components/config';
+import ConfigNav from '../components/configNav';
 import ChatSessionDetail from '../components/chatSessionDetail';
 import ChatWindow from '../components/chatWindow';
 import ContactList from '../components/contactList';
@@ -296,7 +296,6 @@ export default function Index() {
         }
     });
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
-    const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [settingsPanel, setSettingsPanel] = useState<'menu' | 'profile'>('menu');
     const [activeChatId, setActiveChatId] = useState<number>(0);
     const [selectedContact, setSelectedContact] = useState<User | null>(null);
@@ -948,48 +947,19 @@ export default function Index() {
                     {groupSyncToast}
                 </div>
             ) : null}
-            <ConfigPanel
-                isOpen={isSettingsOpen}
-                initialView={settingsPanel}
-                onClose={() => {
-                    setIsSettingsOpen(false);
-                    setActiveTab('chat');
-                }}
-                currentUser={{
-                    userId: currentUserId,
-                    username: userName,
-                    avatar: myAvatar,
-                    birthday: profileBirthday,
-                    address: profileAddress,
-                    signature: profileSignature,
-                }}
-                onAvatarUpdated={setMyAvatar}
-                onLogout={handleLogout}
-                onDeleteAccount={handleDeleteAccount}
-            />
             <aside className="side-bar">
                 <div className="nav-top">
-                    <div
+                    <button
                         className="user-avatar"
                         title="点击更换头像"
                         onClick={() => {
                             setActiveTab('settings');
                             setSettingsPanel('profile');
-                            setIsSettingsOpen(true);
                         }}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setActiveTab('settings');
-                                setSettingsPanel('profile');
-                                setIsSettingsOpen(true);
-                            }
-                        }}
-                        role="button"
-                        tabIndex={0}
+                        type="button"
                     >
                         <img src={myAvatar} alt="myAvatar" title={userName || '当前用户'} />
-                    </div>
+                    </button>
                     <nav className="nav-menu">
                         <button
                             className={`nav-button ${activeTab === 'chat' ? 'active-button' : ''}`}
@@ -1019,7 +989,6 @@ export default function Index() {
                         onClick={() => {
                             setActiveTab('settings');
                             setSettingsPanel('menu');
-                            setIsSettingsOpen(true);
                         }}
                     >
                         <img src={CONFIGICON} alt="config-icon" />
@@ -1080,6 +1049,24 @@ export default function Index() {
                         }}
                         onCreateGroup={handleCreateGroup}
                         onContactsChanged={refreshFriendsAndRooms}
+                    />
+                )}
+                {activeTab === 'settings' && (
+                    <ConfigNav
+                        isOpen
+                        initialView={settingsPanel}
+                        onClose={() => setActiveTab('chat')}
+                        currentUser={{
+                            userId: currentUserId,
+                            username: userName,
+                            avatar: myAvatar,
+                            birthday: profileBirthday,
+                            address: profileAddress,
+                            signature: profileSignature,
+                        }}
+                        onAvatarUpdated={setMyAvatar}
+                        onLogout={handleLogout}
+                        onDeleteAccount={handleDeleteAccount}
                     />
                 )}
             </div>
