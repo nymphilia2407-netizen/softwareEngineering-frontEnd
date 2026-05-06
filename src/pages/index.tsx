@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ChatList from '../components/chatList';
+import ConfigPanel from '../components/config';
 import ChatSessionDetail from '../components/chatSessionDetail';
 import ChatWindow from '../components/chatWindow';
 import ContactList from '../components/contactList';
@@ -9,10 +10,9 @@ import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '.
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar, type GroupSummaryData } from '../services/group';
 import { getFriendList, type FriendSummaryData } from '../services/friend';
-import { getCurrentUser, updateUserProfile, deleteUser } from '../services/user';
+import { getCurrentUser, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
-import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
 import { resolvedUserAvatar } from '../utils/avatarDisplay';
 import type { Group, Message, User } from '../types/entity';
 import type { ActiveTabType } from '../types/ui';
@@ -298,7 +298,6 @@ export default function Index() {
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
     const [settingsPanel, setSettingsPanel] = useState<'menu' | 'profile'>('menu');
-    const [profileAvatarSaving, setProfileAvatarSaving] = useState<boolean>(false);
     const [activeChatId, setActiveChatId] = useState<number>(0);
     const [selectedContact, setSelectedContact] = useState<User | null>(null);
     const [friends, setFriends] = useState<User[]>([]);
@@ -699,17 +698,6 @@ export default function Index() {
         };
     }, [activeChatId]);
 
-    const handleLogout = () => {
-        const isConfirmed = globalThis.confirm('确认要退出登录吗？');
-        if (!isConfirmed) {
-            return;
-        }
-
-        socketRef.current?.disconnect();
-        tokenUtils.removeToken();
-        globalThis.location.reload();
-    };
-
     const clearPendingSendTimer = (clientId: string) => {
         const timer = pendingSendTimers.current[clientId];
         if (timer) {
@@ -910,38 +898,6 @@ export default function Index() {
         }
     };
 
-    const handleSaveProfile = async () => {
-        try {
-            await updateUserProfile({
-                birthday: profileBirthday,
-                address: profileAddress,
-                signature: profileSignature,
-            });
-            alert('保存并提交成功');
-        } catch (err) {
-            alert(err instanceof Error ? err.message : '保存或提交失败');
-        }
-    };
-
-    const handleDelete = async () => {
-        const isConfirmed = globalThis.confirm('确认要注销账号吗？此操作无法撤销！');
-        if (!isConfirmed) {
-            return;
-        }
-
-        const success = await deleteUser();
-    
-        if (success) {
-            alert('账号已注销');
-            localStorage.clear(); // 清空本地存储
-            socketRef.current?.disconnect();
-            tokenUtils.removeToken();
-            globalThis.location.reload();
-        } else {
-            alert('注销失败，请稍后重试');
-        }
-    }
-
     const handleChatDeleted = useCallback(() => {
         const convId = activeChatIdRef.current;
         setChatSessionInfoOpen(false);
@@ -960,6 +916,31 @@ export default function Index() {
         void refreshFriendsAndRooms();
     }, [refreshFriendsAndRooms]);
 
+    const handleLogout = () => {
+        const isConfirmed = globalThis.confirm('确认要退出登录吗？');
+        if (!isConfirmed) {
+            return;
+        }
+
+        socketRef.current?.disconnect();
+        tokenUtils.removeToken();
+        globalThis.location.reload();
+    };
+
+    const handleDeleteAccount = async () => {
+        const success = await deleteUser();
+
+        if (success) {
+            alert('账号已注销');
+            localStorage.clear();
+            socketRef.current?.disconnect();
+            tokenUtils.removeToken();
+            globalThis.location.reload();
+        } else {
+            alert('注销失败，请稍后重试');
+        }
+    };
+
     return (
         <div className="main">
             {groupSyncToast ? (
@@ -967,6 +948,25 @@ export default function Index() {
                     {groupSyncToast}
                 </div>
             ) : null}
+            <ConfigPanel
+                isOpen={isSettingsOpen}
+                initialView={settingsPanel}
+                onClose={() => {
+                    setIsSettingsOpen(false);
+                    setActiveTab('chat');
+                }}
+                currentUser={{
+                    userId: currentUserId,
+                    username: userName,
+                    avatar: myAvatar,
+                    birthday: profileBirthday,
+                    address: profileAddress,
+                    signature: profileSignature,
+                }}
+                onAvatarUpdated={setMyAvatar}
+                onLogout={handleLogout}
+                onDeleteAccount={handleDeleteAccount}
+            />
             <aside className="side-bar">
                 <div className="nav-top">
                     <div
@@ -1026,118 +1026,6 @@ export default function Index() {
                     </button>
                 </div>
             </aside>
-
-            {isSettingsOpen && (
-                <div
-                    className="overlay"
-                    onClick={() => {
-                        setIsSettingsOpen(false);
-                        setSettingsPanel('menu');
-                        setActiveTab('chat'); // 默认返回到chat
-                    }}
-                >
-                    <div
-                        className={`config-panel ${settingsPanel === 'profile' ? 'config-panel--profile' : ''}`}
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {settingsPanel === 'menu' ? (
-                            <>
-                                <button
-                                    type="button"
-                                    className="config-button"
-                                    onClick={() => {
-                                        setIsSettingsOpen(false);
-                                        setSettingsPanel('menu');
-                                        setActiveTab('chat');
-                                    }}
-                                >
-                                    关闭
-                                </button>
-                                <button type="button" className="config-button" onClick={() => setSettingsPanel('profile')}>
-                                    个人资料
-                                </button>
-                                <button type="button" className="config-button" onClick={handleLogout}>
-                                    退出登录
-                                </button>
-                                <button type="button" className="config-button" style={{ color: '#ff4d4f' }} onClick={handleDelete}>
-                                    注销账号
-                                </button>
-                            </>
-                        ) : (
-                            <div className="profile-settings">
-                                <div className="profile-settings-title">头像</div>
-                                <div className="profile-settings-avatar-wrap">
-                                    <img src={myAvatar} alt="" className="profile-settings-avatar-preview" />
-                                </div>
-                                <label className="profile-settings-file-label">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="profile-settings-file-input"
-                                        disabled={profileAvatarSaving}
-                                        onChange={(e) => {
-                                            const input = e.target;
-                                            const file = input.files?.[0];
-                                            if (!file) {
-                                                return;
-                                            }
-
-                                            void (async () => {
-                                                try {
-                                                    setProfileAvatarSaving(true);
-                                                    const dataUrl = await readAvatarFileAsDataUrl(file);
-                                                    await updateUserProfile({ avatar: dataUrl });
-                                                    setMyAvatar(dataUrl);
-                                                    persistUserProfile(userName, dataUrl);
-                                                } catch (err) {
-                                                    alert(err instanceof Error ? err.message : '上传失败');
-                                                } finally {
-                                                    setProfileAvatarSaving(false);
-                                                    input.value = '';
-                                                }
-                                            })();
-                                        }}
-                                    />
-                                    {profileAvatarSaving ? '保存中…' : '选择图片并上传'}
-                                </label>
-                                <p className="profile-settings-hint">支持常见图片格式，单张不超过 4MB。</p>
-                                
-                                <div className="profile-settings-title">生日</div>
-                                <input
-                                    type="date"
-                                    className="profile-settings-input"
-                                    value={profileBirthday}
-                                    onChange={(e) => setProfileBirthday(e.target.value)}
-                                />
-
-                                <div className="profile-settings-title">地址</div>
-                                <input
-                                    type="text"
-                                    className="profile-settings-input"
-                                    value={profileAddress}
-                                    onChange={(e) => setProfileAddress(e.target.value)}
-                                />
-
-                                <div className="profile-settings-title">个性签名</div>
-                                <input
-                                    type="text"
-                                    className="profile-settings-input"
-                                    value={profileSignature}
-                                    onChange={(e) => setProfileSignature(e.target.value)}
-                                />
-
-                                <button type="button" className="config-button" onClick={handleSaveProfile}>
-                                    保存并提交
-                                </button>
-
-                                <button type="button" className="config-button" onClick={() => setSettingsPanel('menu')}>
-                                    返回
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
 
             <div className="list-area">
                 {activeTab === 'chat' && (
