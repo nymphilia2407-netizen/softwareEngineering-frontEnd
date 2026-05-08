@@ -457,6 +457,11 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                         onClick={() => setIsActionMenuOpen((current) => !current)}
                     >
                         +
+                        {(pendingFriendRequestCount ?? 0) > 0 && (
+                            <span className="unread-badge">
+                                {(pendingFriendRequestCount ?? 0) > 99 ? '99+' : pendingFriendRequestCount}
+                            </span>
+                        )}
                     </button>
 
                     {isActionMenuOpen && (
@@ -503,6 +508,11 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                                 }}
                             >
                                 好友请求
+                                {(pendingFriendRequestCount ?? 0) > 0 && (
+                                    <span className="unread-badge-inline">
+                                        {(pendingFriendRequestCount ?? 0) > 99 ? '99+' : pendingFriendRequestCount}
+                                    </span>
+                                )}
                             </button>
                             <button
                                 type='button'
