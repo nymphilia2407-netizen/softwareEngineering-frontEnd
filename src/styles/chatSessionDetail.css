@@ -111,8 +111,10 @@
 }
 
 .chat-session-detail-footer {
+    display: flex;    
     margin-top: 24px;
-    text-align: center;
+    justify-content: center;
+    gap: 20px;
 }
 
 .danger-button {
@@ -127,6 +129,21 @@
 
 .danger-button:hover {
     background: #ff4d4f;
+    color: #fff;
+}
+
+.no-danger-button {
+    padding: 8px 24px;
+    border: 1px solid #1890ff;
+    border-radius: 6px;
+    background: #fff;
+    color: #1890ff;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.no-danger-button:hover {
+    background: #40a9ff;
     color: #fff;
 }
 

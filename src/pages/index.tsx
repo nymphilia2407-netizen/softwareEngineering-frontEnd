@@ -5,12 +5,13 @@ import ConfigNav from '../components/configNav';
 import ChatSessionDetail from '../components/chatSessionDetail';
 import ChatWindow from '../components/chatWindow';
 import ContactList from '../components/contactList';
+import ContactSessionDetail from '../components/contactSessionDetail';
 
 import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
 import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar, type GroupSummaryData } from '../services/group';
 import { getFriendList, getReceivedFriendRequests, type FriendSummaryData } from '../services/friend';
-import { getCurrentUser, updateUserProfile, deleteUser } from '../services/user';
+import { getCurrentUser, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import { resolvedUserAvatar } from '../utils/avatarDisplay';
@@ -322,6 +323,8 @@ export default function Index() {
     const optimisticIdSeqRef = useRef(0);
     /** 已在 WS 上 subscribe_room 的会话；新建私聊在连接之后才出现，必须补订阅才能收到发消息回执 */
     const subscribedWsRoomsRef = useRef<Set<number>>(new Set());
+    // 用于展示联系人具体信息
+    const [contactDetailUserId, setContactDetailUserId] = useState<number | null>(null);
 
     useEffect(() => {
         currentUserIdRef.current = currentUserId;
@@ -948,6 +951,42 @@ export default function Index() {
         }
     };
 
+    // 在好友详情界面里删除好友的接口
+    const handleFriendDetailDeleted = useCallback(() => {
+        const userId = contactDetailUserId;
+        if (!userId) return;
+        
+        setContactDetailUserId(null);
+        setActiveChatId(0);
+        setSelectedContact(null);
+        
+        // 清理对应会话
+        const convId = chatRooms.find(r => r.otherUserId === userId)?.id;
+        if (convId) {
+            setChatRooms(prev => prev.filter(r => r.id !== convId));
+            setMessageStore(prev => {
+                const next = { ...prev };
+                delete next[convId];
+                return next;
+            });
+        }
+        
+        void refreshFriendsAndRooms();
+    }, [contactDetailUserId, chatRooms, refreshFriendsAndRooms]);
+
+    // 在好友详情界面进入聊天
+    const handleEnterChat = useCallback((userId: number) => {
+        const matchedRoom =
+            chatRooms.find(room => room.otherUserId === userId) ??
+            chatRooms.find(room => !room.isGroup && room.name === selectedContact?.username);
+        const roomId = matchedRoom?.id ?? 0;
+        
+        setContactDetailUserId(null);
+        setChatSessionInfoOpen(false);
+        setActiveChatId(roomId);
+        setEntryUnreadHintCount(matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0);
+    }, [chatRooms, selectedContact]);
+
     return (
         <div className="main">
             {groupSyncToast ? (
@@ -1069,19 +1108,7 @@ export default function Index() {
                             if (type === 'user') {
                                 const userItem = item as User;
                                 setSelectedContact(userItem);
-                                const matchedRoom =
-                                    chatRooms.find((room) => room.otherUserId === userItem.id) ??
-                                    chatRooms.find(
-                                        (room) => !room.isGroup && room.name === userItem.username,
-                                    );
-                                const roomId = matchedRoom?.id ?? 0;
-                                const hint = matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0;
-                                setEntryUnreadHintCount(hint);
-                                setChatSessionInfoOpen(false);
-                                if (roomId) {
-                                    setChatRooms((prev) => clearUnreadRoom(prev, roomId));
-                                }
-                                setActiveChatId(roomId);
+                                setContactDetailUserId(userItem.id);
                                 return;
                             }
 
@@ -1121,6 +1148,13 @@ export default function Index() {
                         onAvatarUpdated={setMyAvatar}
                         onLogout={handleLogout}
                         onDeleteAccount={handleDeleteAccount}
+                    />
+                ) : contactDetailUserId != null ? (
+                    <ContactSessionDetail
+                        userId={contactDetailUserId}
+                        onBack={() => setContactDetailUserId(null)}
+                        onEnterChat={handleEnterChat}
+                        onDeleted={handleFriendDetailDeleted}
                     />
                 ) : activeChatName ? (
                     chatSessionInfoOpen ? (
