@@ -42,6 +42,7 @@ export interface FriendDetail {
     birthday: string;
     address: string;
     signature: string;
+    tag?: string; 
 }
 
 interface ApiResponse<T> {
@@ -152,4 +153,15 @@ export const getFriendDetail = async (friendId: number): Promise<FriendDetail> =
 export const deleteFriend = async (friendId: number): Promise<boolean> => {
     await request.delete<any, void>(`/api/friends/${friendId}/`);
     return true;
+};
+
+/** 更改好友分组 */
+export const updateFriendTag = async (friendId: number, tag: string): Promise<void> => {
+    const response = await request.put<any, ApiResponse<null>>(
+        `/api/friends/${friendId}/group/`,
+        { tag: tag }
+    );
+    if (response.code !== 0) {
+        throw new Error(response.info || '更改分组失败');
+    }
 };

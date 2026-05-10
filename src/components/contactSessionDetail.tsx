@@ -1,6 +1,6 @@
 // components/contactSessionDetail.tsx
 import { useEffect, useState } from 'react';
-import { getFriendDetail, deleteFriend } from '../services/friend';
+import { getFriendDetail, deleteFriend, updateFriendTag } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 
 import '../styles/chatSessionDetail.css';
@@ -23,6 +23,15 @@ export default function ContactSessionDetail({ userId, onBack, onEnterChat, onDe
             .then(setFriendDetail)
             .catch(err => setError(err.message || '获取好友信息失败'));
     }, [userId]);
+
+    // 分组相关
+    const [savedTag, setSavedTag] = useState(friendDetail?.tag ?? '');
+    const [friendTag, setFriendTag] = useState(friendDetail?.tag ?? '');
+    const [tagSubmitting, setTagSubmitting] = useState(false);
+
+    useEffect(() => {
+        setFriendTag(friendDetail?.tag ?? '');
+    }, [friendDetail?.tag]);
 
     const handleDelete = async () => {
         if (!globalThis.confirm('确认删除该好友？')) return;
@@ -73,6 +82,42 @@ export default function ContactSessionDetail({ userId, onBack, onEnterChat, onDe
                                 </div>
                             )}
                         </dl>
+
+                        <div className="friend-tag-section">
+                            <div className="friend-tag-label">好友分组</div>
+                            <div className="friend-tag-current">
+                                {savedTag ? `当前分组: ${savedTag}` : '暂未分组'}
+                            </div>
+                            <div className="friend-tag-input-row">
+                                <input
+                                    type="text"
+                                    className="friend-tag-input"
+                                    placeholder="设置好友分组"
+                                    value={friendTag}
+                                    onChange={(e) => setFriendTag(e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    className="friend-tag-submit"
+                                    disabled={tagSubmitting || !friendTag.trim()}
+                                    onClick={async () => {
+                                        if (!friendTag.trim()) return;
+                                        setTagSubmitting(true);
+                                        try {
+                                            await updateFriendTag(userId, friendTag.trim());
+                                            setSavedTag(friendTag.trim());  // 成功后更新显示
+                                            alert('分组已更新');
+                                        } catch (err) {
+                                            alert(err instanceof Error ? err.message : '更改失败');
+                                        } finally {
+                                            setTagSubmitting(false);
+                                        }
+                                    }}
+                                >
+                                    {tagSubmitting ? '提交中' : '提交'}
+                                </button>
+                            </div>
+                        </div>
 
                         <div className="chat-session-detail-footer">
                             <button type="button" className="no-danger-button" onClick={() => onEnterChat(userId)}>
