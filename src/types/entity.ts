@@ -5,6 +5,7 @@ export interface User{
     status: 'online' | 'offline' | 'busy'; // 需要在websocket里获取
     registerTime: number;
     lastLoginTime: number;
+    tag?: string;
 }
 
 // 从后端接受

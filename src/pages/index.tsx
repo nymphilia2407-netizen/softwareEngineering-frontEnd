@@ -219,6 +219,7 @@ const mapFriendSummary = (friend: FriendSummaryData): User => ({
     status: friend.status ?? 'online',
     registerTime: Date.now(),
     lastLoginTime: Date.now(),
+    tag: friend.tag,
 });
 
 const mapHistoryMessage = (roomId: number, message: ChatMessageData): Message => {

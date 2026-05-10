@@ -740,3 +740,13 @@
     transform: translate(20px, -2px);
 }
 
+.friend-tag-group {
+    margin-bottom: 12px;
+}
+
+.friend-tag-group-header {
+    font-size: 12px;
+    font-weight: 500;
+    color: #999;
+    padding: 8px 12px 4px;
+}

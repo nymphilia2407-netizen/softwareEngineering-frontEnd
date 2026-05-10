@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useMemo, type ReactNode } from 'react'
 
 import { type User, type Group } from '../types/entity'
 import {
@@ -172,6 +172,28 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     const filteredGroups = groups.filter(g =>
         g.groupname.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    // 好友分组处理逻辑
+    const taggedFriends = useMemo(() => {
+        const map = new Map<string, User[]>();
+        const untagged: User[] = [];
+
+        for (const f of filteredFriends) {
+            const tag = f.tag?.trim();
+            if (tag) {
+                const list = map.get(tag) || [];
+                list.push(f);
+                map.set(tag, list);
+            } else {
+                untagged.push(f);
+            }
+        }
+
+        const result: { tag: string; users: User[] }[] = [];
+        if (untagged.length > 0) result.push({ tag: '未分组', users: untagged });
+        for (const [tag, users] of map) result.push({ tag, users });
+        return result;
+    }, [filteredFriends]);
 
     const toggleMember = (memberId: number) => {
         setSelectedMemberIds((currentIds) => (
@@ -783,27 +805,32 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                     </button>
                     {friendsExpanded && (
                         <div id='contact-list-friends' className='list-render-area' role='region' aria-labelledby='contact-section-friends-heading'>
-                            {filteredFriends.map((user) => (
-                                <button key={user.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(user, 'user')}>
-                                    <div className='item-avatar'>
-                                        <img
-                                            src={resolvedUserAvatar(user.avatar)}
-                                            alt=''
-                                            onError={(e) => {
-                                                const img = e.currentTarget;
-                                                img.onerror = null;
-                                                img.src = DEFAULT_AVATAR;
-                                            }}
-                                        />
-                                        <span className={`status-badge ${user.status}`} />
-                                    </div>
-                                    <div className='item-info'>
-                                        <span className='item-name'>{user.username}</span>
-                                        <span className={`item-meta status-${user.status}`}>
-                                            {user.status === 'online' ? '在线' : '离线'}
-                                        </span>
-                                    </div>
-                                </button>
+                            {taggedFriends.map(section => (
+                                <div key={section.tag} className="friend-tag-group">
+                                    <div className="friend-tag-group-header">{section.tag} ({section.users.length})</div>
+                                    {section.users.map(user => (
+                                        <button key={user.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(user, 'user')}>
+                                            <div className='item-avatar'>
+                                                <img
+                                                    src={resolvedUserAvatar(user.avatar)}
+                                                    alt=''
+                                                    onError={(e) => {
+                                                        const img = e.currentTarget;
+                                                        img.onerror = null;
+                                                        img.src = DEFAULT_AVATAR;
+                                                    }}
+                                                />
+                                                <span className={`status-badge ${user.status}`} />
+                                            </div>
+                                            <div className='item-info'>
+                                                <span className='item-name'>{user.username}</span>
+                                                <span className={`item-meta status-${user.status}`}>
+                                                    {user.status === 'online' ? '在线' : '离线'}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
                             ))}
                         </div>
                     )}

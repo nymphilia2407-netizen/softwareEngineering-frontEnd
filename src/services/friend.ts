@@ -5,6 +5,7 @@ export interface FriendSummaryData {
     username: string;
     avatar?: string;
     status?: 'online' | 'offline' | 'busy';
+    tag?: string;
 }
 
 export interface UserSearchData {
