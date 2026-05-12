@@ -8,7 +8,7 @@ import ContactList from '../components/contactList';
 import ContactSessionDetail from '../components/contactSessionDetail';
 
 import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
-import { getChatMessages, getChatRooms, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
+import { getChatMessages, getChatRooms, setConversationMuted, type ChatMessageData, type ChatRoomSummaryData } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar, type GroupSummaryData } from '../services/group';
 import { getFriendList, getReceivedFriendRequests, type FriendSummaryData } from '../services/friend';
 import { getCurrentUser, deleteUser } from '../services/user';
@@ -30,6 +30,8 @@ interface ChatListItem {
     status?: 'online' | 'offline' | 'busy';
     otherUserId?: number | null;
     isGroup: boolean;
+    /** 消息免打扰：开启后新消息仍更新预览，但不增加未读数 */
+    isMuted?: boolean;
 }
 
 /** 与 ChatWindow.isOtherMemberMessage 一致：避免 senderId / currentUserId 类型不一致或短暂为 0 时误判己方消息 */
@@ -186,7 +188,8 @@ const updateRoomOnIncomingMessage = (
         room.lastMessage = incomingMessage.content;
         room.lastTime = formattedTime;
 
-        if (!fromSelf && !isActive) {
+        const muted = room.isMuted === true;
+        if (!fromSelf && !isActive && !muted) {
             room.unreadCount = (room.unreadCount || 0) + 1;
         }
 
@@ -204,6 +207,7 @@ const updateRoomOnIncomingMessage = (
             unreadCount: fromSelf || isActive ? 0 : 1,
             otherUserId: null,
             isGroup: false,
+            isMuted: false,
         },
         ...rooms,
     ];
@@ -250,6 +254,7 @@ const mapChatRoom = (room: ChatRoomSummaryData): ChatListItem => ({
     otherUserId: room.other_user_id ?? null,
     status: undefined,
     isGroup: room.is_group,
+    isMuted: room.is_muted === true,
 });
 
 const mapGroupSummary = (group: GroupSummaryData): Group => ({
@@ -596,6 +601,7 @@ export default function Index() {
                                 unreadCount: 0,
                                 otherUserId: null,
                                 isGroup: true,
+                                isMuted: false,
                             };
 
                             return [row, ...prev];
@@ -899,6 +905,7 @@ export default function Index() {
                     unreadCount: 0,
                     otherUserId: null,
                     isGroup: true,
+                    isMuted: false,
                 },
                 ...currentRooms.filter((room) => room.id !== createdGroup.room_id),
             ]);
@@ -907,6 +914,20 @@ export default function Index() {
             alert(error instanceof Error ? error.message : '创建群聊失败');
         }
     };
+
+    const handleConversationMutedChange = useCallback(async (muted: boolean) => {
+        const convId = activeChatIdRef.current;
+        if (!convId) {
+            return;
+        }
+
+        await setConversationMuted(convId, muted);
+        setChatRooms((prev) =>
+            prev.map((room) =>
+                room.id === convId ? { ...room, isMuted: muted, unreadCount: muted ? 0 : room.unreadCount } : room,
+            ),
+        );
+    }, []);
 
     const handleChatDeleted = useCallback(() => {
         const convId = activeChatIdRef.current;
@@ -1164,6 +1185,8 @@ export default function Index() {
                             isGroup={activeChatIsGroup}
                             currentUserId={currentUserId}
                             otherUserId={activeChat?.otherUserId ?? null}
+                            conversationMuted={activeChat?.isMuted === true}
+                            onConversationMutedChange={handleConversationMutedChange}
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
                         />

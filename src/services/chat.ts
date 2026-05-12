@@ -9,6 +9,7 @@ export interface ChatRoomSummaryData {
     last_message: string;
     last_time: string;
     unread_count: number;
+    is_muted?: boolean;
 }
 
 /** 与 HTTP 历史消息映射后的单条结构一致 */
@@ -66,6 +67,7 @@ function mapConversationRow(row: BackendConversationRow): ChatRoomSummaryData {
         last_message: last?.content ?? '',
         last_time: last?.timestamp ?? '',
         unread_count: row.unread_count,
+        is_muted: row.is_muted === true,
     };
 }
 
@@ -112,4 +114,15 @@ export const getChatMessages = async (roomId: number, limit = 50, offset = 0) =>
         count: messages.length,
         messages: messages.map((m) => mapMessageRow(roomId, m)),
     };
+};
+
+export const setConversationMuted = async (conversationId: number, isMuted: boolean) => {
+    const response = await request.put<any, ApiResponse<unknown>>(
+        `/api/conversations/${conversationId}/settings/`,
+        { is_muted: isMuted },
+    );
+
+    if (response.code !== 0) {
+        throw new Error(response.info || '设置免打扰失败');
+    }
 };

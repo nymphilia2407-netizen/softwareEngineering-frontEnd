@@ -11,17 +11,30 @@ export interface ChatSessionDetailProps {
     isGroup: boolean;
     currentUserId: number;
     otherUserId: number | null;
+    /** 当前会话是否消息免打扰（来自会话列表） */
+    conversationMuted: boolean;
+    onConversationMutedChange: (muted: boolean) => Promise<void>;
     onBack: () => void;
     onDeleted?: () => void;
 }
 
-export default function ChatSessionDetail({ roomId, isGroup, currentUserId, otherUserId, onBack, onDeleted }: ChatSessionDetailProps) {
+export default function ChatSessionDetail({
+    roomId,
+    isGroup,
+    currentUserId,
+    otherUserId,
+    onBack,
+    onDeleted,
+    conversationMuted,
+    onConversationMutedChange,
+}: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
     const [announcementContent, setAnnouncementContent] = useState('');
     const [announcementSubmitting, setAnnouncementSubmitting] = useState(false);
+    const [muteSaving, setMuteSaving] = useState(false);
 
     const [roleMenuOpenFor, setRoleMenuOpenFor] = useState<number | null>(null);
     const roleMenuRef = useRef<HTMLDivElement | null>(null); // 点击其它位置的时候让菜单缩回
@@ -100,6 +113,37 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
             alert(err instanceof Error ? err.message : '操作失败');
         }
     };
+
+    const handleMuteToggle = async (next: boolean) => {
+        setMuteSaving(true);
+        try {
+            await onConversationMutedChange(next);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '设置失败');
+        } finally {
+            setMuteSaving(false);
+        }
+    };
+
+    const conversationMuteRow = (
+        <div className="chat-session-mute-card">
+            <div className="chat-session-mute-text">
+                <span className="chat-session-mute-title">消息免打扰</span>
+                <span className="chat-session-mute-hint">开启后仍接收消息，但不再增加未读数</span>
+            </div>
+            <label className="chat-session-mute-switch-label">
+                <input
+                    type="checkbox"
+                    className="chat-session-mute-switch-input"
+                    checked={conversationMuted}
+                    disabled={muteSaving}
+                    onChange={(e) => void handleMuteToggle(e.target.checked)}
+                    aria-label="消息免打扰"
+                />
+                <span className="chat-session-mute-switch-track" aria-hidden />
+            </label>
+        </div>
+    );
     
     return (
         <div className="chat-session-detail">
@@ -228,6 +272,8 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
                             )}
                         </dl>
 
+                        {conversationMuteRow}
+
                         {/* 发布公告 */}
                         {(currentUserRole === 'owner' || currentUserRole === 'admin') && (
                             <div className="announcement-section">
@@ -352,6 +398,9 @@ export default function ChatSessionDetail({ roomId, isGroup, currentUserId, othe
                                 </div>
                             )}
                         </dl>
+
+                        {conversationMuteRow}
+
                         <div className="chat-session-detail-footer">
                             <button type="button" className="danger-button" onClick={async () => {
                                 if (!otherUserId) return;
