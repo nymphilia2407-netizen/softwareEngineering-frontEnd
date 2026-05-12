@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 
 import { DEFAULT_AVATAR } from '../constants/string';
 import { loginApi, registerApi } from '../services/auth';
-import { checkPasswordStrength, persistUserProfile, tokenUtils } from '../utils/auth';
+import { checkPasswordStrength, persistUserProfile, readUserProfileCache, tokenUtils } from '../utils/auth';
 import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
 
 import '../styles/login.css';
@@ -30,17 +30,11 @@ const PASSWORD_STRENGTH_LEVELS: PasswordStrengthMeta[] = [
 ];
 
 const getStoredAvatar = () => {
-    const storedProfile = localStorage.getItem('user_profile');
-    if (!storedProfile) {
+    const cache = readUserProfileCache();
+    if (!cache?.avatar) {
         return DEFAULT_AVATAR;
     }
-
-    try {
-        const parsed = JSON.parse(storedProfile) as { avatar?: string };
-        return parsed.avatar ?? DEFAULT_AVATAR;
-    } catch {
-        return DEFAULT_AVATAR;
-    }
+    return cache.avatar;
 };
 
 interface LoginProps {
@@ -96,7 +90,7 @@ export default function Login({ onLogInSuccess }: LoginProps) {
         alert('注册成功！');
         tokenUtils.setToken(loginResponse.data.token);
         const av = loginResponse.data.avatar || (hasCustomAvatar ? avatar : DEFAULT_AVATAR);
-        persistUserProfile(loginResponse.data.username, av);
+        persistUserProfile({ username: loginResponse.data.username, avatar: av });
         onLogInSuccess();
     };
 
@@ -114,7 +108,7 @@ export default function Login({ onLogInSuccess }: LoginProps) {
         alert('登录成功！');
         tokenUtils.setToken(response.data.token);
         const av = response.data.avatar && response.data.avatar.length > 0 ? response.data.avatar : DEFAULT_AVATAR;
-        persistUserProfile(response.data.username, av);
+        persistUserProfile({ username: response.data.username, avatar: av });
         onLogInSuccess();
     };
 

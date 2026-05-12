@@ -19,6 +19,7 @@ interface ConfigPanelProps {
 		signature: string;
 	};
 	onAvatarUpdated: (avatar: string) => void;
+	onProfileFieldsSaved: (fields: { birthday: string; address: string; signature: string }) => void;
 	onLogout: () => void;
 	onDeleteAccount: () => Promise<void>;
 }
@@ -31,6 +32,7 @@ export default function ConfigPanel({
 	initialView,
 	currentUser,
 	onAvatarUpdated,
+	onProfileFieldsSaved,
 	onLogout,
 	onDeleteAccount,
 }: Readonly<ConfigPanelProps>) {
@@ -70,6 +72,11 @@ export default function ConfigPanel({
 				address: profileAddress,
 				signature: profileSignature,
 			});
+			onProfileFieldsSaved({
+				birthday: profileBirthday,
+				address: profileAddress,
+				signature: profileSignature,
+			});
 			alert('保存成功');
 			setPanelView('menu');
 		} catch (err) {
@@ -89,7 +96,7 @@ export default function ConfigPanel({
 			await updateUserProfile({ avatar: dataUrl });
 			setAvatar(dataUrl);
 			onAvatarUpdated(dataUrl);
-			persistUserProfile(currentUser.username, dataUrl);
+			persistUserProfile({ username: currentUser.username, avatar: dataUrl });
 			alert('头像已更新');
 		} catch (err) {
 			alert(err instanceof Error ? err.message : '上传失败');

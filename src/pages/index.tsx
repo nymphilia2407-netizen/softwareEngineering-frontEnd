@@ -13,7 +13,7 @@ import { createGroup, getGroupList, updateGroupAvatar, type GroupSummaryData } f
 import { getFriendList, getReceivedFriendRequests, type FriendSummaryData } from '../services/friend';
 import { getCurrentUser, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
-import { persistUserProfile, tokenUtils } from '../utils/auth';
+import { persistUserProfile, readUserProfileCache, tokenUtils } from '../utils/auth';
 import { resolvedUserAvatar } from '../utils/avatarDisplay';
 import type { Group, Message, User } from '../types/entity';
 import type { ActiveTabType } from '../types/ui';
@@ -62,6 +62,27 @@ const decodeTokenPayload = () => {
     } catch {
         return null;
     }
+};
+
+/** 在 /me/ 返回前，用 localStorage 还原与当前 token 用户名一致的资料，便于刷新后立刻看到上次保存的内容 */
+const readInitialUserFromLocalCache = () => {
+    const cache = readUserProfileCache();
+    const username = decodeTokenPayload()?.username ?? '';
+    if (!cache || cache.username !== username) {
+        return {
+            avatar: DEFAULT_AVATAR,
+            profileBirthday: '',
+            profileAddress: '',
+            profileSignature: '',
+        };
+    }
+
+    return {
+        avatar: cache.avatar.length > 0 ? cache.avatar : DEFAULT_AVATAR,
+        profileBirthday: cache.birthday,
+        profileAddress: cache.address,
+        profileSignature: cache.signature,
+    };
 };
 
 const formatIncomingMessage = (message: ChatIncomingMessage): Message => {
@@ -287,21 +308,10 @@ const SEND_ACK_GRACE_MS = 2000;
 
 export default function Index() {
     const tokenPayload = decodeTokenPayload();
+    const profileBoot = useMemo(() => readInitialUserFromLocalCache(), []);
     const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0);
     const [userName, setUserName] = useState<string>(tokenPayload?.username ?? '');
-    const [myAvatar, setMyAvatar] = useState<string>(() => {
-        const storedProfile = localStorage.getItem('user_profile');
-        if (!storedProfile) {
-            return DEFAULT_AVATAR;
-        }
-
-        try {
-            const parsed = JSON.parse(storedProfile) as { avatar?: string };
-            return parsed.avatar ?? DEFAULT_AVATAR;
-        } catch {
-            return DEFAULT_AVATAR;
-        }
-    });
+    const [myAvatar, setMyAvatar] = useState<string>(profileBoot.avatar);
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
     const [settingsPanel, setSettingsPanel] = useState<'menu' | 'profile'>('menu');
     const [activeChatId, setActiveChatId] = useState<number>(0);
@@ -311,9 +321,9 @@ export default function Index() {
     const [chatRooms, setChatRooms] = useState<ChatListItem[]>([]);
     const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
     const [chatSessionInfoOpen, setChatSessionInfoOpen] = useState<boolean>(false);
-    const [profileBirthday, setProfileBirthday] = useState<string>('');
-    const [profileAddress, setProfileAddress] = useState<string>('');
-    const [profileSignature, setProfileSignature] = useState<string>('');
+    const [profileBirthday, setProfileBirthday] = useState<string>(profileBoot.profileBirthday);
+    const [profileAddress, setProfileAddress] = useState<string>(profileBoot.profileAddress);
+    const [profileSignature, setProfileSignature] = useState<string>(profileBoot.profileSignature);
     const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
     const [groupSyncToast, setGroupSyncToast] = useState<string | null>(null);
     const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0);
@@ -478,7 +488,13 @@ export default function Index() {
                 setProfileBirthday(currentUser.birthday);
                 setProfileAddress(currentUser.address);
                 setProfileSignature(currentUser.signature);
-                persistUserProfile(currentUser.username, resolvedAvatar);
+                persistUserProfile({
+                    username: currentUser.username,
+                    avatar: resolvedAvatar,
+                    birthday: currentUser.birthday ?? '',
+                    address: currentUser.address ?? '',
+                    signature: currentUser.signature ?? '',
+                });
             } catch (error) {
                 console.error('获取当前用户失败:', error);
             }
@@ -1168,6 +1184,18 @@ export default function Index() {
                             signature: profileSignature,
                         }}
                         onAvatarUpdated={setMyAvatar}
+                        onProfileFieldsSaved={({ birthday, address, signature }) => {
+                            setProfileBirthday(birthday);
+                            setProfileAddress(address);
+                            setProfileSignature(signature);
+                            persistUserProfile({
+                                username: userName,
+                                avatar: myAvatar,
+                                birthday,
+                                address,
+                                signature,
+                            });
+                        }}
                         onLogout={handleLogout}
                         onDeleteAccount={handleDeleteAccount}
                     />

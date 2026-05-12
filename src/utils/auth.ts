@@ -21,14 +21,63 @@ export const tokenUtils = {
 
 const USER_PROFILE_KEY = 'user_profile';
 
-export function persistUserProfile(username: string, avatar: string) {
-    localStorage.setItem(
-        USER_PROFILE_KEY,
-        JSON.stringify({
-            username,
-            avatar,
-        }),
-    );
+/** 与 token 同机缓存的用户展示信息；换账号登录时会按 username 判断是否沿用旧字段 */
+export interface UserProfileCache {
+    username: string;
+    avatar: string;
+    birthday: string;
+    address: string;
+    signature: string;
+}
+
+export function readUserProfileCache(): UserProfileCache | null {
+    const raw = localStorage.getItem(USER_PROFILE_KEY);
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        const p = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof p.username !== 'string' || p.username.length === 0) {
+            return null;
+        }
+
+        return {
+            username: p.username,
+            avatar: typeof p.avatar === 'string' ? p.avatar : '',
+            birthday: typeof p.birthday === 'string' ? p.birthday : '',
+            address: typeof p.address === 'string' ? p.address : '',
+            signature: typeof p.signature === 'string' ? p.signature : '',
+        };
+    } catch {
+        return null;
+    }
+}
+
+/** 写入 localStorage；未传的字段在与当前 username 一致时保留旧值，换用户则清空未传字段 */
+export function persistUserProfile(updates: {
+    username: string;
+    avatar?: string;
+    birthday?: string;
+    address?: string;
+    signature?: string;
+}): void {
+    const prev = readUserProfileCache();
+    const sameUser = prev !== null && prev.username === updates.username;
+
+    const next: UserProfileCache = {
+        username: updates.username,
+        avatar:
+            updates.avatar !== undefined ? updates.avatar : sameUser ? prev.avatar : '',
+        birthday:
+            updates.birthday !== undefined ? updates.birthday : sameUser ? prev.birthday : '',
+        address:
+            updates.address !== undefined ? updates.address : sameUser ? prev.address : '',
+        signature:
+            updates.signature !== undefined ? updates.signature : sameUser ? prev.signature : '',
+    };
+
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(next));
 }
 
 export const checkPasswordStrength = (password: string) => {

@@ -11,7 +11,6 @@ interface ConfigNavProps {
 	isOpen: boolean;
 	onClose: () => void;
 	initialView: PanelView;
-	/** 是否在主区域显示 menu 视图，默认为 false（避免重复显示列表区操作按钮） */
 	showMenuInMain?: boolean;
 	currentUser: {
 		userId: number;
@@ -22,6 +21,7 @@ interface ConfigNavProps {
 		signature: string;
 	};
 	onAvatarUpdated: (avatar: string) => void;
+	onProfileFieldsSaved: (fields: { birthday: string; address: string; signature: string }) => void;
 	onLogout: () => void;
 	onDeleteAccount: () => Promise<void>;
 }
@@ -35,6 +35,7 @@ export default function ConfigNav({
 	showMenuInMain = false,
 	currentUser,
 	onAvatarUpdated,
+	onProfileFieldsSaved,
 	onLogout,
 	onDeleteAccount,
 }: Readonly<ConfigNavProps>) {
@@ -74,6 +75,11 @@ export default function ConfigNav({
 				address: profileAddress,
 				signature: profileSignature,
 			});
+			onProfileFieldsSaved({
+				birthday: profileBirthday,
+				address: profileAddress,
+				signature: profileSignature,
+			});
 			alert('保存成功');
 			setPanelView('menu');
 		} catch (err) {
@@ -93,7 +99,7 @@ export default function ConfigNav({
 			await updateUserProfile({ avatar: dataUrl });
 			setAvatar(dataUrl);
 			onAvatarUpdated(dataUrl);
-			persistUserProfile(currentUser.username, dataUrl);
+			persistUserProfile({ username: currentUser.username, avatar: dataUrl });
 			alert('头像已更新');
 		} catch (err) {
 			alert(err instanceof Error ? err.message : '上传失败');
