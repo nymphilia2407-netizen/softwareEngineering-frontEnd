@@ -63,7 +63,7 @@
     box-shadow: 0 0 0 3px rgba(142, 197, 252, 0.3);
 }
 
-button[type='submit'] {
+.login-form button[type='submit'] {
     width: 100%;
     margin-top: 8px;
     padding: 12px;
@@ -77,12 +77,12 @@ button[type='submit'] {
     transition: transform 0.1s, background 0.2s, color 0.2s;
 }
 
-button[type='submit']:hover {
+.login-form button[type='submit']:hover {
     background: #e0c3fc;
     color: #243040;
 }
 
-button[type='submit']:active {
+.login-form button[type='submit']:active {
     transform: scale(0.97);
 }
 

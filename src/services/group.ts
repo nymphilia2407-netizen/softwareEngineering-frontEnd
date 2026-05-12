@@ -110,6 +110,18 @@ export const updateGroupAvatar = async (roomId: number, avatar: string) => {
     return unwrapApiData(response, '上传群头像失败');
 };
 
+/** 群主/管理员修改群名称（PATCH 部分更新；若后端路径不同可改此处） */
+export const updateGroupName = async (groupId: number, groupName: string): Promise<void> => {
+    const name = groupName.trim();
+    if (!name) {
+        throw new Error('群名称不能为空');
+    }
+    const response = await request.patch<unknown, ApiResponse<unknown>>(`/api/groups/${groupId}/`, {
+        group_name: name,
+    });
+    assertApiSuccess(response, '修改群名称失败');
+};
+
 export const getGroupDetail = async (roomId: number) => {
     const response = await request.get<unknown, ApiResponse<BackendGroupDetailData>>(`/api/groups/${roomId}/`);
     const raw = unwrapApiData(response, '获取群聊详情失败');

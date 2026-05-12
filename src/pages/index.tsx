@@ -63,8 +63,9 @@ export default function Index() {
     const optimisticIdSeqRef = useRef(0);
     /** 已在 WS 上 subscribe_room 的会话；新建私聊在连接之后才出现，必须补订阅才能收到发消息回执 */
     const subscribedWsRoomsRef = useRef<Set<number>>(new Set());
-    // 用于展示联系人具体信息
+    // 用于展示联系人具体信息（好友 / 群）
     const [contactDetailUserId, setContactDetailUserId] = useState<number | null>(null);
+    const [contactDetailGroupId, setContactDetailGroupId] = useState<number | null>(null);
 
     useEffect(() => {
         currentUserIdRef.current = currentUserId;
@@ -295,6 +296,8 @@ export default function Index() {
 
             setActiveTab('chat');
             setSelectedContact(null);
+            setContactDetailUserId(null);
+            setContactDetailGroupId(null);
             setEntryUnreadHintCount(0);
             setActiveChatId(createdGroup.room_id);
 
@@ -361,6 +364,8 @@ export default function Index() {
         setChatSessionInfoOpen(false);
         setActiveChatId(0);
         setSelectedContact(null);
+        setContactDetailUserId(null);
+        setContactDetailGroupId(null);
         
         // 清除该会话，并删除本地存储的消息（目前只能实现一侧的，另一侧需要手动刷新）
         setChatRooms(prev => prev.filter(room => room.id !== convId));
@@ -406,6 +411,7 @@ export default function Index() {
         if (!userId) return;
         
         setContactDetailUserId(null);
+        setContactDetailGroupId(null);
         setActiveChatId(0);
         setSelectedContact(null);
         
@@ -431,10 +437,39 @@ export default function Index() {
         const roomId = matchedRoom?.id ?? 0;
         
         setContactDetailUserId(null);
+        setContactDetailGroupId(null);
         setChatSessionInfoOpen(false);
         setActiveChatId(roomId);
         setEntryUnreadHintCount(matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0);
     }, [chatRooms, selectedContact]);
+
+    const handleContactGroupEnterChat = useCallback(
+        (roomId: number) => {
+            const groupRoom = chatRooms.find((room) => room.id === roomId);
+            const hint = groupRoom ? Math.max(0, groupRoom.unreadCount || 0) : 0;
+            setEntryUnreadHintCount(hint);
+            setChatRooms((prev) => clearUnreadRoom(prev, roomId));
+            setContactDetailGroupId(null);
+            setChatSessionInfoOpen(false);
+            setActiveChatId(roomId);
+        },
+        [chatRooms],
+    );
+
+    const handleContactGroupLeftOrDissolved = useCallback(
+        (roomId: number) => {
+            setActiveChatId((id) => (id === roomId ? 0 : id));
+            setMessageStore((prev) => {
+                const next = { ...prev };
+                delete next[roomId];
+                return next;
+            });
+            setChatRooms((prev) => prev.filter((r) => r.id !== roomId));
+            void refreshFriendsAndRooms();
+            void syncGroupList();
+        },
+        [refreshFriendsAndRooms, syncGroupList],
+    );
 
     return (
         <div className="main">
@@ -455,6 +490,8 @@ export default function Index() {
                 onSelectChat={() => {
                     setActiveTab('chat');
                     setSelectedContact(null);
+                    setContactDetailUserId(null);
+                    setContactDetailGroupId(null);
                 }}
                 onSelectContacts={() => setActiveTab('contacts')}
                 onOpenSettingsMenu={() => {
@@ -504,17 +541,15 @@ export default function Index() {
                             if (type === 'user') {
                                 const userItem = item as User;
                                 setSelectedContact(userItem);
+                                setContactDetailGroupId(null);
                                 setContactDetailUserId(userItem.id);
                                 return;
                             }
 
                             const groupItem = item as { id: number };
                             setSelectedContact(null);
-                            const groupRoom = chatRooms.find((room) => room.id === groupItem.id);
-                            const hint = groupRoom ? Math.max(0, groupRoom.unreadCount || 0) : 0;
-                            setEntryUnreadHintCount(hint);
-                            setChatRooms((prev) => clearUnreadRoom(prev, groupItem.id));
-                            setActiveChatId(groupItem.id);
+                            setContactDetailUserId(null);
+                            setContactDetailGroupId(groupItem.id);
                             setChatSessionInfoOpen(false);
                         }}
                         onCreateGroup={handleCreateGroup}
@@ -562,10 +597,23 @@ export default function Index() {
                     />
                 ) : contactDetailUserId != null ? (
                     <ContactSessionDetail
+                        mode="friend"
                         userId={contactDetailUserId}
                         onBack={() => setContactDetailUserId(null)}
                         onEnterChat={handleEnterChat}
                         onDeleted={handleFriendDetailDeleted}
+                    />
+                ) : contactDetailGroupId != null ? (
+                    <ContactSessionDetail
+                        mode="group"
+                        roomId={contactDetailGroupId}
+                        currentUserId={currentUserId}
+                        onBack={() => setContactDetailGroupId(null)}
+                        onEnterChat={handleContactGroupEnterChat}
+                        onLeftOrDissolved={handleContactGroupLeftOrDissolved}
+                        onGroupProfileUpdated={() => {
+                            void syncChatRoomsAndGroups();
+                        }}
                     />
                 ) : activeChatName ? (
                     chatSessionInfoOpen ? (

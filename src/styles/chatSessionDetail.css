@@ -441,3 +441,202 @@
     background: #ccc;
     cursor: not-allowed;
 }
+
+/* 联系人 — 群：头像下「修改头像」选项卡 + 群名称表单（仅群主/管理员） */
+.contact-group-avatar-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+.contact-group-avatar-tabs {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+    padding: 0 4px;
+    border-bottom: 1px solid #e2e8f0;
+    width: 100%;
+    max-width: 200px;
+}
+
+.contact-group-avatar-tab {
+    padding: 8px 16px 10px;
+    margin: 0 2px -1px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    font-size: 14px;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 8px 8px 0 0;
+}
+
+.contact-group-avatar-tab:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
+.contact-group-avatar-tab--active {
+    color: #1890ff;
+    font-weight: 600;
+    border-bottom-color: #1890ff;
+}
+
+.contact-group-name-meta-form {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+
+/* 群名称行：编辑区与左侧 dt 对齐更自然 */
+.contact-group-meta-name-row {
+    align-items: flex-start;
+}
+
+.contact-group-meta-name-row dd {
+    min-width: 0;
+}
+
+.contact-group-name-editor {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 5px 6px 5px 8px;
+    background: linear-gradient(165deg, #f8fafc 0%, #f1f5f9 100%);
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.contact-group-name-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 220px;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 6px 10px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.35;
+    letter-spacing: 0;
+    color: #0f172a;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.contact-group-name-input::placeholder {
+    color: #94a3b8;
+    font-weight: 400;
+}
+
+.contact-group-name-input:hover {
+    border-color: #94a3b8;
+}
+
+.contact-group-name-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.18);
+}
+
+.contact-group-name-save-btn {
+    flex-shrink: 0;
+    margin-left: auto;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    max-width: fit-content;
+    padding: 0 12px;
+    min-width: 0;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.22);
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+.contact-group-name-save-btn:hover:not(:disabled) {
+    transform: translateY(-0.5px);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
+}
+
+.contact-group-name-save-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.contact-group-name-save-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.contact-group-name-readonly {
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.4;
+    padding: 1px 0;
+}
+
+.contact-group-member-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 280px;
+    overflow-y: auto;
+}
+
+.contact-group-member-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+}
+
+.contact-group-member-list li:last-child {
+    border-bottom: none;
+}
+
+.contact-group-member-name {
+    color: #1a1a1a;
+    font-weight: 500;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.contact-group-member-role {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.contact-group-avatar-file-input {
+    position: absolute;
+    width: 0;
+    height: 0;
+    opacity: 0;
+    overflow: hidden;
+}
