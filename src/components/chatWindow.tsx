@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
+import { sameUserId } from '../utils/messageStore';
 import { resolvedUserAvatar } from '../utils/avatar';
 
 import '../styles/chatWindow.css'
@@ -15,10 +16,7 @@ function messageRowKey(msg: Message) {
     return msg.clientId ? `client:${msg.clientId}` : `id:${msg.id}`;
 }
 
-/** 群聊里 senderId 可能与 currentUserId 类型不一致（number / string），统一比较 */
-function isOtherMemberMessage(msg: Message, currentUserId: number) {
-    return Number(msg.senderId) !== Number(currentUserId);
-}
+const isOtherMemberMessage = (msg: Message, currentUserId: number) => !sameUserId(msg.senderId, currentUserId);
 
 interface ChatWindowProps{
     activeChatId: number;

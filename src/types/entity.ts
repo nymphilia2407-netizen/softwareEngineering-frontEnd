@@ -1,4 +1,4 @@
-export interface User{
+export interface User {
     id: number;
     username: string;
     avatar: string;
@@ -8,26 +8,7 @@ export interface User{
     tag?: string;
 }
 
-// 从后端接受
-export interface BackendFriend {
-    user_id: number;
-    username: string;
-    avatar: string;
-}
-
-// 接受后端类型向前端类型的转换
-export function toUser(friend: BackendFriend): User {
-    return {
-        id: friend.user_id,
-        username: friend.username,
-        avatar: friend.avatar,
-        status: 'offline', // 这几项还没有处理
-        registerTime: 0,
-        lastLoginTime: 0
-    };
-}
-
-export interface Group{
+export interface Group {
     id: number;
     groupname: string;
     avatar: string;
@@ -38,7 +19,7 @@ export interface Group{
 }
 
 export type MsgType = 'text' | 'image' | 'file';
-export type MsgStatus = 'sending' | 'sent' | 'failed'
+export type MsgStatus = 'sending' | 'sent' | 'failed';
 
 export type Message = {
     id: number;
@@ -54,18 +35,12 @@ export type Message = {
     time?: string;
     isRead?: boolean;
     clientId?: string;
-}
+};
 
 // 上行消息格式 (Client -> Server)
-export type WsAction = 
+export type WsAction =
     | { type: 'send_message'; data: { conversation_id: number; content: string; client_id?: string } }
     /** 与 Django ChatConsumer.handle_read_message 一致：last_read_message_id */
     | { type: 'read_message'; data: { conversation_id: number; last_read_message_id: number } }
     /** 建群/入群后加入 room_<id>，无需整页刷新即可收 new_message */
     | { type: 'subscribe_room'; data: { conversation_id: number } };
-
-// 下行消息格式 (Server -> Client)
-export type WsResponse = 
-    | { type: 'new_message'; data: Message & { conversation_id?: number } }
-    | { type: 'read_receipt'; data: { conversation_id: number; reader_id: number; last_message_id: number } }
-    | { type: 'error'; message: string };

@@ -1,6 +1,6 @@
 import { useCallback, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from 'react';
 
-import { SEND_ACK_GRACE_MS, SEND_ACK_TIMEOUT_MS } from '../constants/chat';
+import { SEND_ACK_GRACE_MS, SEND_ACK_TIMEOUT_MS } from '../constants/string';
 import type { ChatListItem } from '../types/chat';
 import type { ChatWebSocketClient } from '../services/websocket';
 import type { Message } from '../types/entity';

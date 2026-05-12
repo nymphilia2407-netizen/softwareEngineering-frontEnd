@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, useMemo, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo, type FormEvent } from 'react';
 
 import AddFriendPanel from './contactList/AddFriendPanel';
+import ContactFriendsSection from './contactList/ContactFriendsSection';
+import ContactGroupsSection from './contactList/ContactGroupsSection';
+import ContactsHeader from './contactList/ContactsHeader';
 import CreateGroupPanel from './contactList/CreateGroupPanel';
 import FriendRequestsPanel from './contactList/FriendRequestsPanel';
 import SearchGroupPanel from './contactList/SearchGroupPanel';
@@ -17,7 +20,6 @@ import {
     type UserSearchData,
 } from '../services/friend';
 import { type User, type Group } from '../types/entity';
-import { resolvedUserAvatar } from '../utils/avatar';
 
 import '../styles/contactList.css'
 
@@ -424,99 +426,56 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         void handleSearchFriend();
     };
 
+    const handleMenuAddFriend = useCallback(() => {
+        setIsActionMenuOpen(false);
+        setIsAddFriendOpen(true);
+        setIsSearchGroupOpen(false);
+        setIsFriendRequestsOpen(false);
+        setRequestHint('');
+        setAddFriendHint('');
+        setSearchResults([]);
+    }, []);
+
+    const handleMenuSearchGroup = useCallback(() => {
+        setIsActionMenuOpen(false);
+        setIsSearchGroupOpen(true);
+        setIsAddFriendOpen(false);
+        setIsFriendRequestsOpen(false);
+        setAddFriendHint('');
+        setRequestHint('');
+    }, []);
+
+    const handleMenuFriendRequests = useCallback(() => {
+        setIsActionMenuOpen(false);
+        setIsFriendRequestsOpen(true);
+        setIsAddFriendOpen(false);
+        setIsSearchGroupOpen(false);
+        setAddFriendHint('');
+        onClearFriendRequests?.();
+    }, [onClearFriendRequests]);
+
+    const handleMenuCreateGroup = useCallback(() => {
+        setIsActionMenuOpen(false);
+        setGroupAvatarPreview(DEFAULT_AVATAR);
+        setGroupAvatarDataUrl(null);
+        setIsCreateGroupOpen(true);
+        setIsSearchGroupOpen(false);
+    }, []);
+
     return (
         <div className='contact-list'>
-            <div className='contacts-header'>
-                <div className='search-action-row' ref={actionMenuRef}>
-                    <div className='search-container'>
-                        <input
-                            type='text'
-                            placeholder='搜索联系人或群聊'
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                    <button
-                        type='button'
-                        className='action-toggle-button'
-                        aria-label='打开更多操作'
-                        onClick={() => setIsActionMenuOpen((current) => !current)}
-                    >
-                        +
-                        {(pendingFriendRequestCount ?? 0) > 0 && (
-                            <span className="unread-badge">
-                                {(pendingFriendRequestCount ?? 0) > 99 ? '99+' : pendingFriendRequestCount}
-                            </span>
-                        )}
-                    </button>
-
-                    {isActionMenuOpen && (
-                        <div className='action-menu'>
-                            <button
-                                type='button'
-                                className='action-menu-item'
-                                onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    setIsAddFriendOpen(true);
-                                    setIsSearchGroupOpen(false);
-                                    setIsFriendRequestsOpen(false);
-                                    setRequestHint('');
-                                    setAddFriendHint('');
-                                    setSearchResults([]);
-                                }}
-                            >
-                                    添加好友
-                            </button>
-                            <button
-                                type='button'
-                                className='action-menu-item'
-                                onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    setIsSearchGroupOpen(true);
-                                    setIsAddFriendOpen(false);
-                                    setIsFriendRequestsOpen(false);
-                                    setAddFriendHint('');
-                                    setRequestHint('');
-                                }}
-                            >
-                                    添加群聊
-                            </button>
-                            <button
-                                type='button'
-                                className='action-menu-item'
-                                onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    setIsFriendRequestsOpen(true);
-                                    setIsAddFriendOpen(false);
-                                    setIsSearchGroupOpen(false);
-                                    setAddFriendHint('');
-                                    onClearFriendRequests?.();
-                                }}
-                            >
-                                好友请求
-                                {(pendingFriendRequestCount ?? 0) > 0 && (
-                                    <span className="unread-badge-inline">
-                                        {(pendingFriendRequestCount ?? 0) > 99 ? '99+' : pendingFriendRequestCount}
-                                    </span>
-                                )}
-                            </button>
-                            <button
-                                type='button'
-                                className='action-menu-item'
-                                onClick={() => {
-                                    setIsActionMenuOpen(false);
-                                    setGroupAvatarPreview(DEFAULT_AVATAR);
-                                    setGroupAvatarDataUrl(null);
-                                    setIsCreateGroupOpen(true);
-                                    setIsSearchGroupOpen(false);
-                                }}
-                            >
-                                新建群聊
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <ContactsHeader
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                actionMenuRef={actionMenuRef}
+                isActionMenuOpen={isActionMenuOpen}
+                onToggleActionMenu={() => setIsActionMenuOpen((current) => !current)}
+                pendingFriendRequestCount={pendingFriendRequestCount}
+                onMenuAddFriend={handleMenuAddFriend}
+                onMenuSearchGroup={handleMenuSearchGroup}
+                onMenuFriendRequests={handleMenuFriendRequests}
+                onMenuCreateGroup={handleMenuCreateGroup}
+            />
 
             {isCreateGroupOpen && (
                 <CreateGroupPanel
@@ -598,91 +557,20 @@ export default function ContactList(props: Readonly<ContactsProps>) {
 
             {/* 联系人 + 群聊：同一滚动区顺序排列，群聊紧跟在联系人列表下方 */}
             <div className='contact-sections-scroll'>
-                <div className={`section-container section-friends${friendsExpanded ? ' is-expanded' : ' is-collapsed'}`}>
-                    <button
-                        type='button'
-                        className='section-header-toggle'
-                        aria-expanded={friendsExpanded}
-                        aria-controls='contact-list-friends'
-                        id='contact-section-friends-heading'
-                        onClick={() => setFriendsExpanded((v) => !v)}
-                    >
-                        <span className='section-header-label'>联系人 ({filteredFriends.length})</span>
-                        <span className='section-header-chevron' aria-hidden>
-                            {friendsExpanded ? '▼' : '▶'}
-                        </span>
-                    </button>
-                    {friendsExpanded && (
-                        <div id='contact-list-friends' className='list-render-area' role='region' aria-labelledby='contact-section-friends-heading'>
-                            {taggedFriends.map(section => (
-                                <div key={section.tag} className="friend-tag-group">
-                                    <div className="friend-tag-group-header">{section.tag} ({section.users.length})</div>
-                                    {section.users.map(user => (
-                                        <button key={user.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(user, 'user')}>
-                                            <div className='item-avatar'>
-                                                <img
-                                                    src={resolvedUserAvatar(user.avatar)}
-                                                    alt=''
-                                                    onError={(e) => {
-                                                        const img = e.currentTarget;
-                                                        img.onerror = null;
-                                                        img.src = DEFAULT_AVATAR;
-                                                    }}
-                                                />
-                                                <span className={`status-badge ${user.status}`} />
-                                            </div>
-                                            <div className='item-info'>
-                                                <span className='item-name'>{user.username}</span>
-                                                <span className={`item-meta status-${user.status}`}>
-                                                    {user.status === 'online' ? '在线' : '离线'}
-                                                </span>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className={`section-container section-groups${groupsExpanded ? ' is-expanded' : ' is-collapsed'}`}>
-                    <button
-                        type='button'
-                        className='section-header-toggle'
-                        aria-expanded={groupsExpanded}
-                        aria-controls='contact-list-groups'
-                        id='contact-section-groups-heading'
-                        onClick={() => setGroupsExpanded((v) => !v)}
-                    >
-                        <span className='section-header-label'>群聊 ({filteredGroups.length})</span>
-                        <span className='section-header-chevron' aria-hidden>
-                            {groupsExpanded ? '▼' : '▶'}
-                        </span>
-                    </button>
-                    {groupsExpanded && (
-                        <div id='contact-list-groups' className='list-render-area' role='region' aria-labelledby='contact-section-groups-heading'>
-                            {filteredGroups.map((group) => (
-                                <button key={group.id} type='button' className='contact-item contact-button' onClick={() => onItemClick(group, 'group')}>
-                                    <div className='item-avatar'>
-                                        <img
-                                            src={resolvedUserAvatar(group.avatar)}
-                                            alt=''
-                                            onError={(e) => {
-                                                const img = e.currentTarget;
-                                                img.onerror = null;
-                                                img.src = DEFAULT_AVATAR;
-                                            }}
-                                        />
-                                    </div>
-                                    <div className='item-info'>
-                                        <span className='item-name'>{group.groupname}</span>
-                                        <span className='item-meta'>{group.memberCount} 人</span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                <ContactFriendsSection
+                    taggedFriends={taggedFriends}
+                    friendCount={filteredFriends.length}
+                    expanded={friendsExpanded}
+                    onToggleExpanded={() => setFriendsExpanded((v) => !v)}
+                    onUserClick={(user) => onItemClick(user, 'user')}
+                />
+                <ContactGroupsSection
+                    groups={filteredGroups}
+                    groupCount={filteredGroups.length}
+                    expanded={groupsExpanded}
+                    onToggleExpanded={() => setGroupsExpanded((v) => !v)}
+                    onGroupClick={(group) => onItemClick(group, 'group')}
+                />
             </div>
         </div>
     )
