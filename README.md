@@ -1,70 +1,92 @@
-# 即时通信系统 - 项目前端
+# 即时通信系统 · 前端
 
-本项目是基于React实现的即时通信系统前端
+基于 **React 19**、**TypeScript** 与 **Vite** 的即时通信 Web 客户端：会话列表、单聊/群聊、联系人、好友请求、设置，以及通过 **WebSocket** 接收实时消息与群同步事件。
 
-## 项目结构
+## 技术栈
+
+| 类别 | 说明 |
+|------|------|
+| 框架 | React 19、react-dom |
+| 构建 | Vite 8、`tsc -b` 做类型检查 |
+| HTTP | Axios（`src/utils/request.ts` 统一实例与拦截器） |
+| 实时 | `reconnecting-websocket` 封装于 `src/services/websocket.ts` |
+| 表单 | 登录页使用 `react-hook-form` |
+
+包管理推荐使用 **pnpm**（仓库内包含 `pnpm-lock.yaml`）。
+
+## 环境变量
+
+| 变量 | 说明 |
+|------|------|
+| `VITE_API_BASE_URL` | 后端 API 根地址（含协议与端口）。未设置时与 `src/constants/string.ts` 中 `BACKENDURL` 的本地兜底一致，并与 Axios `baseURL` 同源。 |
+
+本地开发可在 `front-end` 目录新建 `.env` 或 `.env.local`：
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:80
 ```
-.
-├── Dockerfile
-├── .dockerignore
-├── .gitlab-ci.yml
-├── secoder-deploy.yaml
-├── eslint.config.js
-├── index.html                    # 项目入口 HTML
-├── package.json
-├── package-lock.json
-├── pnpm-lock.yaml
-├── README.md
-├── tsconfig.json
-├── tsconfig.app.json
-├── tsconfig.node.json
-├── vite.config.ts
-├── public/
-│   └── icons.svg
-├── src/                          # 源代码目录
-│   ├── main.tsx                  # 应用渲染入口（挂载根节点）
-│   ├── App.tsx                   # 根组件（路由等）
-│   ├── assets/                   # 静态资源（侧栏图标等）
-│   │   ├── chat-icon.jpg
-│   │   ├── config-icon.webp
-│   │   └── contact-icon.jpg
-│   ├── components/               # UI 组件
-│   │   ├── chatList.tsx          # 会话列表
-│   │   ├── chatWindow.tsx        # 单会话聊天窗口
-│   │   ├── chatSessionDetail.tsx # 会话详情（群资料 / 好友资料、免打扰等）
-│   │   ├── contactList.tsx       # 联系人列表（好友、群、请求等）
-│   │   ├── contactSessionDetail.tsx # 从联系人进入的资料 / 发起聊天
-│   │   ├── config.tsx            # 设置页内容片段
-│   │   └── configNav.tsx         # 设置侧栏与主导航
-│   ├── constants/
-│   │   └── string.ts             # 常量（后端地址、默认头像路径等）
-│   ├── pages/
-│   │   ├── index.tsx             # 主界面（会话 + 联系人 + WebSocket）
-│   │   └── login.tsx             # 登录 / 注册
-│   ├── services/                 # HTTP 与 WebSocket 封装
-│   │   ├── auth.ts               # 登录、注册
-│   │   ├── chat.ts               # 会话列表、历史消息、免打扰设置
-│   │   ├── friend.ts             # 好友、好友请求
-│   │   ├── group.ts              # 群聊创建与管理、成员禁言等
-│   │   ├── user.ts               # 当前用户资料
-│   │   └── websocket.ts          # 即时消息 WebSocket 客户端
-│   ├── styles/
-│   │   ├── index.css             # 主布局与全局样式入口
-│   │   ├── global.css
-│   │   ├── login.css
-│   │   ├── chatList.css
-│   │   ├── chatWindow.css
-│   │   ├── chatSessionDetail.css
-│   │   ├── contactList.css
-│   │   ├── config.css
-│   │   └── configNav.css
-│   ├── types/
-│   │   ├── auth.ts
-│   │   ├── chat.ts
-│   │   ├── entity.ts             # 用户、消息、WS 载荷等实体类型
-│   │   └── ui.ts                 # 界面状态枚举等
-│   └── utils/
-│       ├── auth.ts               # Token 存取、登录态
-│       ├── request.ts            # Axios 封装与拦截器
-│       └── avatar.ts             # 头像 URL 解析、本地选图读入 data URL
+
+生产构建由部署环境注入上述变量即可。
+
+## 常用命令
+
+```bash
+pnpm install          # 安装依赖
+pnpm dev              # 开发服务器（Vite）
+pnpm run build        # tsc -b && vite build，产出 dist/
+pnpm run preview      # 预览生产构建（默认端口见 vite.config.ts，可用 PORT 覆盖）
+pnpm run lint         # ESLint
 ```
+
+## 源码结构（`src/`）
+
+```
+src/
+├── main.tsx                 # 挂载 React 根节点，引入 global.css
+├── App.tsx                  # 根布局：根据 token 切换登录页与主界面
+├── assets/                  # 图片资源（默认头像、侧栏图标等）
+├── pages/
+│   ├── index.tsx            # 主界面：侧栏、会话/联系人/设置、WebSocket 与状态编排
+│   └── login.tsx            # 登录 / 注册
+├── components/
+│   ├── chatList.tsx         # 会话列表（类型与 ChatListItem 对齐）
+│   ├── chatWindow.tsx       # 当前会话消息区与输入框
+│   ├── chatSessionDetail.tsx   # 会话资料（群成员、公告、禁言、免打扰等）
+│   ├── contactList.tsx      # 联系人页容器：状态与若干子面板
+│   ├── contactSessionDetail.tsx # 好友资料详情（从联系人进入）
+│   ├── settingsPanel.tsx    # 设置：资料、邮箱/密码、注销等
+│   ├── main/                # 主壳层小组件（侧栏、设置侧按钮、群同步 Toast）
+│   └── contactList/         # 联系人子模块：头部、好友/群列表区、各弹层面板
+├── hooks/                   # 主页面抽离的逻辑（首屏与 WS、历史消息、乐观发送）
+├── services/                # API 与 WS 客户端（含 apiResponse 统一解包）
+├── mappers/                 # 后端 DTO → 前端展示模型（如 chat.ts）
+├── constants/
+│   └── string.ts            # 资源 URL、BACKENDURL、发送 ACK 超时等常量
+├── types/
+│   ├── auth.ts              # 登录/注册请求与响应类型
+│   ├── chat.ts              # ChatListItem、ActiveTabType 等
+│   └── entity.ts            # User、Group、Message、WsAction 等
+├── utils/
+│   ├── request.ts           # Axios 实例（baseURL 来自 constants/string）
+│   ├── auth.ts              # Token、用户资料缓存
+│   ├── avatar.ts            # 头像 URL 与本地选图
+│   ├── jwtProfile.ts        # JWT 解析与首屏资料缓存读取
+│   ├── messageStore.ts      # 消息列表纯更新与 sameUserId
+│   └── chatRoomList.ts      # 会话列表角标/预览更新
+└── styles/                  # 按页面或模块拆分的 CSS（index、login、chat、contact、settings、global）
+```
+
+## 架构说明（简）
+
+- **页面（`pages/`）**：负责路由级编排；`index.tsx` 将数据拉取、WebSocket、乐观发送等委托给 `hooks/`，UI 片段委托给 `components/main/`。
+- **组件（`components/`）**：可复用 UI；联系人相关复杂 UI 拆在 `contactList/` 子目录，避免单文件过长。
+- **服务（`services/`）**：仅关心 HTTP 路径与类型；列表类接口的 `code === 0` 判断集中在 `apiResponse.ts` 的 `unwrapApiData` / `assertApiSuccess`。
+- **类型**：会话列表行统一为 `types/chat.ts` 中的 `ChatListItem`，与会话映射 `mappers/chat.ts` 及 `chatList.tsx` 一致。
+
+## 仓库根目录其它文件
+
+除 `src/` 外，本目录常见文件还包括：`Dockerfile`、`.dockerignore`、`.gitlab-ci.yml`、`secoder-deploy.yaml` 等，用于容器与流水线部署；具体以仓库为准。
+
+## 构建产物
+
+执行 `pnpm run build` 后生成 **`dist/`**，由任意静态文件服务器或容器内 Web 服务器托管；请求仍指向配置好的 `VITE_API_BASE_URL` 对应后端。
