@@ -10,7 +10,7 @@ import type { ChatListItem } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import { resolvedUserAvatar } from '../utils/avatar';
-import { clearUnreadRoom, updateRoomOnIncomingMessage } from '../utils/chatRoomList';
+import { clearUnreadRoom, sortChatRoomsForDisplay, updateRoomOnIncomingMessage } from '../utils/chatRoomList';
 import {
     applyReadReceiptToMessages,
     formatIncomingMessage,
@@ -132,7 +132,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 }
 
                 const mappedRooms = roomList.map(mapChatRoom);
-                setChatRooms(mappedRooms);
+                setChatRooms(sortChatRoomsForDisplay(mappedRooms));
                 setActiveChatId((currentActiveChatId) => currentActiveChatId || mappedRooms[0]?.id || 0);
             } catch (error) {
                 console.error('获取会话列表失败:', error);
@@ -228,9 +228,10 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                                 otherUserId: null,
                                 isGroup: true,
                                 isMuted: false,
+                                isPinned: false,
                             };
 
-                            return [row, ...prev];
+                            return sortChatRoomsForDisplay([row, ...prev]);
                         });
 
                         setGroups((prev) => {

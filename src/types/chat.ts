@@ -11,6 +11,8 @@ export interface ChatListItem {
     isGroup: boolean;
     /** 消息免打扰：开启后新消息仍更新预览，但不增加未读数 */
     isMuted?: boolean;
+    /** 会话置顶：显示在列表顶部 */
+    isPinned?: boolean;
 }
 
 export type ActiveTabType = 'chat' | 'contacts' | 'settings';

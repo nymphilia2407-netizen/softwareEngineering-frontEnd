@@ -12,6 +12,7 @@ export interface ChatRoomSummaryData {
     last_time: string;
     unread_count: number;
     is_muted?: boolean;
+    is_pinned?: boolean;
 }
 
 /** 与 HTTP 历史消息映射后的单条结构一致 */
@@ -64,6 +65,7 @@ function mapConversationRow(row: BackendConversationRow): ChatRoomSummaryData {
         last_time: last?.timestamp ?? '',
         unread_count: row.unread_count,
         is_muted: row.is_muted === true,
+        is_pinned: row.is_pinned === true,
     };
 }
 
@@ -111,4 +113,12 @@ export const setConversationMuted = async (conversationId: number, isMuted: bool
         { is_muted: isMuted },
     );
     assertApiSuccess(response, '设置免打扰失败');
+};
+
+export const setConversationPinned = async (conversationId: number, isPinned: boolean) => {
+    const response = await request.put<unknown, ApiResponse<unknown>>(
+        `/api/conversations/${conversationId}/settings/`,
+        { is_pinned: isPinned },
+    );
+    assertApiSuccess(response, '设置置顶失败');
 };

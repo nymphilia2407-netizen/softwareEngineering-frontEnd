@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 
 import { DEFAULT_AVATAR } from '../constants/string';
 import type { ChatListItem } from '../types/chat';
+import { sortChatRoomsForDisplay } from '../utils/chatRoomList';
 
 import '../styles/chatList.css';
 
@@ -15,13 +16,13 @@ export default function ChatList({ chats, activeId, onChatClick }: ChatListProps
     const [searchQuery, setSearchQuery] = useState<string>('');
 
     const filteredChats = useMemo(() => {
-        return chats
-            .filter(
+        const q = searchQuery.toLowerCase();
+        return sortChatRoomsForDisplay(
+            chats.filter(
                 (chat) =>
-                    chat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()),
-            )
-            .sort((a, b) => new Date(b.lastTime).getTime() - new Date(a.lastTime).getTime());
+                    chat.name.toLowerCase().includes(q) || chat.lastMessage.toLowerCase().includes(q),
+            ),
+        );
     }, [chats, searchQuery]);
 
     return (
@@ -41,7 +42,7 @@ export default function ChatList({ chats, activeId, onChatClick }: ChatListProps
                     filteredChats.map((chat) => (
                         <div
                             key={chat.id}
-                            className={`chat-item ${activeId === chat.id ? 'active' : ''}`}
+                            className={`chat-item ${activeId === chat.id ? 'active' : ''}${chat.isPinned ? ' pinned' : ''}`}
                             onClick={() => onChatClick(chat)}
                         >
                             <div className="item-avatar">
@@ -54,7 +55,10 @@ export default function ChatList({ chats, activeId, onChatClick }: ChatListProps
                             </div>
                             <div className="item-content">
                                 <div className="content-top">
-                                    <span className="item-name">{chat.name}</span>
+                                    <span className="item-name">
+                                        {chat.isPinned ? <span className="item-pin-badge" title="置顶">顶</span> : null}
+                                        {chat.name}
+                                    </span>
                                     <span className="item-time">{chat.lastTime}</span>
                                 </div>
                                 <div className="content-bottom">

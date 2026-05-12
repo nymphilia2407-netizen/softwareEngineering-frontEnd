@@ -44,6 +44,7 @@ export const mapChatRoom = (room: ChatRoomSummaryData): ChatListItem => ({
     status: undefined,
     isGroup: room.is_group,
     isMuted: room.is_muted === true,
+    isPinned: room.is_pinned === true,
 });
 
 export const mapGroupSummary = (group: GroupSummaryData): Group => ({

@@ -14,6 +14,8 @@ export interface ChatSessionDetailProps {
     /** 当前会话是否消息免打扰（来自会话列表） */
     conversationMuted: boolean;
     onConversationMutedChange: (muted: boolean) => Promise<void>;
+    conversationPinned: boolean;
+    onConversationPinnedChange: (pinned: boolean) => Promise<void>;
     onBack: () => void;
     onDeleted?: () => void;
 }
@@ -27,6 +29,8 @@ export default function ChatSessionDetail({
     onDeleted,
     conversationMuted,
     onConversationMutedChange,
+    conversationPinned,
+    onConversationPinnedChange,
 }: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
@@ -35,6 +39,7 @@ export default function ChatSessionDetail({
     const [announcementContent, setAnnouncementContent] = useState('');
     const [announcementSubmitting, setAnnouncementSubmitting] = useState(false);
     const [muteSaving, setMuteSaving] = useState(false);
+    const [pinSaving, setPinSaving] = useState(false);
 
     const [roleMenuOpenFor, setRoleMenuOpenFor] = useState<number | null>(null);
     const roleMenuRef = useRef<HTMLDivElement | null>(null); // 点击其它位置的时候让菜单缩回
@@ -124,6 +129,37 @@ export default function ChatSessionDetail({
             setMuteSaving(false);
         }
     };
+
+    const handlePinToggle = async (next: boolean) => {
+        setPinSaving(true);
+        try {
+            await onConversationPinnedChange(next);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '设置失败');
+        } finally {
+            setPinSaving(false);
+        }
+    };
+
+    const conversationPinRow = (
+        <div className="chat-session-mute-card">
+            <div className="chat-session-mute-text">
+                <span className="chat-session-mute-title">置顶会话</span>
+                <span className="chat-session-mute-hint">置顶后会话固定在列表顶部，按时间排序</span>
+            </div>
+            <label className="chat-session-mute-switch-label">
+                <input
+                    type="checkbox"
+                    className="chat-session-mute-switch-input"
+                    checked={conversationPinned}
+                    disabled={pinSaving}
+                    onChange={(e) => void handlePinToggle(e.target.checked)}
+                    aria-label="置顶会话"
+                />
+                <span className="chat-session-mute-switch-track" aria-hidden />
+            </label>
+        </div>
+    );
 
     const conversationMuteRow = (
         <div className="chat-session-mute-card">
@@ -272,6 +308,7 @@ export default function ChatSessionDetail({
                             )}
                         </dl>
 
+                        {conversationPinRow}
                         {conversationMuteRow}
 
                         {/* 发布公告 */}
@@ -399,6 +436,7 @@ export default function ChatSessionDetail({
                             )}
                         </dl>
 
+                        {conversationPinRow}
                         {conversationMuteRow}
 
                         <div className="chat-session-detail-footer">

@@ -15,7 +15,7 @@ import { useActiveChatHistory } from '../hooks/useActiveChatHistory';
 import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket';
 import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
 import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomList } from '../mappers/chat';
-import { getChatRooms, setConversationMuted } from '../services/chat';
+import { getChatRooms, setConversationMuted, setConversationPinned } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar } from '../services/group';
 import { getFriendList } from '../services/friend';
 import { deleteUser } from '../services/user';
@@ -24,7 +24,7 @@ import type { ActiveTabType, ChatListItem } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import { resolvedUserAvatar } from '../utils/avatar';
-import { clearUnreadRoom } from '../utils/chatRoomList';
+import { clearUnreadRoom, sortChatRoomsForDisplay } from '../utils/chatRoomList';
 import { decodeTokenPayload, readInitialUserFromLocalCache } from '../utils/jwtProfile';
 
 import '../styles/index.css';
@@ -101,7 +101,7 @@ export default function Index() {
         try {
             const [friendList, roomList] = await Promise.all([getFriendList(), getChatRooms()]);
             setFriends(friendList.map(mapFriendSummary));
-            setChatRooms(roomList.map(mapChatRoom));
+            setChatRooms(sortChatRoomsForDisplay(roomList.map(mapChatRoom)));
         } catch (error) {
             console.error('刷新好友或会话失败:', error);
         }
@@ -110,7 +110,7 @@ export default function Index() {
     const syncChatRoomsAndGroups = useCallback(async () => {
         try {
             const roomList = await getChatRooms();
-            setChatRooms(roomList.map(mapChatRoom));
+            setChatRooms(sortChatRoomsForDisplay(roomList.map(mapChatRoom)));
             setGroups(groupSummariesFromRoomList(roomList));
         } catch (error) {
             console.error('同步群会话列表失败:', error);
@@ -303,20 +303,23 @@ export default function Index() {
                 avatar: optimisticAvatar,
             });
             setGroups((currentGroups) => [mappedGroup, ...currentGroups.filter((group) => group.id !== mappedGroup.id)]);
-            setChatRooms((currentRooms) => [
-                {
-                    id: createdGroup.room_id,
-                    name: createdGroup.group_name,
-                    avatar: optimisticAvatar,
-                    lastMessage: '[最近暂无消息]',
-                    lastTime: new Date(createdGroup.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    unreadCount: 0,
-                    otherUserId: null,
-                    isGroup: true,
-                    isMuted: false,
-                },
-                ...currentRooms.filter((room) => room.id !== createdGroup.room_id),
-            ]);
+            setChatRooms((currentRooms) =>
+                sortChatRoomsForDisplay([
+                    {
+                        id: createdGroup.room_id,
+                        name: createdGroup.group_name,
+                        avatar: optimisticAvatar,
+                        lastMessage: '[最近暂无消息]',
+                        lastTime: new Date(createdGroup.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        unreadCount: 0,
+                        otherUserId: null,
+                        isGroup: true,
+                        isMuted: false,
+                        isPinned: false,
+                    },
+                    ...currentRooms.filter((room) => room.id !== createdGroup.room_id),
+                ]),
+            );
         } catch (error) {
             console.error('创建群聊失败:', error);
             alert(error instanceof Error ? error.message : '创建群聊失败');
@@ -331,8 +334,24 @@ export default function Index() {
 
         await setConversationMuted(convId, muted);
         setChatRooms((prev) =>
-            prev.map((room) =>
-                room.id === convId ? { ...room, isMuted: muted, unreadCount: muted ? 0 : room.unreadCount } : room,
+            sortChatRoomsForDisplay(
+                prev.map((room) =>
+                    room.id === convId ? { ...room, isMuted: muted, unreadCount: muted ? 0 : room.unreadCount } : room,
+                ),
+            ),
+        );
+    }, []);
+
+    const handleConversationPinnedChange = useCallback(async (pinned: boolean) => {
+        const convId = activeChatIdRef.current;
+        if (!convId) {
+            return;
+        }
+
+        await setConversationPinned(convId, pinned);
+        setChatRooms((prev) =>
+            sortChatRoomsForDisplay(
+                prev.map((room) => (room.id === convId ? { ...room, isPinned: pinned } : room)),
             ),
         );
     }, []);
@@ -557,6 +576,8 @@ export default function Index() {
                             otherUserId={activeChat?.otherUserId ?? null}
                             conversationMuted={activeChat?.isMuted === true}
                             onConversationMutedChange={handleConversationMutedChange}
+                            conversationPinned={activeChat?.isPinned === true}
+                            onConversationPinnedChange={handleConversationPinnedChange}
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
                         />
