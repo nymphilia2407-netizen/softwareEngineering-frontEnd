@@ -83,10 +83,6 @@ export default function ContactSessionDetail({ userId, onBack, onEnterChat, onDe
                         </div>
                         <dl className="chat-session-detail-meta">
                             <div>
-                                <dt>用户 ID</dt>
-                                <dd>{friendDetail.user_id}</dd>
-                            </div>
-                            <div>
                                 <dt>邮箱</dt>
                                 <dd>{(friendDetail.email ?? '').trim() || '未公开'}</dd>
                             </div>
