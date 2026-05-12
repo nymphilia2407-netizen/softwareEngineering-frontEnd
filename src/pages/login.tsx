@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { DEFAULT_AVATAR } from '../constants/string';
 import { loginApi, registerApi } from '../services/auth';
 import { checkPasswordStrength, persistUserProfile, readUserProfileCache, tokenUtils } from '../utils/auth';
+import { isValidEmailFormat } from '../utils/emailPasswordRules';
 import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
 
 import '../styles/login.css';
@@ -61,7 +62,7 @@ export default function Login({ onLogInSuccess }: LoginProps) {
 
     const usernameLengthInvalid = !isLogin && !!username && (username.length < 3 || username.length > 20);
     const usernameCharInvalid = !isLogin && !!username && !/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username);
-    const emailInvalid = !!email && !/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+    const emailInvalid = !!email && !isValidEmailFormat(email);
     const passwordInconsistent = !isLogin && !!confirmPassword && password !== confirmPassword;
 
     const handleRegister = async (data: LoginFormValues) => {

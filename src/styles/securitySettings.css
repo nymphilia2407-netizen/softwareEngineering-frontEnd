@@ -1,0 +1,98 @@
+/* 设置内「安全信息」区块（与 settings.css 中的表单布局配合） */
+
+.security-current-email {
+	margin: 0 0 12px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #0f172a;
+	word-break: break-all;
+}
+
+.security-settings-divider {
+	border: none;
+	border-top: 1px solid rgba(15, 23, 42, 0.1);
+	margin: 18px 0;
+}
+
+.security-settings-sub {
+	font-size: 13px;
+	font-weight: 600;
+	color: #475569;
+	margin-top: 4px;
+}
+
+.security-password-strength {
+	margin-top: 6px;
+	margin-bottom: 4px;
+}
+
+.security-strength-info {
+	font-size: 12px;
+	color: #64748b;
+	margin-bottom: 4px;
+}
+
+.security-strength-meter-bg {
+	height: 6px;
+	border-radius: 999px;
+	background: #e2e8f0;
+	overflow: hidden;
+}
+
+.security-strength-meter-fill {
+	height: 100%;
+	border-radius: 999px;
+	transition: width 0.2s ease, background-color 0.2s ease;
+	min-width: 0;
+}
+
+.security-strength-meter-fill--invalid {
+	width: 20%;
+	background: #ef4444;
+}
+
+.security-strength-meter-fill--level-1 {
+	width: 20%;
+	background: #f97316;
+}
+
+.security-strength-meter-fill--level-2 {
+	width: 40%;
+	background: #f59e0b;
+}
+
+.security-strength-meter-fill--level-3 {
+	width: 60%;
+	background: #eab308;
+}
+
+.security-strength-meter-fill--level-4 {
+	width: 80%;
+	background: #22c55e;
+}
+
+.security-strength-meter-fill--level-5 {
+	width: 100%;
+	background: #16a34a;
+}
+
+.security-strength-text--invalid {
+	color: #ef4444;
+}
+
+.security-strength-text--level-1,
+.security-strength-text--level-2 {
+	color: #f97316;
+}
+
+.security-strength-text--level-3 {
+	color: #ca8a04;
+}
+
+.security-strength-text--level-4 {
+	color: #16a34a;
+}
+
+.security-strength-text--level-5 {
+	color: #15803d;
+}

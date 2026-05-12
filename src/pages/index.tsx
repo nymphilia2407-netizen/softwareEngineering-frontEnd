@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ChatList from '../components/chatList';
-import ConfigNav from '../components/configNav';
+import SettingsPanel from '../components/settingsPanel';
 import ChatSessionDetail from '../components/chatSessionDetail';
 import ChatWindow from '../components/chatWindow';
 import ContactList from '../components/contactList';
@@ -313,7 +313,8 @@ export default function Index() {
     const [userName, setUserName] = useState<string>(tokenPayload?.username ?? '');
     const [myAvatar, setMyAvatar] = useState<string>(profileBoot.avatar);
     const [activeTab, setActiveTab] = useState<ActiveTabType>('chat');
-    const [settingsPanel, setSettingsPanel] = useState<'menu' | 'profile'>('menu');
+    const [settingsPanel, setSettingsPanel] = useState<'menu' | 'profile' | 'security'>('menu');
+    const [userEmail, setUserEmail] = useState<string>('');
     const [activeChatId, setActiveChatId] = useState<number>(0);
     const [selectedContact, setSelectedContact] = useState<User | null>(null);
     const [friends, setFriends] = useState<User[]>([]);
@@ -488,6 +489,7 @@ export default function Index() {
                 setProfileBirthday(currentUser.birthday);
                 setProfileAddress(currentUser.address);
                 setProfileSignature(currentUser.signature);
+                setUserEmail(currentUser.email ?? '');
                 persistUserProfile({
                     username: currentUser.username,
                     avatar: resolvedAvatar,
@@ -1101,6 +1103,17 @@ export default function Index() {
                     </button>
 
                     <button
+                        className={`list-action-button ${activeTab === 'settings' && settingsPanel === 'security' ? 'active' : ''}`}
+                        onClick={() => {
+                            setActiveTab('settings');
+                            setSettingsPanel('security');
+                        }}
+                        title="安全信息"
+                    >
+                        安全信息
+                    </button>
+
+                    <button
                         className="list-action-button"
                         onClick={() => handleLogout()}
                         title="退出登录"
@@ -1170,20 +1183,23 @@ export default function Index() {
 
             <main className="chat-area">
                 {activeTab === 'settings' ? (
-                    <ConfigNav
+                    <SettingsPanel
                         isOpen
                         initialView={settingsPanel}
                         showMenuInMain={false}
                         onClose={() => setActiveTab('chat')}
+                        onSubpanelChange={setSettingsPanel}
                         currentUser={{
                             userId: currentUserId,
                             username: userName,
+                            email: userEmail,
                             avatar: myAvatar,
                             birthday: profileBirthday,
                             address: profileAddress,
                             signature: profileSignature,
                         }}
                         onAvatarUpdated={setMyAvatar}
+                        onEmailUpdated={setUserEmail}
                         onProfileFieldsSaved={({ birthday, address, signature }) => {
                             setProfileBirthday(birthday);
                             setProfileAddress(address);
