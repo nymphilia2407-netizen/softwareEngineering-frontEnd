@@ -1,1 +1,0 @@
-export type ActiveTabType = 'chat' |'contacts' |'settings'

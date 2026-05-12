@@ -1,11 +1,7 @@
 import request from '../utils/request';
-import { getChatRooms } from './chat';
 
-interface ApiResponse<T> {
-    code: number;
-    info: string;
-    data?: T;
-}
+import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
+import { getChatRooms } from './chat';
 
 export interface GroupSummaryData {
     room_id: number;
@@ -92,13 +88,9 @@ export const createGroup = async (payload: CreateGroupPayload) => {
         body.client_request_id = payload.client_request_id;
     }
 
-    const response = await request.post<any, ApiResponse<CreateGroupResponseData>>('/api/groups/', body);
+    const response = await request.post<unknown, ApiResponse<CreateGroupResponseData>>('/api/groups/', body);
+    const d = unwrapApiData(response, '创建群聊失败');
 
-    if (response.code !== 0 || !response.data) {
-        throw new Error(response.info || '创建群聊失败');
-    }
-
-    const d = response.data;
     return {
         room_id: d.conversation_id,
         group_name: d.group_name,
@@ -111,26 +103,17 @@ export const createGroup = async (payload: CreateGroupPayload) => {
 
 /** 群主单独上传群头像（与 POST /api/groups/ 分离以降低建群延时） */
 export const updateGroupAvatar = async (roomId: number, avatar: string) => {
-    const response = await request.put<any, ApiResponse<{ conversation_id: number; avatar: string }>>(
+    const response = await request.put<unknown, ApiResponse<{ conversation_id: number; avatar: string }>>(
         `/api/groups/${roomId}/avatar/`,
         { avatar },
     );
-
-    if (response.code !== 0 || !response.data) {
-        throw new Error(response.info || '上传群头像失败');
-    }
-
-    return response.data;
+    return unwrapApiData(response, '上传群头像失败');
 };
 
 export const getGroupDetail = async (roomId: number) => {
-    const response = await request.get<any, ApiResponse<BackendGroupDetailData>>(`/api/groups/${roomId}/`);
+    const response = await request.get<unknown, ApiResponse<BackendGroupDetailData>>(`/api/groups/${roomId}/`);
+    const raw = unwrapApiData(response, '获取群聊详情失败');
 
-    if (response.code !== 0 || !response.data) {
-        throw new Error(response.info || '获取群聊详情失败');
-    }
-
-    const raw = response.data;
     const ownerMember = raw.members.find((m) => m.role === 'owner');
 
     const mapped: GroupDetailData = {
@@ -160,57 +143,43 @@ export const getGroupDetail = async (roomId: number) => {
 
 /** 退出群聊（非群主） */
 export const leaveGroup = async (groupId: number): Promise<void> => {
-    const response = await request.delete<any, ApiResponse<null>>(`/api/groups/${groupId}/members/me/`);
-    if (response.code !== 0) {
-        throw new Error(response.info || '退群失败');
-    }
+    const response = await request.delete<unknown, ApiResponse<null>>(`/api/groups/${groupId}/members/me/`);
+    assertApiSuccess(response, '退群失败');
 };
 
 /** 解散群聊（仅群主） */
 export const dissolveGroup = async (groupId: number): Promise<void> => {
-    const response = await request.delete<any, ApiResponse<null>>(`/api/groups/${groupId}/`);
-    if (response.code !== 0) {
-        throw new Error(response.info || '解散群聊失败');
-    }
+    const response = await request.delete<unknown, ApiResponse<null>>(`/api/groups/${groupId}/`);
+    assertApiSuccess(response, '解散群聊失败');
 };
 
 /** 发布群公告 */
 export const publishAnnouncement = async (groupId: number, content: string): Promise<void> => {
-    const response = await request.post<any, ApiResponse<null>>(
+    const response = await request.post<unknown, ApiResponse<null>>(
         `/api/groups/${groupId}/announcements/`,
-        { content }
+        { content },
     );
-    if (response.code !== 0) {
-        throw new Error(response.info || '发布公告失败');
-    }
+    assertApiSuccess(response, '发布公告失败');
 };
 
 /** 更新成员角色（转让群主 / 设管理员 / 取消管理员） */
 export const updateMemberRole = async (
     groupId: number,
     userId: number,
-    role: 'owner' | 'admin' | 'member'
+    role: 'owner' | 'admin' | 'member',
 ): Promise<void> => {
-    const response = await request.put<any, ApiResponse<null>>(
-        `/api/groups/${groupId}/members/`,
-        { user_id: userId, role }
-    );
-    if (response.code !== 0) {
-        throw new Error(response.info || '操作失败');
-    }
+    const response = await request.put<unknown, ApiResponse<null>>(`/api/groups/${groupId}/members/`, {
+        user_id: userId,
+        role,
+    });
+    assertApiSuccess(response, '操作失败');
 };
 
 // 禁言功能
-export const muteMember = async (
-    groupId: number,
-    userId: number,
-    mutedUntil: string | null
-): Promise<void> => {
-    const response = await request.patch<any, ApiResponse<null>>(
+export const muteMember = async (groupId: number, userId: number, mutedUntil: string | null): Promise<void> => {
+    const response = await request.patch<unknown, ApiResponse<null>>(
         `/api/groups/${groupId}/members/${userId}/mute/`,
-        { muted_until: mutedUntil }
+        { muted_until: mutedUntil },
     );
-    if (response.code !== 0) {
-        throw new Error(response.info || '操作失败');
-    }
+    assertApiSuccess(response, '操作失败');
 };

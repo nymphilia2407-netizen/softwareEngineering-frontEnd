@@ -1,5 +1,7 @@
 import request from '../utils/request';
 
+import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
+
 export interface ChatRoomSummaryData {
     room_id: number;
     is_group: boolean;
@@ -22,12 +24,6 @@ export interface ChatMessageData {
     content: string;
     created_at: string;
     is_read: boolean;
-}
-
-interface ApiResponse<T> {
-    code: number;
-    info: string;
-    data?: T;
 }
 
 /** 后端 GET /api/conversations/ 单条 */
@@ -87,28 +83,21 @@ function mapMessageRow(convId: number, row: BackendMessageRow): ChatMessageData 
 }
 
 export const getChatRooms = async () => {
-    const response = await request.get<any, ApiResponse<BackendConversationRow[]>>('/api/conversations/');
-
-    if (response.code !== 0 || !response.data) {
-        throw new Error(response.info || '获取会话列表失败');
-    }
-
-    return response.data.map(mapConversationRow);
+    const response = await request.get<unknown, ApiResponse<BackendConversationRow[]>>('/api/conversations/');
+    const rows = unwrapApiData(response, '获取会话列表失败');
+    return rows.map(mapConversationRow);
 };
 
 export const getChatMessages = async (roomId: number, limit = 50, offset = 0) => {
     const page = Math.floor(offset / limit) + 1;
     const pageSize = limit;
-    const response = await request.get<any, ApiResponse<{ messages: BackendMessageRow[]; total_pages: number; current_page: number }>>(
-        `/api/conversations/${roomId}/messages/`,
-        { params: { page, page_size: pageSize } },
-    );
+    const response = await request.get<
+        unknown,
+        ApiResponse<{ messages: BackendMessageRow[]; total_pages: number; current_page: number }>
+    >(`/api/conversations/${roomId}/messages/`, { params: { page, page_size: pageSize } });
 
-    if (response.code !== 0 || !response.data) {
-        throw new Error(response.info || '获取聊天记录失败');
-    }
-
-    const { messages } = response.data;
+    const payload = unwrapApiData(response, '获取聊天记录失败');
+    const { messages } = payload;
     return {
         room_id: roomId,
         count: messages.length,
@@ -117,12 +106,9 @@ export const getChatMessages = async (roomId: number, limit = 50, offset = 0) =>
 };
 
 export const setConversationMuted = async (conversationId: number, isMuted: boolean) => {
-    const response = await request.put<any, ApiResponse<unknown>>(
+    const response = await request.put<unknown, ApiResponse<unknown>>(
         `/api/conversations/${conversationId}/settings/`,
         { is_muted: isMuted },
     );
-
-    if (response.code !== 0) {
-        throw new Error(response.info || '设置免打扰失败');
-    }
+    assertApiSuccess(response, '设置免打扰失败');
 };

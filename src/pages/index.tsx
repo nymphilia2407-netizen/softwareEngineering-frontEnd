@@ -1,34 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import ChatList from '../components/chatList';
-import SettingsPanel from '../components/settingsPanel';
-import ChatSessionDetail from '../components/chatSessionDetail';
-import ChatWindow from '../components/chatWindow';
 import ContactList from '../components/contactList';
 import ContactSessionDetail from '../components/contactSessionDetail';
+import ChatSessionDetail from '../components/chatSessionDetail';
+import ChatWindow from '../components/chatWindow';
+import GroupSyncToast from '../components/main/GroupSyncToast';
+import MainSidebar from '../components/main/MainSidebar';
+import SettingsListActions from '../components/main/SettingsListActions';
+import SettingsPanel from '../components/settingsPanel';
 
-import { SEND_ACK_GRACE_MS, SEND_ACK_TIMEOUT_MS } from '../constants/chat';
-import { BACKENDURL, CHATICON, CONFIGICON, CONTACTICON, DEFAULT_AVATAR } from '../constants/string';
-import { mapChatRoom, mapFriendSummary, mapGroupSummary, mapHistoryMessage, groupSummariesFromRoomList } from '../mappers/chat';
-import { getChatMessages, getChatRooms, setConversationMuted } from '../services/chat';
+import { CHATICON, CONFIGICON, CONTACTICON } from '../constants/string';
+import { useActiveChatHistory } from '../hooks/useActiveChatHistory';
+import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket';
+import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
+import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomList } from '../mappers/chat';
+import { getChatRooms, setConversationMuted } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar } from '../services/group';
-import { getFriendList, getReceivedFriendRequests } from '../services/friend';
-import { getCurrentUser, deleteUser } from '../services/user';
-import { createChatWebSocketClient, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
-import type { ChatListItem } from '../types/chat';
+import { getFriendList } from '../services/friend';
+import { deleteUser } from '../services/user';
+import type { ChatWebSocketClient } from '../services/websocket';
+import type { ActiveTabType, ChatListItem } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
-import type { ActiveTabType } from '../types/ui';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import { resolvedUserAvatar } from '../utils/avatar';
-import { clearUnreadRoom, updateRoomOnIncomingMessage } from '../utils/chatRoomList';
+import { clearUnreadRoom } from '../utils/chatRoomList';
 import { decodeTokenPayload, readInitialUserFromLocalCache } from '../utils/jwtProfile';
-import {
-    appendOptimisticMessage,
-    applyReadReceiptToMessages,
-    formatIncomingMessage,
-    markMessageFailedInStore,
-    replaceOrAppendIncomingMessage,
-} from '../utils/messageStore';
 
 import '../styles/index.css';
 
@@ -187,7 +184,7 @@ export default function Index() {
         };
     }, [refreshFriendsAndRooms]);
 
-    const syncGroupList = async () => {
+    const syncGroupList = useCallback(async () => {
         try {
             const groupList = await getGroupList();
             setGroups(groupList.map(mapGroupSummary));
@@ -195,223 +192,32 @@ export default function Index() {
             console.error('获取群聊列表失败:', error);
             setGroups([]);
         }
-    };
+    }, []);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        const syncCurrentUser = async () => {
-            try {
-                const currentUser = await getCurrentUser();
-
-                if (cancelled) {
-                    return;
-                }
-
-                setCurrentUserId(currentUser.user_id);
-                setUserName(currentUser.username);
-                const resolvedAvatar = currentUser.avatar && currentUser.avatar.length > 0 ? currentUser.avatar : DEFAULT_AVATAR;
-                setMyAvatar(resolvedAvatar);
-                setProfileBirthday(currentUser.birthday);
-                setProfileAddress(currentUser.address);
-                setProfileSignature(currentUser.signature);
-                setUserEmail(currentUser.email ?? '');
-                persistUserProfile({
-                    username: currentUser.username,
-                    avatar: resolvedAvatar,
-                    birthday: currentUser.birthday ?? '',
-                    address: currentUser.address ?? '',
-                    signature: currentUser.signature ?? '',
-                });
-            } catch (error) {
-                console.error('获取当前用户失败:', error);
-            }
-        };
-
-        const syncFriendList = async () => {
-            try {
-                const friendList = await getFriendList();
-
-                if (cancelled) {
-                    return;
-                }
-
-                setFriends(friendList.map(mapFriendSummary));
-            } catch (error) {
-                console.error('获取好友列表失败:', error);
-                setFriends([]);
-            }
-        };
-
-        getReceivedFriendRequests().then(requests => {
-            if (!cancelled) setPendingFriendRequestCount(requests.length);
-        }).catch(() => {});
-
-        const syncChatRooms = async () => {
-            try {
-                const roomList = await getChatRooms();
-
-                if (cancelled) {
-                    return;
-                }
-
-                const mappedRooms = roomList.map(mapChatRoom);
-                setChatRooms(mappedRooms);
-                setActiveChatId((currentActiveChatId) => currentActiveChatId || mappedRooms[0]?.id || 0);
-            } catch (error) {
-                console.error('获取会话列表失败:', error);
-                setChatRooms([]);
-            }
-        };
-
-        const token = tokenUtils.getToken();
-
-        // 先同步当前用户/列表数据
-        void syncCurrentUser();
-        void syncFriendList();
-        void syncChatRooms();
-        void syncGroupList();
-
-        if (token) {
-            const client = createChatWebSocketClient({
-                backendUrl: BACKENDURL,
-                token,
-                autoReconnect: true,
-                reconnectDelayMs: 3000,
-            });
-
-            socketRef.current = client;
-
-            const unsubscribeMessage = client.onMessage((event: ChatSocketEvent) => {
-                if (event.type === 'new_message') {
-                    const incomingMsg = formatIncomingMessage(event.data);
-
-                    setMessageStore((prev) => {
-                        const result = replaceOrAppendIncomingMessage(prev, incomingMsg, currentUserIdRef.current);
-
-                        if (result.consumedClientId) {
-                            const timer = pendingSendTimers.current[result.consumedClientId];
-                            if (timer) {
-                                clearTimeout(timer);
-                            }
-
-                            delete pendingSendTimers.current[result.consumedClientId];
-                        }
-
-                        return result.nextStore;
-                    });
-
-                    setChatRooms((prevRooms) => updateRoomOnIncomingMessage(prevRooms, incomingMsg, currentUserIdRef.current, activeChatIdRef.current));
-                }
-
-                if (event.type === 'read_receipt') {
-                    setMessageStore((prev) => applyReadReceiptToMessages(prev, event.data, currentUserIdRef.current));
-                    setChatRooms((prev) => clearUnreadRoom(prev, event.data.conversation_id));
-                }
-
-                if (event.type === 'error') {
-                    console.error('Chat WebSocket:', event.message);
-                    if (event.message?.toLowerCase().includes('muted') || event.message?.includes('禁言')) {
-                        setGroupSyncToast('你已被禁言，暂时无法发送消息');
-                    }
-                }
-
-                if (event.type === 'group_sync') {
-                    const d = event.data;
-                    subscribeWsRoom(d.conversation_id);
-
-                    if (d.action === 'created') {
-                        const displayName = d.group_name?.trim() || '群聊';
-                        const creator = d.creator_username?.trim();
-                        const selfName = userNameRef.current?.trim();
-                        if (creator && creator === selfName) {
-                            setGroupSyncToast(`群聊「${displayName}」已创建，成员将同步收到`);
-                        } else {
-                            const suffix = creator ? `（${creator} 创建）` : '';
-                            setGroupSyncToast(`新群聊「${displayName}」已加入会话与联系人${suffix}`);
-                        }
-
-                        setChatRooms((prev) => {
-                            if (prev.some((r) => r.id === d.conversation_id)) {
-                                return prev;
-                            }
-
-                            const row: ChatListItem = {
-                                id: d.conversation_id,
-                                name: displayName,
-                                avatar: resolvedUserAvatar(d.avatar || ''),
-                                lastMessage: '[最近暂无消息]',
-                                lastTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                                unreadCount: 0,
-                                otherUserId: null,
-                                isGroup: true,
-                                isMuted: false,
-                            };
-
-                            return [row, ...prev];
-                        });
-
-                        setGroups((prev) => {
-                            if (prev.some((g) => g.id === d.conversation_id)) {
-                                return prev;
-                            }
-
-                            const next: Group = {
-                                id: d.conversation_id,
-                                groupname: displayName,
-                                avatar: resolvedUserAvatar(d.avatar || ''),
-                                ownerId: 0,
-                                adminIds: [],
-                                memberCount: 0,
-                                createdTime: Date.now(),
-                            };
-
-                            return [next, ...prev];
-                        });
-                    } else if (d.action === 'avatar_updated') {
-                        const displayName = d.group_name?.trim() || '群聊';
-                        setGroupSyncToast(`「${displayName}」群头像已更新`);
-                    }
-
-                    void syncChatRoomsAndGroups();
-                }
-
-                if (event.type === 'friend_request') {
-                    setPendingFriendRequestCount(prev => prev + 1);
-                }
-            });
-
-            const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
-                console.log('WebSocket status:', status);
-            });
-
-            client.connect();
-
-            return () => {
-                cancelled = true;
-                unsubscribeMessage();
-                unsubscribeStatus();
-                client.disconnect();
-                socketRef.current = null;
-
-                // 组件卸载时清理所有发送超时
-                Object.values(pendingSendTimers.current).forEach((t) => {
-                    if (t) clearTimeout(t);
-                });
-                pendingSendTimers.current = {};
-            };
-        }
-
-        return () => {
-            cancelled = true;
-
-            // 组件卸载时清理所有发送超时
-            Object.values(pendingSendTimers.current).forEach((t) => {
-                if (t) clearTimeout(t);
-            });
-            pendingSendTimers.current = {};
-        };
-    }, [syncChatRoomsAndGroups, subscribeWsRoom]);
+    useIndexBootstrapAndSocket({
+        socketRef,
+        pendingSendTimers,
+        currentUserIdRef,
+        activeChatIdRef,
+        userNameRef,
+        subscribeWsRoom,
+        syncChatRoomsAndGroups,
+        syncGroupList,
+        setCurrentUserId,
+        setUserName,
+        setMyAvatar,
+        setProfileBirthday,
+        setProfileAddress,
+        setProfileSignature,
+        setUserEmail,
+        setFriends,
+        setChatRooms,
+        setActiveChatId,
+        setMessageStore,
+        setGroupSyncToast,
+        setGroups,
+        setPendingFriendRequestCount,
+    });
 
     const chatListData: ChatListItem[] = chatRooms;
     const totalUnreadCount = useMemo(
@@ -422,171 +228,29 @@ export default function Index() {
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
 
-    useEffect(() => {
-        if (!activeChatId) {
-            return;
-        }
+    useActiveChatHistory(activeChatId, setMessageStore);
 
-        let cancelled = false;
+    const optimisticRefs = useMemo<IndexOptimisticRefs>(
+        () => ({
+            socketRef,
+            pendingSendTimers,
+            messageStoreRef,
+            currentUserIdRef,
+            userNameRef,
+            myAvatarRef,
+            optimisticIdSeqRef,
+        }),
+        [],
+    );
 
-        const loadMessages = async () => {
-            try {
-                const history = await getChatMessages(activeChatId, 100, 0);
-
-                if (cancelled) {
-                    return;
-                }
-
-                // 后端按时间倒序分页，界面按时间正序展示
-                const chronological = [...history.messages].sort(
-                    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-                );
-
-                setMessageStore((prev) => ({
-                    ...prev,
-                    [activeChatId]: chronological.map((m) => mapHistoryMessage(history.room_id, m)),
-                }));
-            } catch (error) {
-                console.error('获取聊天记录失败:', error);
-            }
-        };
-
-        void loadMessages();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [activeChatId]);
-
-    const clearPendingSendTimer = (clientId: string) => {
-        const timer = pendingSendTimers.current[clientId];
-        if (timer) {
-            clearTimeout(timer);
-        }
-        delete pendingSendTimers.current[clientId];
-    };
-
-    const scheduleSendFailureCheck = (conversationId: number, clientId: string) => {
-        const timer = setTimeout(() => {
-            const roomMessages = messageStoreRef.current[conversationId] ?? [];
-            const stillSending = roomMessages.some((message) => message.clientId === clientId && message.status === 'sending');
-
-            if (!stillSending) {
-                clearPendingSendTimer(clientId);
-                return;
-            }
-
-            const graceTimer = setTimeout(() => {
-                setMessageStore((prev) => markMessageFailedInStore(prev, conversationId, clientId));
-                clearPendingSendTimer(clientId);
-            }, SEND_ACK_GRACE_MS);
-
-            pendingSendTimers.current[clientId] = graceTimer;
-        }, SEND_ACK_TIMEOUT_MS);
-
-        pendingSendTimers.current[clientId] = timer;
-    };
-
-    const handleSendMessage = (content: string) => {
-        if (!activeChatId || !content.trim()) {
-            return;
-        }
-
-        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-        optimisticIdSeqRef.current += 1;
-        const tempId = -optimisticIdSeqRef.current;
-        const timestamp = Date.now();
-
-        const optimisticMsg: Message = {
-            id: tempId,
-            convId: activeChatId,
-            senderId: currentUserIdRef.current,
-            senderUsername: userNameRef.current,
-            senderAvatar: myAvatarRef.current,
-            type: 'text',
-            status: 'sending',
-            content,
-            timestamp,
-            time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isRead: false,
-            clientId,
-        };
-
-        setMessageStore((prev) => appendOptimisticMessage(prev, activeChatId, optimisticMsg));
-        setChatRooms((prev) => updateRoomOnIncomingMessage(prev, optimisticMsg, currentUserIdRef.current, activeChatId));
-        scheduleSendFailureCheck(activeChatId, clientId);
-
-        const socket = socketRef.current;
-        if (!socket) {
-            clearPendingSendTimer(clientId);
-            setMessageStore((prev) => markMessageFailedInStore(prev, activeChatId, clientId));
-            return;
-        }
-
-        // 未 OPEN 时由客户端入队，连接建立后自动发出，避免与 HTTP 双写
-        socket.send({
-            type: 'send_message',
-            data: {
-                conversation_id: activeChatId,
-                content,
-                client_id: clientId,
-            },
-        });
-    };
-
-    // 直接向指定会话发送（用于重试）
-    const sendMessageDirect = (convId: number, content: string) => {
-        if (!convId || !content.trim()) return;
-
-        const clientId = `c_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-        optimisticIdSeqRef.current += 1;
-        const tempId = -optimisticIdSeqRef.current;
-        const timestamp = Date.now();
-
-        const optimisticMsg: Message = {
-            id: tempId,
-            convId,
-            senderId: currentUserIdRef.current,
-            senderUsername: userNameRef.current,
-            senderAvatar: myAvatarRef.current,
-            type: 'text',
-            status: 'sending',
-            content,
-            timestamp,
-            time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isRead: false,
-            clientId,
-        };
-
-        setMessageStore((prev) => appendOptimisticMessage(prev, convId, optimisticMsg));
-        scheduleSendFailureCheck(convId, clientId);
-
-        const socket = socketRef.current;
-        if (!socket) {
-            clearPendingSendTimer(clientId);
-            setMessageStore((prev) => markMessageFailedInStore(prev, convId, clientId));
-            return;
-        }
-
-        socket.send({ type: 'send_message', data: { conversation_id: convId, content, client_id: clientId } });
-    };
-
-    const handleRetryMessage = (clientId: string) => {
-        // 找到原消息
-        const store = messageStore;
-        for (const convKey of Object.keys(store)) {
-            const convId = Number(convKey);
-            const msgs = store[convId] || [];
-            const orig = msgs.find((m) => m.clientId === clientId);
-            if (orig) {
-                // 移除旧的失败消息
-                setMessageStore((prev) => ({ ...prev, [convId]: prev[convId].filter((m) => m.clientId !== clientId) }));
-                // 用新 clientId 重新发送
-                sendMessageDirect(convId, orig.content);
-                return;
-            }
-        }
-    };
+    const { handleSendMessage, handleRetryMessage } = useIndexOptimisticSend(
+        activeChatId,
+        messageStore,
+        optimisticRefs,
+        activeChatIdRef,
+        setMessageStore,
+        setChatRooms,
+    );
 
     const handleReadMessage = (convId: number, lastMsgId: number) => {
         if (lastMsgId > 0) {
@@ -755,110 +419,46 @@ export default function Index() {
 
     return (
         <div className="main">
-            {groupSyncToast ? (
-                <div className="group-sync-toast" role="status" aria-live="polite">
-                    {groupSyncToast}
-                </div>
-            ) : null}
-            <aside className="side-bar">
-                <div className="nav-top">
-                    <button
-                        className="user-avatar"
-                        title="点击更换头像"
-                        onClick={() => {
-                            setActiveTab('settings');
-                            setSettingsPanel('profile');
-                        }}
-                        type="button"
-                    >
-                        <img src={myAvatar} alt="myAvatar" title={userName || '当前用户'} />
-                    </button>
-                    <nav className="nav-menu">
-                        <button
-                            className={`nav-button ${activeTab === 'chat' ? 'active-button' : ''}`}
-                            onClick={() => {
-                                setActiveTab('chat');
-                                setSelectedContact(null);
-                            }}
-                        >
-                            <img src={CHATICON} alt="chat-icon" />
-                            {totalUnreadCount > 0 && (
-                                <span className="nav-unread-badge" aria-label={`${totalUnreadCount} 条未读消息`}>
-                                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                                </span>
-                            )}
-                        </button>
-                        <button
-                            className={`nav-button ${activeTab === 'contacts' ? 'active-button' : ''}`}
-                            onClick={() => setActiveTab('contacts')}
-                        >
-                            <img src={CONTACTICON} alt="contact-icon" />
-                            {pendingFriendRequestCount > 0 && (
-                                <span className="nav-unread-badge">
-                                    {pendingFriendRequestCount > 99 ? '99+' : pendingFriendRequestCount}
-                                </span>
-                            )}
-                        </button>
-                    </nav>
-                </div>
-                <div className="nav-bottom">
-                    <button
-                        className={`nav-button ${activeTab === 'settings' ? 'active-button' : ''}`}
-                        onClick={() => {
-                            setActiveTab('settings');
-                            setSettingsPanel('menu');
-                        }}
-                    >
-                        <img src={CONFIGICON} alt="config-icon" />
-                    </button>
-                </div>
-            </aside>
+            {groupSyncToast ? <GroupSyncToast message={groupSyncToast} /> : null}
+            <MainSidebar
+                myAvatar={myAvatar}
+                userName={userName}
+                activeTab={activeTab}
+                totalUnreadCount={totalUnreadCount}
+                pendingFriendRequestCount={pendingFriendRequestCount}
+                chatIcon={CHATICON}
+                contactIcon={CONTACTICON}
+                configIcon={CONFIGICON}
+                onOpenProfileSettings={() => {
+                    setActiveTab('settings');
+                    setSettingsPanel('profile');
+                }}
+                onSelectChat={() => {
+                    setActiveTab('chat');
+                    setSelectedContact(null);
+                }}
+                onSelectContacts={() => setActiveTab('contacts')}
+                onOpenSettingsMenu={() => {
+                    setActiveTab('settings');
+                    setSettingsPanel('menu');
+                }}
+            />
 
                 <div className="list-area">
                 {activeTab === 'settings' && (
-                <div className="list-actions">
-                    <button
-                        className={`list-action-button ${activeTab === 'settings' && settingsPanel === 'profile' ? 'active' : ''}`}
-                        onClick={() => {
-                            setActiveTab('settings');
-                            setSettingsPanel('profile');
-                        }}
-                        title="个人资料"
-                    >
-                        个人资料
-                    </button>
-
-                    <button
-                        className={`list-action-button ${activeTab === 'settings' && settingsPanel === 'security' ? 'active' : ''}`}
-                        onClick={() => {
-                            setActiveTab('settings');
-                            setSettingsPanel('security');
-                        }}
-                        title="安全信息"
-                    >
-                        安全信息
-                    </button>
-
-                    <button
-                        className="list-action-button"
-                        onClick={() => handleLogout()}
-                        title="退出登录"
-                    >
-                        退出登录
-                    </button>
-
-                    <button
-                        className="list-action-button list-action-button--danger"
-                        onClick={async () => {
-                            const confirmed = globalThis.confirm('确认要注销账号吗？此操作无法撤销！');
-                            if (!confirmed) return;
-                            await handleDeleteAccount();
-                        }}
-                        title="注销账号"
-                    >
-                        注销账号
-                    </button>
-                </div>
+                <SettingsListActions
+                    settingsPanel={settingsPanel}
+                    onSelectProfile={() => {
+                        setActiveTab('settings');
+                        setSettingsPanel('profile');
+                    }}
+                    onSelectSecurity={() => {
+                        setActiveTab('settings');
+                        setSettingsPanel('security');
+                    }}
+                    onLogout={handleLogout}
+                    onDeleteAccount={handleDeleteAccount}
+                />
                 )}
                 {activeTab === 'chat' && (
                     <ChatList

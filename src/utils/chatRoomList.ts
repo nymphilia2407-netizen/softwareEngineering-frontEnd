@@ -1,7 +1,7 @@
 import { DEFAULT_AVATAR } from '../constants/string';
 import type { ChatListItem } from '../types/chat';
 import type { Message } from '../types/entity';
-import { sameUserId } from './userId';
+import { sameUserId } from './messageStore';
 
 export const updateRoomOnIncomingMessage = (
     rooms: ChatListItem[],

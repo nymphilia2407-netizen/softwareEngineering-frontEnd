@@ -45,3 +45,5 @@ export interface ChatListItem {
   isMuted?: boolean;
 }
 
+export type ActiveTabType = 'chat' | 'contacts' | 'settings';
+

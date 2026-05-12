@@ -3,10 +3,10 @@ import type { RegisterResponse, RegisterParams, LoginParams, LoginResponse } fro
 
 // 注册
 export const registerApi = (data: RegisterParams) => {
-    return request.post<any, RegisterResponse>('/api/auth/register/', data);
+    return request.post<unknown, RegisterResponse>('/api/auth/register/', data);
 };
 
 // 登录
 export const loginApi = (data: LoginParams) => {
-    return request.post<any, LoginResponse>('/api/auth/login/', data);
+    return request.post<unknown, LoginResponse>('/api/auth/login/', data);
 };

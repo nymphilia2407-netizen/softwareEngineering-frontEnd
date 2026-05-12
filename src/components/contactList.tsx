@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState, useMemo, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useMemo, type FormEvent } from 'react';
 
-import { type User, type Group } from '../types/entity'
+import AddFriendPanel from './contactList/AddFriendPanel';
+import CreateGroupPanel from './contactList/CreateGroupPanel';
+import FriendRequestsPanel from './contactList/FriendRequestsPanel';
+import SearchGroupPanel from './contactList/SearchGroupPanel';
+import { DEFAULT_AVATAR } from '../constants/string';
 import {
     acceptFriendRequest,
     getReceivedFriendRequests,
@@ -11,9 +15,9 @@ import {
     sendFriendRequest,
     type ReceivedFriendRequestData,
     type UserSearchData,
-} from '../services/friend'
-import { DEFAULT_AVATAR } from '../constants/string'
-import { readAvatarFileAsDataUrl, resolvedUserAvatar } from '../utils/avatar'
+} from '../services/friend';
+import { type User, type Group } from '../types/entity';
+import { resolvedUserAvatar } from '../utils/avatar';
 
 import '../styles/contactList.css'
 
@@ -370,79 +374,6 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         );
     };
 
-    let friendRequestContent: ReactNode;
-
-    if (requestLoading) {
-        friendRequestContent = <div className='friend-request-empty'>加载中...</div>;
-    } else if (receivedRequests.length === 0) {
-        friendRequestContent = <div className='friend-request-empty'>暂无待处理请求</div>;
-    } else {
-        friendRequestContent = (
-            <>
-                {receivedRequests.map((request) => {
-                    const from = request.from_user;
-                    const sig = (from.signature ?? '').trim();
-                    const sigShort = sig.length > 72 ? `${sig.slice(0, 72)}…` : sig;
-
-                    return (
-                        <div key={request.request_id} className='friend-request-item'>
-                            <img
-                                className='friend-request-avatar'
-                                src={resolvedUserAvatar(from.avatar)}
-                                alt=""
-                                onError={(e) => {
-                                    const img = e.currentTarget;
-                                    img.onerror = null;
-                                    img.src = DEFAULT_AVATAR;
-                                }}
-                            />
-                            <div className='friend-request-body'>
-                                <div className='friend-request-meta'>
-                                    <span className='friend-request-name'>{from.username}</span>
-                                    <span className='friend-request-email'>
-                                        邮箱 · {(from.email ?? '').trim() || '未公开'}
-                                    </span>
-                                    <span className='friend-request-signature'>
-                                        {sig ? `个性签名 · 「${sigShort}」` : '个性签名 · 未填写'}
-                                    </span>
-                                    {(from.birthday ?? '').trim() ? (
-                                        <span className='friend-request-extra'>生日 · {from.birthday}</span>
-                                    ) : null}
-                                    {(from.address ?? '').trim() ? (
-                                        <span className='friend-request-extra friend-request-extra--address' title={from.address}>
-                                            地址 · {from.address}
-                                        </span>
-                                    ) : null}
-                                    <span className='friend-request-time'>
-                                        申请时间 · {new Date(request.created_at).toLocaleString()}
-                                    </span>
-                                </div>
-                                <div className='friend-request-actions'>
-                                    <button
-                                        type='button'
-                                        className='friend-request-accept-button'
-                                        onClick={() => void handleAcceptRequest(request.request_id)}
-                                        disabled={requestActionId === request.request_id}
-                                    >
-                                        {requestActionId === request.request_id ? '处理中' : '接受'}
-                                    </button>
-                                    <button
-                                        type='button'
-                                        className='friend-request-reject-button'
-                                        onClick={() => void handleRejectRequest(request.request_id)}
-                                        disabled={requestActionId === request.request_id}
-                                    >
-                                        拒绝
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </>
-        );
-    }
-
     const handleCreateGroup = async () => {
         if (createGroupInFlightRef.current) {
             return;
@@ -488,7 +419,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         }
     };
 
-    const handleFriendSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleFriendSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         void handleSearchFriend();
     };
@@ -588,236 +519,81 @@ export default function ContactList(props: Readonly<ContactsProps>) {
             </div>
 
             {isCreateGroupOpen && (
-                <div className='create-group-panel'>
-                    <div className='create-group-field'>
-                        <label htmlFor='group-name-input'>群聊名称</label>
-                        <input
-                            id='group-name-input'
-                            type='text'
-                            placeholder='输入群聊名称'
-                            value={groupName}
-                            onChange={(e) => setGroupName(e.target.value)}
-                        />
-                    </div>
-                    <div className='create-group-field'>
-                        <span className='create-group-member-list-label'>群头像（可选）</span>
-                        <div className='create-group-avatar-row'>
-                            <img className='create-group-avatar-preview' src={groupAvatarPreview} alt="" />
-                            <div className='create-group-avatar-actions'>
-                                <label className='create-group-avatar-upload'>
-                                    选择图片
-                                    <input
-                                        type='file'
-                                        accept='image/*'
-                                        className='create-group-avatar-file'
-                                        onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) {
-                                                return;
-                                            }
-                                            void (async () => {
-                                                try {
-                                                    const dataUrl = await readAvatarFileAsDataUrl(file);
-                                                    setGroupAvatarPreview(dataUrl);
-                                                    setGroupAvatarDataUrl(dataUrl);
-                                                } catch (err) {
-                                                    alert(err instanceof Error ? err.message : '选择图片失败');
-                                                } finally {
-                                                    e.target.value = '';
-                                                }
-                                            })();
-                                        }}
-                                    />
-                                </label>
-                                {groupAvatarDataUrl && (
-                                    <button
-                                        type='button'
-                                        className='create-group-avatar-clear'
-                                        onClick={() => {
-                                            setGroupAvatarPreview(DEFAULT_AVATAR);
-                                            setGroupAvatarDataUrl(null);
-                                        }}
-                                    >
-                                        使用默认
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className='create-group-field'>
-                        <div className='create-group-label-row'>
-                            <span className='create-group-member-list-label'>选择好友</span>
-                            <span>{selectedMemberIds.length} 人已选</span>
-                        </div>
-                        <div className='create-group-member-list'>
-                            {filteredFriends.map((friend) => (
-                                <label key={friend.id} className='create-group-member-item'>
-                                    <input
-                                        type='checkbox'
-                                        checked={selectedMemberIds.includes(friend.id)}
-                                        onChange={() => toggleMember(friend.id)}
-                                    />
-                                    <span>{friend.username}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
-                    <div className='create-group-actions'>
-                        <button
-                            type='button'
-                            className='create-group-secondary-button'
-                            onClick={() => {
-                                setGroupAvatarPreview(DEFAULT_AVATAR);
-                                setGroupAvatarDataUrl(null);
-                                setIsCreateGroupOpen(false);
-                            }}
-                        >
-                            取消
-                        </button>
-                        <button
-                            type='button'
-                            className='create-group-primary-button'
-                            onClick={() => void handleCreateGroup()}
-                            disabled={isCreateGroupSubmitting}
-                        >
-                            {isCreateGroupSubmitting ? '创建中…' : '创建群聊'}
-                        </button>
-                    </div>
-                </div>
+                <CreateGroupPanel
+                    filteredFriends={filteredFriends}
+                    groupName={groupName}
+                    onGroupNameChange={setGroupName}
+                    selectedMemberIds={selectedMemberIds}
+                    onToggleMember={toggleMember}
+                    groupAvatarPreview={groupAvatarPreview}
+                    groupAvatarDataUrl={groupAvatarDataUrl}
+                    onAvatarPicked={(dataUrl) => {
+                        setGroupAvatarPreview(dataUrl);
+                        setGroupAvatarDataUrl(dataUrl);
+                    }}
+                    onAvatarClear={() => {
+                        setGroupAvatarPreview(DEFAULT_AVATAR);
+                        setGroupAvatarDataUrl(null);
+                    }}
+                    isSubmitting={isCreateGroupSubmitting}
+                    onSubmit={handleCreateGroup}
+                    onCancel={() => {
+                        setGroupAvatarPreview(DEFAULT_AVATAR);
+                        setGroupAvatarDataUrl(null);
+                        setIsCreateGroupOpen(false);
+                    }}
+                />
             )}
 
             {isAddFriendOpen && (
-                <div className='add-friend-panel'>
-                    <div className='add-friend-field'>
-                        <label htmlFor='friend-search-input'>搜索用户</label>
-                        <form className='add-friend-search-row' onSubmit={handleFriendSearchSubmit}>
-                            <input
-                                id='friend-search-input'
-                                type='text'
-                                placeholder='输入用户名或邮箱'
-                                value={friendKeyword}
-                                onChange={(e) => setFriendKeyword(e.target.value)}
-                            />
-                            <button type='submit' className='add-friend-search-button' disabled={searching}>
-                                {searching ? '搜索中' : '搜索'}
-                            </button>
-                        </form>
-                    </div>
-
-                    {addFriendHint && <div className='add-friend-hint'>{addFriendHint}</div>}
-
-                    <div className='add-friend-result-list'>
-                        {searchResults.map((user) => (
-                            <div key={user.user_id} className='add-friend-result-item'>
-                                <div className='add-friend-user-info'>
-                                    <img className='add-friend-user-avatar' src={resolvedUserAvatar(user.avatar)} alt='avatar' />
-                                    <div className='add-friend-user-text'>
-                                    <span className='add-friend-user-name'>{user.username}</span>
-                                        <span className='add-friend-user-email'>{user.email || '邮箱未公开'}</span>
-                                    </div>
-                                </div>
-                                <button
-                                    type='button'
-                                    className={`add-friend-action-button ${isAddFriendDisabled(user) ? 'is-disabled' : ''}`}
-                                    onClick={() => void handleSendFriendRequest(user.user_id)}
-                                    disabled={isAddFriendDisabled(user)}
-                                >
-                                    {getAddFriendButtonText(user)}
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className='create-group-actions'>
-                        <button type='button' className='create-group-secondary-button' onClick={() => {
-                            setIsAddFriendOpen(false);
-                            setAddFriendHint('');
-                        }}>
-                            关闭
-                        </button>
-                    </div>
-                </div>
+                <AddFriendPanel
+                    friendKeyword={friendKeyword}
+                    onFriendKeywordChange={setFriendKeyword}
+                    searching={searching}
+                    addFriendHint={addFriendHint}
+                    searchResults={searchResults}
+                    getAddFriendButtonText={getAddFriendButtonText}
+                    isAddFriendDisabled={isAddFriendDisabled}
+                    onSearchSubmit={handleFriendSearchSubmit}
+                    onSendRequest={handleSendFriendRequest}
+                    onClose={() => {
+                        setIsAddFriendOpen(false);
+                        setAddFriendHint('');
+                    }}
+                />
             )}
 
             {isSearchGroupOpen && (
-                <div className='add-friend-panel'>
-                    <div className='add-friend-field'>
-                        <label htmlFor='group-search-input'>搜索群聊</label>
-                        <form
-                            className='add-friend-search-row'
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                handleSearchGroup();
-                            }}
-                        >
-                            <input
-                                id='group-search-input'
-                                type='text'
-                                placeholder='输入群聊名称或群聊ID'
-                                value={groupKeyword}
-                                onChange={(e) => setGroupKeyword(e.target.value)}
-                            />
-                            <button type='submit' className='add-friend-search-button'>
-                                搜索
-                            </button>
-                        </form>
-                    </div>
-
-                    {groupHint && <div className='add-friend-hint'>{groupHint}</div>}
-
-                    <div className='add-friend-result-list'>
-                        {groupSearchResults.map((group) => (
-                            <div key={group.id} className='add-friend-result-item'>
-                                <div className='add-friend-user-info'>
-                                    <img className='add-friend-user-avatar' src={resolvedUserAvatar(group.avatar)} alt='group-avatar' />
-                                    <div className='add-friend-user-text'>
-                                        <span className='add-friend-user-name'>{group.groupname}</span>
-                                        <span className='add-friend-user-email'>群聊ID: {group.id}</span>
-                                    </div>
-                                </div>
-                                <button
-                                    type='button'
-                                    className='add-friend-action-button'
-                                    onClick={() => {
-                                        onItemClick(group, 'group');
-                                        setIsSearchGroupOpen(false);
-                                    }}
-                                >
-                                    进入
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-
-                    <div className='create-group-actions'>
-                        <button type='button' className='create-group-secondary-button' onClick={() => {
-                            setIsSearchGroupOpen(false);
-                            setGroupHint('');
-                        }}>
-                            关闭
-                        </button>
-                    </div>
-                </div>
+                <SearchGroupPanel
+                    groupKeyword={groupKeyword}
+                    onGroupKeywordChange={setGroupKeyword}
+                    groupHint={groupHint}
+                    groupSearchResults={groupSearchResults}
+                    onSearchSubmit={(event) => {
+                        event.preventDefault();
+                        handleSearchGroup();
+                    }}
+                    onEnterGroup={(group) => {
+                        onItemClick(group, 'group');
+                        setIsSearchGroupOpen(false);
+                    }}
+                    onClose={() => {
+                        setIsSearchGroupOpen(false);
+                        setGroupHint('');
+                    }}
+                />
             )}
 
             {isFriendRequestsOpen && (
-                <div className='friend-request-panel'>
-                    <div className='friend-request-header'>
-                        <div>
-                            <div className='friend-request-title'>好友请求</div>
-                            <div className='friend-request-subtitle'>处理其他人发来的好友申请</div>
-                        </div>
-                        <button type='button' className='friend-request-close-button' onClick={() => setIsFriendRequestsOpen(false)}>
-                            关闭
-                        </button>
-                    </div>
-
-                    {requestHint && <div className='friend-request-hint'>{requestHint}</div>}
-
-                    <div className='friend-request-list'>
-                        {friendRequestContent}
-                    </div>
-                </div>
+                <FriendRequestsPanel
+                    requestHint={requestHint}
+                    requestLoading={requestLoading}
+                    receivedRequests={receivedRequests}
+                    requestActionId={requestActionId}
+                    onAccept={handleAcceptRequest}
+                    onReject={handleRejectRequest}
+                    onClose={() => setIsFriendRequestsOpen(false)}
+                />
             )}
 
             {/* 联系人 + 群聊：同一滚动区顺序排列，群聊紧跟在联系人列表下方 */}

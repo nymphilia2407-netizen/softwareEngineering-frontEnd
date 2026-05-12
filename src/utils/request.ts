@@ -1,13 +1,11 @@
-import axios from 'axios'
+import axios from 'axios';
+
+import { BACKENDURL } from '../constants/string';
 import { tokenUtils } from './auth';
 
-// 部署环境通过 VITE_API_BASE_URL 注入，未配置时走本地默认地址
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:80'
-
-// 创建 axios 实例
+// 创建 axios 实例（与 constants/string 中 BACKENDURL 同源，避免两处改漏）
 const request = axios.create({
-    // 后端地址
-    baseURL: BASE_URL,
+    baseURL: BACKENDURL,
     timeout: 10000,
     headers: {
         'Content-Type': 'application/json',

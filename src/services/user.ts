@@ -1,5 +1,7 @@
 import request from '../utils/request';
 
+import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
+
 export interface CurrentUserData {
     user_id: number;
     username: string;
@@ -10,20 +12,9 @@ export interface CurrentUserData {
     signature: string;
 }
 
-interface ApiResponse<T> {
-    code: number;
-    info: string;
-    data?: T;
-}
-
 export const getCurrentUser = async () => {
-    const response = await request.get<any, ApiResponse<CurrentUserData>>('/api/users/me/');
-
-    if (response.code !== 0 || !response.data) {
-        throw new Error(response.info || '获取当前用户失败');
-    }
-
-    return response.data;
+    const response = await request.get<unknown, ApiResponse<CurrentUserData>>('/api/users/me/');
+    return unwrapApiData(response, '获取当前用户失败');
 };
 
 export interface UpdateProfilePayload {
@@ -38,12 +29,8 @@ export interface UpdateProfilePayload {
 }
 
 export const updateUserProfile = async (payload: UpdateProfilePayload) => {
-    const response = await request.put<any, ApiResponse<null>>('/api/users/me/', payload);
-
-    if (response.code !== 0) {
-        throw new Error(response.info || '更新资料失败');
-    }
-
+    const response = await request.put<unknown, ApiResponse<null>>('/api/users/me/', payload);
+    assertApiSuccess(response, '更新资料失败');
     return true;
 };
 
