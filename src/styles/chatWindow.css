@@ -377,3 +377,49 @@
     padding: 8px;
     border-radius: 4px;
 }
+
+/* 消息悬浮 / 右键：回复、删除占位菜单 */
+.message-action-popover {
+    position: fixed;
+    z-index: 10050;
+    min-width: 112px;
+    padding: 6px 0;
+    background: #fff;
+    border: 1px solid #e2e6ea;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.message-action-popover--hover {
+    transform: translateX(-50%);
+}
+
+.message-action-popover--context {
+    transform: translate(4px, 4px);
+}
+
+.message-action-btn {
+    margin: 0;
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    line-height: 1.35;
+    color: #1e293b;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background-color 0.12s ease;
+}
+
+.message-action-btn:hover {
+    background: #f1f5f9;
+}
+
+.message-action-btn:focus-visible {
+    outline: none;
+    background: #e8f1ff;
+}

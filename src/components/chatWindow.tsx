@@ -1,10 +1,15 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
 import { resolvedUserAvatar } from "../utils/avatarDisplay";
 
 import '../styles/chatWindow.css'
+
+/** 消息行悬浮一段时间后弹出操作菜单；右键立即打开 */
+const MESSAGE_ACTION_HOVER_MS = 600;
+const MESSAGE_ACTION_LEAVE_CLOSE_MS = 220;
 
 function messageRowKey(msg: Message) {
     return msg.clientId ? `client:${msg.clientId}` : `id:${msg.id}`;
@@ -69,6 +74,127 @@ export default function ChatWindow({
     const SHOW_UNREAD_DISTANCE_BASE_PX = 220;
     const SHOW_UNREAD_DISTANCE_RATIO = 0.6;
     const MIN_VISIBLE_OVERLAP_PX = 1;
+
+    /** 消息行悬浮一段时间后，或右键，弹出「回复 / 删除」占位菜单 */
+    const [messageActionMenu, setMessageActionMenu] = useState<{
+        messageKey: string;
+        mode: "hover" | "context";
+        x: number;
+        y: number;
+    } | null>(null);
+    const messageActionPopoverRef = useRef<HTMLDivElement>(null);
+    const messageHoverOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const messageHoverLeaveCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const messageHoverRowRef = useRef<{ key: string; el: HTMLElement } | null>(null);
+
+    const clearMessageHoverOpenTimer = useCallback(() => {
+        if (messageHoverOpenTimerRef.current !== null) {
+            clearTimeout(messageHoverOpenTimerRef.current);
+            messageHoverOpenTimerRef.current = null;
+        }
+    }, []);
+
+    const clearMessageHoverLeaveCloseTimer = useCallback(() => {
+        if (messageHoverLeaveCloseTimerRef.current !== null) {
+            clearTimeout(messageHoverLeaveCloseTimerRef.current);
+            messageHoverLeaveCloseTimerRef.current = null;
+        }
+    }, []);
+
+    const closeMessageActionMenu = useCallback(() => {
+        clearMessageHoverOpenTimer();
+        clearMessageHoverLeaveCloseTimer();
+        messageHoverRowRef.current = null;
+        setMessageActionMenu(null);
+    }, [clearMessageHoverLeaveCloseTimer, clearMessageHoverOpenTimer]);
+
+    const handleMessageRowPointerEnter = useCallback(
+        (msgKey: string, e: React.PointerEvent<HTMLDivElement>) => {
+            if (e.pointerType === "touch") {
+                return;
+            }
+            clearMessageHoverOpenTimer();
+            clearMessageHoverLeaveCloseTimer();
+            messageHoverRowRef.current = { key: msgKey, el: e.currentTarget };
+            messageHoverOpenTimerRef.current = setTimeout(() => {
+                messageHoverOpenTimerRef.current = null;
+                if (messageHoverRowRef.current?.key !== msgKey) {
+                    return;
+                }
+                const bubble = messageHoverRowRef.current.el.querySelector<HTMLElement>(".message-bubble");
+                if (!bubble) {
+                    return;
+                }
+                const rect = bubble.getBoundingClientRect();
+                setMessageActionMenu({
+                    messageKey: msgKey,
+                    mode: "hover",
+                    x: rect.left + rect.width / 2,
+                    y: rect.bottom + 6,
+                });
+            }, MESSAGE_ACTION_HOVER_MS);
+        },
+        [clearMessageHoverLeaveCloseTimer, clearMessageHoverOpenTimer],
+    );
+
+    const handleMessageRowPointerLeave = useCallback(
+        (msgKey: string) => {
+            clearMessageHoverOpenTimer();
+            if (messageHoverRowRef.current?.key === msgKey) {
+                messageHoverRowRef.current = null;
+            }
+            clearMessageHoverLeaveCloseTimer();
+            messageHoverLeaveCloseTimerRef.current = setTimeout(() => {
+                messageHoverLeaveCloseTimerRef.current = null;
+                setMessageActionMenu((prev) =>
+                    prev?.messageKey === msgKey && prev.mode === "hover" ? null : prev,
+                );
+            }, MESSAGE_ACTION_LEAVE_CLOSE_MS);
+        },
+        [clearMessageHoverLeaveCloseTimer, clearMessageHoverOpenTimer],
+    );
+
+    const handleMessageRowContextMenu = useCallback(
+        (msgKey: string, e: React.MouseEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            clearMessageHoverOpenTimer();
+            clearMessageHoverLeaveCloseTimer();
+            messageHoverRowRef.current = null;
+            setMessageActionMenu({
+                messageKey: msgKey,
+                mode: "context",
+                x: e.clientX,
+                y: e.clientY,
+            });
+        },
+        [clearMessageHoverLeaveCloseTimer, clearMessageHoverOpenTimer],
+    );
+
+    useEffect(() => {
+        if (!messageActionMenu) {
+            return;
+        }
+        const onKeyDown = (ev: KeyboardEvent) => {
+            if (ev.key === "Escape") {
+                closeMessageActionMenu();
+            }
+        };
+        const onPointerDown = (ev: PointerEvent) => {
+            const pop = messageActionPopoverRef.current;
+            if (pop && ev.target instanceof Node && pop.contains(ev.target)) {
+                return;
+            }
+            closeMessageActionMenu();
+        };
+        document.addEventListener("keydown", onKeyDown);
+        document.addEventListener("pointerdown", onPointerDown, true);
+        return () => {
+            document.removeEventListener("keydown", onKeyDown);
+            document.removeEventListener("pointerdown", onPointerDown, true);
+        };
+    }, [messageActionMenu, closeMessageActionMenu]);
+
+    useEffect(() => () => closeMessageActionMenu(), [closeMessageActionMenu]);
 
     const resolveReadCursorId = useCallback((msgs: Message[]) => {
         for (let i = msgs.length - 1; i >= 0; i -= 1) {
@@ -193,6 +319,7 @@ export default function ChatWindow({
     }, []);
 
     useLayoutEffect(() => {
+        closeMessageActionMenu();
         shouldAutoScrollRef.current = true;
         lastMessageKeyRef.current = null;
         headerUnreadKeysRef.current = [];
@@ -210,7 +337,7 @@ export default function ChatWindow({
             scrollSyncRafRef.current = null;
         }
         scrollToBottom('auto');
-    }, [activeChatId, initialUnreadCount, scrollToBottom]);
+    }, [activeChatId, initialUnreadCount, scrollToBottom, closeMessageActionMenu]);
 
     useLayoutEffect(() => {
         messagesRef.current = messages;
@@ -386,6 +513,46 @@ export default function ChatWindow({
         }
     }
 
+    const messageActionMenuPortal =
+        messageActionMenu &&
+        (() => {
+            const { messageKey: actionMenuMessageKey, mode: actionMenuMode, x: ax, y: ay } = messageActionMenu;
+            return createPortal(
+                <div
+                    ref={messageActionPopoverRef}
+                    className={`message-action-popover${actionMenuMode === "hover" ? " message-action-popover--hover" : " message-action-popover--context"}`}
+                    style={{ left: ax, top: ay }}
+                    role="menu"
+                    aria-label="消息操作"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onPointerEnter={clearMessageHoverLeaveCloseTimer}
+                    onPointerLeave={() => {
+                        if (actionMenuMode === "context") {
+                            closeMessageActionMenu();
+                            return;
+                        }
+                        clearMessageHoverLeaveCloseTimer();
+                        messageHoverLeaveCloseTimerRef.current = setTimeout(() => {
+                            messageHoverLeaveCloseTimerRef.current = null;
+                            setMessageActionMenu((prev) =>
+                                prev?.messageKey === actionMenuMessageKey && prev.mode === "hover"
+                                    ? null
+                                    : prev,
+                            );
+                        }, MESSAGE_ACTION_LEAVE_CLOSE_MS);
+                    }}
+                >
+                    <button type="button" className="message-action-btn" role="menuitem">
+                        回复
+                    </button>
+                    <button type="button" className="message-action-btn" role="menuitem">
+                        删除
+                    </button>
+                </div>,
+                document.body,
+            );
+        })();
+
 return (
         <div className="chat-window">
             <div className="window-header">
@@ -430,6 +597,7 @@ return (
                 onScroll={(e) => {
                     canConsumeUnreadRef.current = true;
                     listInteractionRef.current = true;
+                    closeMessageActionMenu();
                     scheduleSyncUnreadAfterScroll(e.currentTarget);
                 }}
             >
@@ -450,6 +618,9 @@ return (
                         key={msgKey}
                         data-message-key={msgKey}
                         className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}`}
+                        onPointerEnter={(e) => handleMessageRowPointerEnter(msgKey, e)}
+                        onPointerLeave={() => handleMessageRowPointerLeave(msgKey)}
+                        onContextMenu={(e) => handleMessageRowContextMenu(msgKey, e)}
                     >
                         {isGroupChat && (
                             <img
@@ -505,6 +676,8 @@ return (
                     下方新消息 {unreadFloatingCount > 99 ? '99+' : unreadFloatingCount}
                 </button>
             )}
+
+            {messageActionMenuPortal}
 
             <div className="window-footer">
                 <textarea
