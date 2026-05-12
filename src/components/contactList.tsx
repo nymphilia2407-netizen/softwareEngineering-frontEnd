@@ -380,32 +380,66 @@ export default function ContactList(props: Readonly<ContactsProps>) {
     } else {
         friendRequestContent = (
             <>
-                {receivedRequests.map((request) => (
-                    <div key={request.request_id} className='friend-request-item'>
-                        <div className='friend-request-meta'>
-                            <span className='friend-request-name'>{request.from_user.username}</span>
-                            <span className='friend-request-time'>{new Date(request.created_at).toLocaleString()}</span>
+                {receivedRequests.map((request) => {
+                    const from = request.from_user;
+                    const sig = (from.signature ?? '').trim();
+                    const sigShort = sig.length > 72 ? `${sig.slice(0, 72)}…` : sig;
+
+                    return (
+                        <div key={request.request_id} className='friend-request-item'>
+                            <img
+                                className='friend-request-avatar'
+                                src={resolvedUserAvatar(from.avatar)}
+                                alt=""
+                                onError={(e) => {
+                                    const img = e.currentTarget;
+                                    img.onerror = null;
+                                    img.src = DEFAULT_AVATAR;
+                                }}
+                            />
+                            <div className='friend-request-body'>
+                                <div className='friend-request-meta'>
+                                    <span className='friend-request-name'>{from.username}</span>
+                                    <span className='friend-request-email'>
+                                        邮箱 · {(from.email ?? '').trim() || '未公开'}
+                                    </span>
+                                    <span className='friend-request-signature'>
+                                        {sig ? `个性签名 · 「${sigShort}」` : '个性签名 · 未填写'}
+                                    </span>
+                                    {(from.birthday ?? '').trim() ? (
+                                        <span className='friend-request-extra'>生日 · {from.birthday}</span>
+                                    ) : null}
+                                    {(from.address ?? '').trim() ? (
+                                        <span className='friend-request-extra friend-request-extra--address' title={from.address}>
+                                            地址 · {from.address}
+                                        </span>
+                                    ) : null}
+                                    <span className='friend-request-time'>
+                                        申请时间 · {new Date(request.created_at).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className='friend-request-actions'>
+                                    <button
+                                        type='button'
+                                        className='friend-request-accept-button'
+                                        onClick={() => void handleAcceptRequest(request.request_id)}
+                                        disabled={requestActionId === request.request_id}
+                                    >
+                                        {requestActionId === request.request_id ? '处理中' : '接受'}
+                                    </button>
+                                    <button
+                                        type='button'
+                                        className='friend-request-reject-button'
+                                        onClick={() => void handleRejectRequest(request.request_id)}
+                                        disabled={requestActionId === request.request_id}
+                                    >
+                                        拒绝
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div className='friend-request-actions'>
-                            <button
-                                type='button'
-                                className='friend-request-accept-button'
-                                onClick={() => void handleAcceptRequest(request.request_id)}
-                                disabled={requestActionId === request.request_id}
-                            >
-                                {requestActionId === request.request_id ? '处理中' : '接受'}
-                            </button>
-                            <button
-                                type='button'
-                                className='friend-request-reject-button'
-                                onClick={() => void handleRejectRequest(request.request_id)}
-                                disabled={requestActionId === request.request_id}
-                            >
-                                拒绝
-                            </button>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </>
         );
     }

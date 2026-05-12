@@ -2,8 +2,15 @@
 import { useEffect, useState } from 'react';
 import { getFriendDetail, deleteFriend, updateFriendTag } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
+import { DEFAULT_AVATAR } from '../constants/string';
+import { resolvedUserAvatar } from '../utils/avatarDisplay';
 
 import '../styles/chatSessionDetail.css';
+
+const displayMeta = (value: string | undefined) => {
+    const t = (value ?? '').trim();
+    return t.length > 0 ? t : '未填写';
+};
 
 export interface ContactSessionDetailProps {
     userId: number; // 所查看好友的信息
@@ -25,12 +32,14 @@ export default function ContactSessionDetail({ userId, onBack, onEnterChat, onDe
     }, [userId]);
 
     // 分组相关
-    const [savedTag, setSavedTag] = useState(friendDetail?.tag ?? '');
-    const [friendTag, setFriendTag] = useState(friendDetail?.tag ?? '');
+    const [savedTag, setSavedTag] = useState('');
+    const [friendTag, setFriendTag] = useState('');
     const [tagSubmitting, setTagSubmitting] = useState(false);
 
     useEffect(() => {
-        setFriendTag(friendDetail?.tag ?? '');
+        const tag = friendDetail?.tag ?? '';
+        setFriendTag(tag);
+        setSavedTag(tag);
     }, [friendDetail?.tag]);
 
     const handleDelete = async () => {
@@ -57,30 +66,42 @@ export default function ContactSessionDetail({ userId, onBack, onEnterChat, onDe
 
                 {friendDetail && (
                     <>
-                        <p className="chat-session-detail-name">{friendDetail.username}</p>
+                        <div className="contact-detail-profile-head">
+                            <div className="contact-detail-avatar-wrap">
+                                <img
+                                    className="contact-detail-avatar"
+                                    src={resolvedUserAvatar(friendDetail.avatar)}
+                                    alt=""
+                                    onError={(e) => {
+                                        const img = e.currentTarget;
+                                        img.onerror = null;
+                                        img.src = DEFAULT_AVATAR;
+                                    }}
+                                />
+                            </div>
+                            <p className="chat-session-detail-name contact-detail-username">{friendDetail.username}</p>
+                        </div>
                         <dl className="chat-session-detail-meta">
                             <div>
-                                <dt>邮箱</dt>
-                                <dd>{friendDetail.email}</dd>
+                                <dt>用户 ID</dt>
+                                <dd>{friendDetail.user_id}</dd>
                             </div>
-                            {friendDetail.birthday && (
-                                <div>
-                                    <dt>生日</dt>
-                                    <dd>{friendDetail.birthday}</dd>
-                                </div>
-                            )}
-                            {friendDetail.address && (
-                                <div>
-                                    <dt>地址</dt>
-                                    <dd>{friendDetail.address}</dd>
-                                </div>
-                            )}
-                            {friendDetail.signature && (
-                                <div>
-                                    <dt>个性签名</dt>
-                                    <dd>{friendDetail.signature}</dd>
-                                </div>
-                            )}
+                            <div>
+                                <dt>邮箱</dt>
+                                <dd>{(friendDetail.email ?? '').trim() || '未公开'}</dd>
+                            </div>
+                            <div>
+                                <dt>生日</dt>
+                                <dd>{displayMeta(friendDetail.birthday)}</dd>
+                            </div>
+                            <div>
+                                <dt>地址</dt>
+                                <dd className="chat-session-detail-meta-multiline">{displayMeta(friendDetail.address)}</dd>
+                            </div>
+                            <div>
+                                <dt>个性签名</dt>
+                                <dd className="chat-session-detail-meta-multiline">{displayMeta(friendDetail.signature)}</dd>
+                            </div>
                         </dl>
 
                         <div className="friend-tag-section">

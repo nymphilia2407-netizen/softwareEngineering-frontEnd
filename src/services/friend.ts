@@ -15,22 +15,27 @@ export interface UserSearchData {
     email?: string;
 }
 
+/** 好友请求里嵌套的用户信息；后端可只返回 id + username，其余为可选 */
+export interface FriendRequestUserSnippet {
+    user_id: number;
+    username: string;
+    avatar?: string;
+    email?: string;
+    birthday?: string;
+    address?: string;
+    signature?: string;
+}
+
 export interface ReceivedFriendRequestData {
     request_id: number;
-    from_user: {
-        user_id: number;
-        username: string;
-    };
+    from_user: FriendRequestUserSnippet;
     created_at: string;
 }
 
 /** GET /api/friends/requests/sent/ — 当前用户发出且仍为 pending 的申请 */
 export interface SentFriendRequestData {
     request_id: number;
-    to_user: {
-        user_id: number;
-        username: string;
-    };
+    to_user: FriendRequestUserSnippet;
     created_at: string;
 }
 
