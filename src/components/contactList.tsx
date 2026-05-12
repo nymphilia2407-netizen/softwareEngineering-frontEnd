@@ -13,8 +13,7 @@ import {
     type UserSearchData,
 } from '../services/friend'
 import { DEFAULT_AVATAR } from '../constants/string'
-import { readAvatarFileAsDataUrl } from '../utils/avatarFile'
-import { resolvedUserAvatar } from '../utils/avatarDisplay'
+import { readAvatarFileAsDataUrl, resolvedUserAvatar } from '../utils/avatar'
 
 import '../styles/contactList.css'
 

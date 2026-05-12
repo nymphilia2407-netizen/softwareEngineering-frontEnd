@@ -66,6 +66,5 @@
 │   └── utils/
 │       ├── auth.ts               # Token 存取、登录态
 │       ├── request.ts            # Axios 封装与拦截器
-│       ├── avatarDisplay.ts      # 头像 URL 解析展示
-│       └── avatarFile.ts         # 头像文件选择与上传辅助
+│       └── avatar.ts             # 头像 URL 解析、本地选图读入 data URL
 ```

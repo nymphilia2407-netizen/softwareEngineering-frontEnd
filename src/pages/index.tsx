@@ -14,7 +14,7 @@ import { getFriendList, getReceivedFriendRequests, type FriendSummaryData } from
 import { getCurrentUser, deleteUser } from '../services/user';
 import { createChatWebSocketClient, type ChatIncomingMessage, type ChatReadReceiptData, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import { persistUserProfile, readUserProfileCache, tokenUtils } from '../utils/auth';
-import { resolvedUserAvatar } from '../utils/avatarDisplay';
+import { resolvedUserAvatar } from '../utils/avatar';
 import type { Group, Message, User } from '../types/entity';
 import type { ActiveTabType } from '../types/ui';
 

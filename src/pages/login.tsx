@@ -3,9 +3,8 @@ import { useForm } from 'react-hook-form';
 
 import { DEFAULT_AVATAR } from '../constants/string';
 import { loginApi, registerApi } from '../services/auth';
-import { checkPasswordStrength, persistUserProfile, readUserProfileCache, tokenUtils } from '../utils/auth';
-import { isValidEmailFormat } from '../utils/emailPasswordRules';
-import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
+import { checkPasswordStrength, isValidEmailFormat, persistUserProfile, readUserProfileCache, tokenUtils } from '../utils/auth';
+import { readAvatarFileAsDataUrl } from '../utils/avatar';
 
 import '../styles/login.css';
 

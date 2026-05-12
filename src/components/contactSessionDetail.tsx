@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { getFriendDetail, deleteFriend, updateFriendTag } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 import { DEFAULT_AVATAR } from '../constants/string';
-import { resolvedUserAvatar } from '../utils/avatarDisplay';
+import { resolvedUserAvatar } from '../utils/avatar';
 
 import '../styles/chatSessionDetail.css';
 

@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
-import { resolvedUserAvatar } from "../utils/avatarDisplay";
+import { resolvedUserAvatar } from '../utils/avatar';
 
 import '../styles/chatWindow.css'
 

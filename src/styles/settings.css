@@ -1,9 +1,17 @@
+/* 作为主列（.chat-area）子节点时占满高度，避免 flex 子项高度塌陷、内容区无法滚动 */
+.chat-area > .config-nav {
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+}
+
 .config-nav {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	width: 100%;
-	background: #f5f7f9;
+	min-height: 0;
+	background: linear-gradient(180deg, #eef2f7 0%, #f5f7f9 38%, #f5f7f9 100%);
 	color: #1a1a1a;
 }
 
@@ -15,9 +23,11 @@
 	grid-template-columns: auto 1fr auto;
 	align-items: center;
 	gap: 8px;
-	background: #fff;
-	border-bottom: 1px solid #e6e8eb;
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+	background: rgba(255, 255, 255, 0.82);
+	-webkit-backdrop-filter: blur(14px) saturate(160%);
+	backdrop-filter: blur(14px) saturate(160%);
+	border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 4px 14px rgba(15, 23, 42, 0.06);
 }
 
 .config-nav-back {
@@ -48,8 +58,11 @@
 
 .config-nav-body {
 	flex: 1;
+	min-height: 0;
 	overflow-y: auto;
-	padding: 24px 20px;
+	overflow-x: hidden;
+	padding: 20px 16px 28px;
+	-webkit-overflow-scrolling: touch;
 }
 
 .config-nav-menu {
@@ -99,11 +112,26 @@
 .profile-settings {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: 12px;
 	align-items: stretch;
-	max-width: 420px;
+	max-width: 440px;
+	width: 100%;
 	margin: 0 auto;
-	padding-bottom: 12px;
+	padding: 22px 20px 26px;
+	box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.94);
+	-webkit-backdrop-filter: blur(12px) saturate(170%);
+	backdrop-filter: blur(12px) saturate(170%);
+	border-radius: 18px;
+	border: 1px solid rgba(15, 23, 42, 0.07);
+	box-shadow:
+		0 0 0 1px rgba(255, 255, 255, 0.65) inset,
+		0 10px 32px rgba(15, 23, 42, 0.08),
+		0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.profile-settings.security-settings {
+	max-width: 480px;
 }
 
 .profile-settings-title {
@@ -184,4 +212,103 @@
 	flex-direction: column;
 	gap: 10px;
 	padding-top: 8px;
+}
+
+/* ----- 安全信息（修改邮箱、密码强度条等） ----- */
+
+.security-current-email {
+	margin: 0 0 12px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #0f172a;
+	word-break: break-all;
+}
+
+.security-settings-divider {
+	border: none;
+	border-top: 1px solid rgba(15, 23, 42, 0.1);
+	margin: 18px 0;
+}
+
+.security-settings-sub {
+	font-size: 13px;
+	font-weight: 600;
+	color: #475569;
+	margin-top: 4px;
+}
+
+.security-password-strength {
+	margin-top: 6px;
+	margin-bottom: 4px;
+}
+
+.security-strength-info {
+	font-size: 12px;
+	color: #64748b;
+	margin-bottom: 4px;
+}
+
+.security-strength-meter-bg {
+	height: 6px;
+	border-radius: 999px;
+	background: #e2e8f0;
+	overflow: hidden;
+}
+
+.security-strength-meter-fill {
+	height: 100%;
+	border-radius: 999px;
+	transition: width 0.2s ease, background-color 0.2s ease;
+	min-width: 0;
+}
+
+.security-strength-meter-fill--invalid {
+	width: 20%;
+	background: #ef4444;
+}
+
+.security-strength-meter-fill--level-1 {
+	width: 20%;
+	background: #f97316;
+}
+
+.security-strength-meter-fill--level-2 {
+	width: 40%;
+	background: #f59e0b;
+}
+
+.security-strength-meter-fill--level-3 {
+	width: 60%;
+	background: #eab308;
+}
+
+.security-strength-meter-fill--level-4 {
+	width: 80%;
+	background: #22c55e;
+}
+
+.security-strength-meter-fill--level-5 {
+	width: 100%;
+	background: #16a34a;
+}
+
+.security-strength-text--invalid {
+	color: #ef4444;
+}
+
+.security-strength-text--level-1,
+.security-strength-text--level-2 {
+	color: #f97316;
+}
+
+.security-strength-text--level-3 {
+	color: #ca8a04;
+}
+
+.security-strength-text--level-4 {
+	color: #16a34a;
+}
+
+.security-strength-text--level-5 {
+	color: #15803d;
 }

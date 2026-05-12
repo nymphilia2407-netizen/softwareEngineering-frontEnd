@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 
 import { updateUserProfile } from '../services/user';
-import { persistUserProfile } from '../utils/auth';
-import { readAvatarFileAsDataUrl } from '../utils/avatarFile';
-import { isValidEmailFormat } from '../utils/emailPasswordRules';
-import { getPasswordStrengthDisplay, isPasswordAllowedForRegister } from '../utils/passwordStrengthUi';
+import { getPasswordStrengthDisplay, isPasswordAllowedForRegister, isValidEmailFormat, persistUserProfile } from '../utils/auth';
+import { readAvatarFileAsDataUrl } from '../utils/avatar';
 
 import '../styles/settings.css';
-import '../styles/securitySettings.css';
 
 type PanelView = 'menu' | 'profile' | 'security';
 
