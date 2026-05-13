@@ -206,8 +206,7 @@ export default function ChatSessionDetail({
                                     {groupDetail.members.map(m => {
                                         const isSelf = m.user_id === currentUserId;
                                         const showRoleMenu =
-                                            (currentUserRole === 'owner' && !isSelf) ||
-                                            (currentUserRole === 'admin' && m.role === 'member');
+                                            (currentUserRole === 'owner' && !isSelf);
 
                                         return (
                                             <div key={m.user_id} className="member-row">
