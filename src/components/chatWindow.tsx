@@ -31,6 +31,7 @@ interface ChatWindowProps{
     onRetryMessage?: (clientId: string) => void;
     /** 右上角「…」打开好友/群聊资料（由父级处理路由或占位页） */
     onOpenSessionInfo?: () => void;
+    onDeleteMessage?: (convId: number, messageId: number) => void;
 }
 
 export default function ChatWindow({
@@ -43,6 +44,7 @@ export default function ChatWindow({
     onSendMessage,
     onReadMessage,
     onRetryMessage,
+    onDeleteMessage,
     onOpenSessionInfo,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
@@ -515,6 +517,12 @@ export default function ChatWindow({
         messageActionMenu &&
         (() => {
             const { messageKey: actionMenuMessageKey, mode: actionMenuMode, x: ax, y: ay } = messageActionMenu;
+            // 找到对应的消息
+            const targetMsg = messages.find((msg) => messageRowKey(msg) === actionMenuMessageKey);
+            const isOwnMessage = targetMsg ? sameUserId(targetMsg.senderId, currentUserId) : false;
+            // 仅当消息已落盘（id > 0）且是本人发送时才显示删除按钮
+            const canDelete = isOwnMessage && targetMsg && targetMsg.id > 0 && onDeleteMessage;
+
             return createPortal(
                 <div
                     ref={messageActionPopoverRef}
@@ -531,11 +539,8 @@ export default function ChatWindow({
                         }
                         clearMessageHoverLeaveCloseTimer();
                         messageHoverLeaveCloseTimerRef.current = setTimeout(() => {
-                            messageHoverLeaveCloseTimerRef.current = null;
                             setMessageActionMenu((prev) =>
-                                prev?.messageKey === actionMenuMessageKey && prev.mode === "hover"
-                                    ? null
-                                    : prev,
+                                prev?.messageKey === actionMenuMessageKey && prev.mode === "hover" ? null : prev
                             );
                         }, MESSAGE_ACTION_LEAVE_CLOSE_MS);
                     }}
@@ -543,11 +548,21 @@ export default function ChatWindow({
                     <button type="button" className="message-action-btn" role="menuitem">
                         回复
                     </button>
-                    <button type="button" className="message-action-btn" role="menuitem">
-                        删除
-                    </button>
+                    {canDelete && (
+                        <button
+                            type="button"
+                            className="message-action-btn message-action-btn--danger"
+                            role="menuitem"
+                            onClick={() => {
+                                onDeleteMessage(activeChatId, targetMsg.id);
+                                closeMessageActionMenu();
+                            }}
+                        >
+                            删除
+                        </button>
+                    )}
                 </div>,
-                document.body,
+                document.body
             );
         })();
 

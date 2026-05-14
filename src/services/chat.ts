@@ -122,3 +122,16 @@ export const setConversationPinned = async (conversationId: number, isPinned: bo
     );
     assertApiSuccess(response, '设置置顶失败');
 };
+
+/**
+ * 删除单条消息（软删除，仅对当前用户隐藏）
+ * @param conversationId 会话ID
+ * @param messageId 消息ID（必须是已落盘的正数ID）
+ * @returns Promise<void>
+ */
+export const deleteMessage = async (conversationId: number, messageId: number): Promise<void> => {
+    // 后端返回 204 No Content，没有响应体，所以直接用 request.delete 并忽略返回值
+    await request.delete(`/api/conversations/${conversationId}/messages/${messageId}/`);
+    // 如果 request 拦截器统一处理了非 2xx 状态码并抛出异常，这里不需要额外处理
+    // 如果 request 未处理 204，上面调用成功即表示删除成功
+};

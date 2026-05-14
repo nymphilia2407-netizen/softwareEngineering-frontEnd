@@ -15,7 +15,7 @@ import { useActiveChatHistory } from '../hooks/useActiveChatHistory';
 import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket';
 import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
 import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomList } from '../mappers/chat';
-import { getChatRooms, setConversationMuted, setConversationPinned } from '../services/chat';
+import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar } from '../services/group';
 import { getFriendList } from '../services/friend';
 import { deleteUser } from '../services/user';
@@ -193,6 +193,41 @@ export default function Index() {
             console.error('获取群聊列表失败:', error);
             setGroups([]);
         }
+    }, []);
+
+    const handleDeleteMessage = useCallback(async (convId: number, messageId: number) => {
+        try {
+            await deleteMessage(convId, messageId);
+        } catch (err) {
+            alert('删除失败');
+            return;
+        }
+
+        // 先更新 messageStore，然后基于新的 messageStore 更新 chatRooms
+        setMessageStore((prev) => {
+            const newMessages = (prev[convId] || []).filter((m) => m.id !== messageId);
+            const newStore = { ...prev, [convId]: newMessages };
+
+            // 同时更新 chatRooms（使用最新的消息列表）
+            setChatRooms((prevRooms) => {
+                const room = prevRooms.find((r) => r.id === convId);
+                if (!room) return prevRooms;
+                let newLastMsg = '[暂无消息]';
+                let newLastTime = '';
+                if (newMessages.length) {
+                    const latest = newMessages.reduce((a, b) => (a.timestamp > b.timestamp ? a : b));
+                    newLastMsg = latest.content;
+                    newLastTime = latest.time || '';
+                }
+                const updatedRoom = { ...room, lastMessage: newLastMsg, lastTime: newLastTime };
+                return sortChatRoomsForDisplay([
+                    updatedRoom,
+                    ...prevRooms.filter((r) => r.id !== convId),
+                ]);
+            });
+
+            return newStore;
+        });
     }, []);
 
     useIndexBootstrapAndSocket({
@@ -641,6 +676,7 @@ export default function Index() {
                             onReadMessage={handleReadMessage}
                             onRetryMessage={handleRetryMessage}
                             onOpenSessionInfo={() => setChatSessionInfoOpen(true)}
+                            onDeleteMessage={handleDeleteMessage}   // 新增
                         />
                     )
                 ) : (
