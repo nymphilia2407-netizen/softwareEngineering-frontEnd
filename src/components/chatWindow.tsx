@@ -519,10 +519,8 @@ export default function ChatWindow({
             const { messageKey: actionMenuMessageKey, mode: actionMenuMode, x: ax, y: ay } = messageActionMenu;
             // 找到对应的消息
             const targetMsg = messages.find((msg) => messageRowKey(msg) === actionMenuMessageKey);
-            const isOwnMessage = targetMsg ? sameUserId(targetMsg.senderId, currentUserId) : false;
-            // 仅当消息已落盘（id > 0）且是本人发送时才显示删除按钮
-            const canDelete = isOwnMessage && targetMsg && targetMsg.id > 0 && onDeleteMessage;
-
+            const canDelete = targetMsg && targetMsg.id > 0 && onDeleteMessage;
+            
             return createPortal(
                 <div
                     ref={messageActionPopoverRef}
