@@ -15,7 +15,7 @@ import { useActiveChatHistory } from '../hooks/useActiveChatHistory';
 import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket';
 import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
 import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomList } from '../mappers/chat';
-import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage } from '../services/chat';
+import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage, clearConversationMessages } from '../services/chat';
 import { createGroup, getGroupList, updateGroupAvatar } from '../services/group';
 import { getFriendList } from '../services/friend';
 import { deleteUser } from '../services/user';
@@ -506,6 +506,49 @@ export default function Index() {
         [refreshFriendsAndRooms, syncGroupList],
     );
 
+    const handleClearChatMessages = useCallback(
+        async (convId: number) => {
+            // 1. 确认操作（可选，提升用户体验）
+            if (!globalThis.confirm('确定要清空该会话的聊天记录吗？清空后仅对您自己不可见，其他人仍可看到。')) {
+                return;
+            }
+
+            // 2. 调用后端清空接口
+            try {
+                await clearConversationMessages(convId);
+            } catch (error) {
+                console.error('清空聊天记录失败:', error);
+                alert(error instanceof Error ? error.message : '清空失败，请稍后重试');
+                return;
+            }
+
+            // 3. 更新 messageStore：删除该会话的所有消息
+            setMessageStore((prev) => {
+                const next = { ...prev };
+                delete next[convId];
+                return next;
+            });
+
+            // 4. 更新 chatRooms：重置该会话的最后消息、时间和未读数
+            setChatRooms((prevRooms) =>
+                prevRooms.map((room) =>
+                    room.id === convId
+                        ? {
+                            ...room,
+                            lastMessage: '[暂无消息]',
+                            lastTime: '',
+                            unreadCount: 0,
+                        }
+                        : room
+                )
+            );
+
+            // 5. 如果当前激活的会话正好是被清空的，且聊天窗口处于打开状态，可能还需要额外刷新？
+            // 由于 messageStore 已经删除该会话的消息，ChatWindow 中 messages 会变为空数组，界面会显示空，无需额外操作。
+        },
+        [setMessageStore, setChatRooms]
+    );
+
     return (
         <div className="main">
             {groupSyncToast ? <GroupSyncToast message={groupSyncToast} /> : null}
@@ -565,6 +608,7 @@ export default function Index() {
                             setChatSessionInfoOpen(false);
                             setActiveTab('chat');
                         }}
+                        onClearChat={handleClearChatMessages}
                     />
                 )}
                 {activeTab === 'contacts' && (
@@ -688,3 +732,4 @@ export default function Index() {
         </div>
     );
 }
+

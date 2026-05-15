@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 import { DEFAULT_AVATAR } from '../constants/string';
 import type { ChatListItem } from '../types/chat';
@@ -10,10 +11,17 @@ interface ChatListProps {
     chats: ChatListItem[];
     activeId?: number;
     onChatClick: (chat: ChatListItem) => void;
+    onClearChat?: (convId: number) => void;   // 新增：清空会话的回调
 }
 
-export default function ChatList({ chats, activeId, onChatClick }: ChatListProps) {
+export default function ChatList({ chats, activeId, onChatClick, onClearChat }: ChatListProps) {
     const [searchQuery, setSearchQuery] = useState<string>('');
+    const [contextMenu, setContextMenu] = useState<{
+        chat: ChatListItem;
+        x: number;
+        y: number;
+    } | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     const filteredChats = useMemo(() => {
         const q = searchQuery.toLowerCase();
@@ -24,6 +32,45 @@ export default function ChatList({ chats, activeId, onChatClick }: ChatListProps
             ),
         );
     }, [chats, searchQuery]);
+
+    // 点击其他地方关闭菜单
+    useEffect(() => {
+        if (!contextMenu) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setContextMenu(null);
+            }
+        };
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setContextMenu(null);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [contextMenu]);
+
+    const handleContextMenu = useCallback((e: React.MouseEvent, chat: ChatListItem) => {
+        e.preventDefault();
+        setContextMenu({
+            chat,
+            x: e.clientX,
+            y: e.clientY,
+        });
+    }, []);
+
+    const handleClear = useCallback(() => {
+        if (contextMenu && onClearChat) {
+            onClearChat(contextMenu.chat.id);
+        }
+        setContextMenu(null);
+    }, [contextMenu, onClearChat]);
+
+    const handleCloseMenu = useCallback(() => {
+        setContextMenu(null);
+    }, []);
 
     return (
         <div className="chat-list">
@@ -44,6 +91,7 @@ export default function ChatList({ chats, activeId, onChatClick }: ChatListProps
                             key={chat.id}
                             className={`chat-item ${activeId === chat.id ? 'active' : ''}${chat.isPinned ? ' pinned' : ''}`}
                             onClick={() => onChatClick(chat)}
+                            onContextMenu={(e) => handleContextMenu(e, chat)}
                         >
                             <div className="item-avatar">
                                 <img src={chat.avatar || DEFAULT_AVATAR} alt="avatar" />
@@ -71,6 +119,37 @@ export default function ChatList({ chats, activeId, onChatClick }: ChatListProps
                     <div className="empty-hint">没有找到相关聊天</div>
                 )}
             </div>
+
+            {/* 右键菜单 Portal */}
+            {contextMenu &&
+                createPortal(
+                    <div
+                        ref={menuRef}
+                        className="message-action-popover message-action-popover--context"
+                        style={{ left: contextMenu.x, top: contextMenu.y }}
+                        role="menu"
+                        aria-label="会话操作"
+                        onContextMenu={(e) => e.preventDefault()}
+                    >
+                        <button
+                            type="button"
+                            className="message-action-btn message-action-btn--danger"
+                            role="menuitem"
+                            onClick={handleClear}
+                        >
+                            清空聊天记录
+                        </button>
+                        <button
+                            type="button"
+                            className="message-action-btn"
+                            role="menuitem"
+                            onClick={handleCloseMenu}
+                        >
+                            取消
+                        </button>
+                    </div>,
+                    document.body
+                )}
         </div>
     );
 }

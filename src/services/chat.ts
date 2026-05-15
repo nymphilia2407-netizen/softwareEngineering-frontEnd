@@ -135,3 +135,12 @@ export const deleteMessage = async (conversationId: number, messageId: number): 
     // 如果 request 拦截器统一处理了非 2xx 状态码并抛出异常，这里不需要额外处理
     // 如果 request 未处理 204，上面调用成功即表示删除成功
 };
+
+/**
+ * 清空当前用户在某会话中的所有消息（软删除，仅对操作者生效）
+ * @param conversationId 会话ID
+ */
+export const clearConversationMessages = async (conversationId: number): Promise<void> => {
+    await request.delete(`/api/conversations/${conversationId}/messages/`);
+    // 后端返回 204 No Content，无需处理返回值
+};
