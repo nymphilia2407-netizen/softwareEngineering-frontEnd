@@ -249,7 +249,7 @@
 }
 
 .self .message-bubble {
-    background-color: #007bff;
+    background-color: #b58bfe;
     color: #fff;
     border-bottom-right-radius: 2px;
     margin-right: 8px;
@@ -470,12 +470,17 @@
 
 /* 消息中 @高亮 */
 .mention-highlight {
-    color: #2563eb;
-    background: rgba(37, 99, 235, 0.08);
+    color: #b388ff;
+    background: rgba(179, 136, 255, 0.12);
     padding: 1px 4px;
     border-radius: 4px;
     font-weight: 500;
     white-space: nowrap;
+}
+
+.self .mention-highlight {
+    color: #ffffff;
+    background: rgba(255, 249, 196, 0.2);
 }
 
 /* [有人@你] badge */
@@ -491,7 +496,7 @@
 /* 消息气泡中的引用块 */
 .reply-quote {
     background: rgba(0, 0, 0, 0.04);
-    border-left: 3px solid #3b82f6;
+    border-left: 3px solid rgb(102, 8, 116);
     padding: 4px 10px;
     margin-bottom: 6px;
     border-radius: 0 6px 6px 0;
@@ -502,7 +507,7 @@
 .reply-quote-sender {
     display: block;
     font-size: 12px;
-    color: #3b82f6;
+    color: rgb(102, 8, 116);
     font-weight: 600;
     margin-bottom: 2px;
 }
@@ -514,6 +519,19 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.self .reply-quote {
+    background: rgba(255, 255, 255, 0.12);
+    border-left-color: rgba(255, 255, 255, 0.45);
+}
+
+.self .reply-quote-sender {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.self .reply-quote-text {
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .reply-preview-bar {

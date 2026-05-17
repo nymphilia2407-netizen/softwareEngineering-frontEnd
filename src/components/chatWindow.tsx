@@ -825,9 +825,19 @@ return (
                                             {msg.replyTo.senderUsername}
                                         </span>
                                         <span className="reply-quote-text">
-                                            {msg.replyTo.content.length > 80
+                                            {(msg.replyTo.content.length > 80
                                                 ? msg.replyTo.content.slice(0, 80) + '...'
-                                                : msg.replyTo.content}
+                                                : msg.replyTo.content
+                                            ).split(/(@\S+?)(?=\s|$)/g).map((part, i) =>
+                                                part.startsWith('@') &&
+                                                groupMembers?.some((m) => `@${m.username}` === part) ? (
+                                                    <span key={i} className="mention-highlight">
+                                                        {part}
+                                                    </span>
+                                                ) : (
+                                                    part
+                                                ),
+                                            )}
                                         </span>
                                     </div>
                                 )}
