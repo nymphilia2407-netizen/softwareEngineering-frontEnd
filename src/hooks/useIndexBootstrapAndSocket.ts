@@ -44,6 +44,7 @@ export type IndexBootstrapSocketParams = {
     setMentionToast: Dispatch<SetStateAction<string | null>>;
     setMentionCount: Dispatch<SetStateAction<number>>;
     setMyInvitationCount: Dispatch<SetStateAction<number>>;
+    setMentionTargetMap: Dispatch<SetStateAction<Record<number, number>>>;
 };
 
 export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
@@ -73,6 +74,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setMentionToast,
         setMentionCount,
         setMyInvitationCount,
+        setMentionTargetMap,
     } = params;
 
     useEffect(() => {
@@ -343,6 +345,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
 
                 if (event.type === 'mention') {
                     const d = event.data;
+                    setMentionTargetMap((prev) => ({ ...prev, [d.conversation_id]: d.message_id }));
                     setChatRooms((prev) =>
                         prev.map((r) =>
                             r.id === d.conversation_id ? { ...r, hasUnreadMention: true } : r,
@@ -398,6 +401,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setGroupSyncToast,
         setGroups,
         setMentionCount,
+        setMentionTargetMap,
         setMentionToast,
         setMessageStore,
         setMyAvatar,

@@ -324,6 +324,27 @@
     z-index: 20;
 }
 
+.mention-jump-button {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    z-index: 30;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 18px;
+    background: #ff4d4f;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(255, 77, 79, 0.3);
+    transition: transform 0.15s;
+}
+
+.mention-jump-button:hover {
+    transform: scale(1.05);
+}
+
 .footer-input-row textarea {
     flex: 1;
     border: 1px solid #ddd;

@@ -37,6 +37,8 @@ interface ChatWindowProps{
     onOpenSessionInfo?: () => void;
     onDeleteMessage?: (convId: number, messageId: number) => void;
     scrollToMessageId?: number;
+    mentionTargetMessageId?: number;
+    onClearMentionTarget?: () => void;
 }
 
 export default function ChatWindow({
@@ -54,6 +56,8 @@ export default function ChatWindow({
     onDeleteMessage,
     onOpenSessionInfo,
     scrollToMessageId,
+    mentionTargetMessageId,
+    onClearMentionTarget,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
@@ -897,6 +901,26 @@ return (
                     aria-label={`跳转到底部新消息，当前 ${unreadFloatingCount} 条`}
                 >
                     下方新消息 {unreadFloatingCount > 99 ? '99+' : unreadFloatingCount}
+                </button>
+            )}
+
+            {mentionTargetMessageId && (
+                <button
+                    type="button"
+                    className="mention-jump-button"
+                    aria-label="有人@你，点击定位"
+                    onClick={() => {
+                        const key = `id:${mentionTargetMessageId}`;
+                        const el = scrollRef.current?.querySelector<HTMLElement>(
+                            `[data-message-key="${CSS.escape(key)}"]`,
+                        );
+                        if (el) {
+                            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                        }
+                        onClearMentionTarget?.();
+                    }}
+                >
+                    有人@你
                 </button>
             )}
 

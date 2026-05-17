@@ -58,6 +58,7 @@ export default function Index() {
     const [myInvitationsData, setMyInvitationsData] = useState<MyInvitationData[]>([]);
     const [groupMembersCache, setGroupMembersCache] = useState<Record<number, { id: number; username: string }[]>>({});
     const [scrollTarget, setScrollTarget] = useState<{ convId: number; messageId: number; timestamp: string } | null>(null);
+    const [mentionTargetMap, setMentionTargetMap] = useState<Record<number, number>>({});
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -330,6 +331,7 @@ export default function Index() {
         setMentionToast,
         setMentionCount,
         setMyInvitationCount,
+        setMentionTargetMap,
     });
 
     const chatListData: ChatListItem[] = chatRooms;
@@ -878,6 +880,14 @@ export default function Index() {
                             onOpenSessionInfo={() => setChatSessionInfoOpen(true)}
                             onDeleteMessage={handleDeleteMessage}
                             scrollToMessageId={scrollTarget?.convId === activeChatId ? scrollTarget.messageId : undefined}
+                            mentionTargetMessageId={activeChatId ? mentionTargetMap[activeChatId] : undefined}
+                            onClearMentionTarget={() => {
+                                setMentionTargetMap((prev) => {
+                                    const next = { ...prev };
+                                    delete next[activeChatId];
+                                    return next;
+                                });
+                            }}
                         />
                     )
                 ) : myInvitationsData.length > 0 ? (
