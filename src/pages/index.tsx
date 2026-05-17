@@ -309,7 +309,11 @@ export default function Index() {
 
     const chatListData: ChatListItem[] = chatRooms;
     const totalUnreadCount = useMemo(
-        () => chatListData.reduce((sum, room) => sum + Math.max(0, room.unreadCount || 0), 0),
+        () => chatListData.reduce((sum, room) => sum + (room.isMuted ? 0 : Math.max(0, room.unreadCount || 0)), 0),
+        [chatListData]
+    );
+    const hasMutedUnread = useMemo(
+        () => chatListData.some((room) => room.isMuted === true && (room.unreadCount || 0) > 0),
         [chatListData]
     );
     const messages = messageStore[activeChatId] ?? [];
@@ -627,6 +631,24 @@ export default function Index() {
         [],
     );
 
+    const handleMuteChat = useCallback(
+        async (convId: number, muted: boolean) => {
+            try {
+                await setConversationMuted(convId, muted);
+                setChatRooms((prev) =>
+                    sortChatRoomsForDisplay(
+                        prev.map((room) =>
+                            room.id === convId ? { ...room, isMuted: muted } : room,
+                        ),
+                    ),
+                );
+            } catch (err) {
+                alert(err instanceof Error ? err.message : '操作失败');
+            }
+        },
+        [],
+    );
+
     const handleRespondToInvitation = async (invitationId: number, action: 'accept' | 'reject') => {
         try {
             await respondToInvitation(invitationId, action);
@@ -651,6 +673,7 @@ export default function Index() {
                 userName={userName}
                 activeTab={activeTab}
                 totalUnreadCount={totalUnreadCount}
+                hasMutedUnread={hasMutedUnread}
                 pendingFriendRequestCount={pendingFriendRequestCount}
                 mentionCount={mentionCount}
                 chatIcon={CHATICON}
@@ -705,6 +728,7 @@ export default function Index() {
                         }}
                         onClearChat={handleClearChatMessages}
                         onPinChat={handlePinChat}
+                        onMuteChat={handleMuteChat}
                     />
                 )}
                 {activeTab === 'contacts' && (

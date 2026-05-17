@@ -102,6 +102,17 @@
     font-weight: bold;
 }
 
+.unread-dot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background: #ff4d4f;
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+
 .item-content {
     flex: 1;
     display: flex;

@@ -11,11 +11,12 @@ interface ChatListProps {
     chats: ChatListItem[];
     activeId?: number;
     onChatClick: (chat: ChatListItem) => void;
-    onClearChat?: (convId: number) => void;   // 新增：清空会话的回调
+    onClearChat?: (convId: number) => void;
     onPinChat?: (convId: number, pinned: boolean) => void;
+    onMuteChat?: (convId: number, muted: boolean) => void;
 }
 
-export default function ChatList({ chats, activeId, onChatClick, onClearChat, onPinChat }: ChatListProps) {
+export default function ChatList({ chats, activeId, onChatClick, onClearChat, onPinChat, onMuteChat }: ChatListProps) {
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [contextMenu, setContextMenu] = useState<{
         chat: ChatListItem;
@@ -97,9 +98,13 @@ export default function ChatList({ chats, activeId, onChatClick, onClearChat, on
                             <div className="item-avatar">
                                 <img src={chat.avatar || DEFAULT_AVATAR} alt="avatar" />
                                 {chat.unreadCount > 0 && (
-                                    <span className="unread-badge">
-                                        {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-                                    </span>
+                                    chat.isMuted ? (
+                                        <span className="unread-dot" />
+                                    ) : (
+                                        <span className="unread-badge">
+                                            {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
+                                        </span>
+                                    )
                                 )}
                             </div>
                             <div className="item-content">
@@ -147,6 +152,19 @@ export default function ChatList({ chats, activeId, onChatClick, onClearChat, on
                             }}
                         >
                             {contextMenu?.chat.isPinned ? '取消置顶' : '置顶'}
+                        </button>
+                        <button
+                            type="button"
+                            className="message-action-btn"
+                            role="menuitem"
+                            onClick={() => {
+                                if (contextMenu && onMuteChat) {
+                                    onMuteChat(contextMenu.chat.id, !contextMenu.chat.isMuted);
+                                }
+                                setContextMenu(null);
+                            }}
+                        >
+                            {contextMenu?.chat.isMuted ? '取消免打扰' : '消息免打扰'}
                         </button>
                         <button
                             type="button"

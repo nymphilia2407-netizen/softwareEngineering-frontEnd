@@ -5,6 +5,7 @@ interface MainSidebarProps {
     userName: string;
     activeTab: ActiveTabType;
     totalUnreadCount: number;
+    hasMutedUnread?: boolean;
     pendingFriendRequestCount: number;
     mentionCount?: number;
     chatIcon: string;
@@ -21,6 +22,7 @@ export default function MainSidebar({
     userName,
     activeTab,
     totalUnreadCount,
+    hasMutedUnread,
     pendingFriendRequestCount,
     mentionCount,
     chatIcon,
@@ -51,8 +53,17 @@ export default function MainSidebar({
                         <img src={chatIcon} alt="chat-icon" />
                         {(totalUnreadCount > 0 || (mentionCount ?? 0) > 0) && (
                             <span className="nav-unread-badge" aria-label={`${totalUnreadCount} 条未读消息`}>
-                                {totalUnreadCount > 99 ? '99+' : (mentionCount ?? 0) > 0 ? `@${mentionCount}` : totalUnreadCount}
+                                {totalUnreadCount > 99
+                                    ? '99+'
+                                    : (mentionCount ?? 0) > 0 && totalUnreadCount > 0
+                                        ? `@${mentionCount} ${totalUnreadCount}`
+                                        : (mentionCount ?? 0) > 0
+                                            ? `@${mentionCount}`
+                                            : totalUnreadCount}
                             </span>
+                        )}
+                        {totalUnreadCount === 0 && hasMutedUnread && (
+                            <span className="nav-unread-dot" aria-label="免打扰会话有新消息" />
                         )}
                     </button>
                     <button
