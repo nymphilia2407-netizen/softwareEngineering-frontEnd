@@ -96,13 +96,17 @@ export const getChatRooms = async () => {
     return rows.map(mapConversationRow);
 };
 
-export const getChatMessages = async (roomId: number, limit = 50, offset = 0) => {
+export const getChatMessages = async (roomId: number, limit = 50, offset = 0, startTime?: string) => {
     const page = Math.floor(offset / limit) + 1;
     const pageSize = limit;
+    const params: Record<string, string | number> = { page, page_size: pageSize };
+    if (startTime) {
+        params.start_time = startTime;
+    }
     const response = await request.get<
         unknown,
         ApiResponse<{ messages: BackendMessageRow[]; total_pages: number; current_page: number }>
-    >(`/api/conversations/${roomId}/messages/`, { params: { page, page_size: pageSize } });
+    >(`/api/conversations/${roomId}/messages/`, { params });
 
     const payload = unwrapApiData(response, '获取聊天记录失败');
     const { messages } = payload;

@@ -7,6 +7,7 @@ import type { Message } from '../types/entity';
 export function useActiveChatHistory(
     activeChatId: number,
     setMessageStore: Dispatch<SetStateAction<Record<number, Message[]>>>,
+    targetTimestamp?: string,
 ) {
     useEffect(() => {
         if (!activeChatId) {
@@ -17,7 +18,7 @@ export function useActiveChatHistory(
 
         const loadMessages = async () => {
             try {
-                const history = await getChatMessages(activeChatId, 100, 0);
+                const history = await getChatMessages(activeChatId, 100, 0, targetTimestamp);
 
                 if (cancelled) {
                     return;
@@ -41,5 +42,5 @@ export function useActiveChatHistory(
         return () => {
             cancelled = true;
         };
-    }, [activeChatId, setMessageStore]);
+    }, [activeChatId, setMessageStore, targetTimestamp]);
 }

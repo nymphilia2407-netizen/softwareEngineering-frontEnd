@@ -22,7 +22,7 @@ export interface ChatSessionDetailProps {
     onBack: () => void;
     onDeleted?: () => void;
     friends?: User[];
-    onNavigateToChat?: (convId: number) => void;
+    onNavigateToChat?: (convId: number, messageId?: number, timestamp?: string) => void;
 }
 
 export default function ChatSessionDetail({
@@ -745,7 +745,7 @@ export default function ChatSessionDetail({
                                             className="search-result-item"
                                             onClick={() => {
                                                 setShowSearchModal(false);
-                                                onNavigateToChat?.(result.conversation_id);
+                                                onNavigateToChat?.(result.conversation_id, result.message_id, result.timestamp);
                                             }}
                                         >
                                             <div className="search-result-header">

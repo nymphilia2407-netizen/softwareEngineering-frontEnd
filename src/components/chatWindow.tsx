@@ -36,6 +36,7 @@ interface ChatWindowProps{
     /** 右上角「…」打开好友/群聊资料（由父级处理路由或占位页） */
     onOpenSessionInfo?: () => void;
     onDeleteMessage?: (convId: number, messageId: number) => void;
+    scrollToMessageId?: number;
 }
 
 export default function ChatWindow({
@@ -52,6 +53,7 @@ export default function ChatWindow({
     onRetryMessage,
     onDeleteMessage,
     onOpenSessionInfo,
+    scrollToMessageId,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
@@ -371,6 +373,15 @@ export default function ChatWindow({
     useLayoutEffect(() => {
         setReplyTarget(null);
     }, [activeChatId]);
+
+    useEffect(() => {
+        if (!scrollToMessageId || !scrollRef.current) return;
+        const key = `id:${scrollToMessageId}`;
+        const el = scrollRef.current.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(key)}"]`);
+        if (el) {
+            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+    }, [scrollToMessageId, messages]);
 
     useLayoutEffect(() => {
         messagesRef.current = messages;

@@ -57,6 +57,7 @@ export default function Index() {
     const [myInvitationCount, setMyInvitationCount] = useState(0);
     const [myInvitationsData, setMyInvitationsData] = useState<MyInvitationData[]>([]);
     const [groupMembersCache, setGroupMembersCache] = useState<Record<number, { id: number; username: string }[]>>({});
+    const [scrollTarget, setScrollTarget] = useState<{ convId: number; messageId: number; timestamp: string } | null>(null);
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -344,7 +345,7 @@ export default function Index() {
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
 
-    useActiveChatHistory(activeChatId, setMessageStore);
+    useActiveChatHistory(activeChatId, setMessageStore, scrollTarget?.convId === activeChatId ? scrollTarget.timestamp : undefined);
 
     const optimisticRefs = useMemo<IndexOptimisticRefs>(
         () => ({
@@ -852,10 +853,13 @@ export default function Index() {
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
                             friends={friends}
-                            onNavigateToChat={(convId: number) => {
+                            onNavigateToChat={(convId: number, messageId?: number, timestamp?: string) => {
                                 setChatSessionInfoOpen(false);
                                 setChatRooms((prev) => clearUnreadRoom(prev, convId));
                                 setActiveChatId(convId);
+                                if (messageId && timestamp) {
+                                    setScrollTarget({ convId, messageId, timestamp });
+                                }
                             }}
                         />
                     ) : (
@@ -872,7 +876,8 @@ export default function Index() {
                             onReadMessage={handleReadMessage}
                             onRetryMessage={handleRetryMessage}
                             onOpenSessionInfo={() => setChatSessionInfoOpen(true)}
-                            onDeleteMessage={handleDeleteMessage}   // 新增
+                            onDeleteMessage={handleDeleteMessage}
+                            scrollToMessageId={scrollTarget?.convId === activeChatId ? scrollTarget.messageId : undefined}
                         />
                     )
                 ) : myInvitationsData.length > 0 ? (
