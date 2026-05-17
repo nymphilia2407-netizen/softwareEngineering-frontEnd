@@ -611,6 +611,22 @@ export default function Index() {
         }
     }, [myInvitationCount]);
 
+    const handlePinChat = useCallback(
+        async (convId: number, pinned: boolean) => {
+            try {
+                await setConversationPinned(convId, pinned);
+                setChatRooms((prev) =>
+                    sortChatRoomsForDisplay(
+                        prev.map((room) => (room.id === convId ? { ...room, isPinned: pinned } : room)),
+                    ),
+                );
+            } catch (err) {
+                alert(err instanceof Error ? err.message : '操作失败');
+            }
+        },
+        [],
+    );
+
     const handleRespondToInvitation = async (invitationId: number, action: 'accept' | 'reject') => {
         try {
             await respondToInvitation(invitationId, action);
@@ -688,6 +704,7 @@ export default function Index() {
                             setActiveTab('chat');
                         }}
                         onClearChat={handleClearChatMessages}
+                        onPinChat={handlePinChat}
                     />
                 )}
                 {activeTab === 'contacts' && (

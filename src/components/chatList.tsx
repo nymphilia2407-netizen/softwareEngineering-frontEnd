@@ -12,9 +12,10 @@ interface ChatListProps {
     activeId?: number;
     onChatClick: (chat: ChatListItem) => void;
     onClearChat?: (convId: number) => void;   // 新增：清空会话的回调
+    onPinChat?: (convId: number, pinned: boolean) => void;
 }
 
-export default function ChatList({ chats, activeId, onChatClick, onClearChat }: ChatListProps) {
+export default function ChatList({ chats, activeId, onChatClick, onClearChat, onPinChat }: ChatListProps) {
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [contextMenu, setContextMenu] = useState<{
         chat: ChatListItem;
@@ -134,6 +135,19 @@ export default function ChatList({ chats, activeId, onChatClick, onClearChat }: 
                         aria-label="会话操作"
                         onContextMenu={(e) => e.preventDefault()}
                     >
+                        <button
+                            type="button"
+                            className="message-action-btn"
+                            role="menuitem"
+                            onClick={() => {
+                                if (contextMenu && onPinChat) {
+                                    onPinChat(contextMenu.chat.id, !contextMenu.chat.isPinned);
+                                }
+                                setContextMenu(null);
+                            }}
+                        >
+                            {contextMenu?.chat.isPinned ? '取消置顶' : '置顶'}
+                        </button>
                         <button
                             type="button"
                             className="message-action-btn message-action-btn--danger"

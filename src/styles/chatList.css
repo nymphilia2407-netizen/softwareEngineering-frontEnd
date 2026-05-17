@@ -41,7 +41,7 @@
 }
 
 .chat-item.pinned {
-    border-left: 3px solid #007bff;
+    border-left: 3px solid rgb(102, 8, 116);
     padding-left: 9px;
 }
 
@@ -62,8 +62,8 @@
     flex-shrink: 0;
     font-size: 10px;
     font-weight: 700;
-    color: #007bff;
-    background: rgba(0, 123, 255, 0.12);
+    color: rgb(102, 8, 116);
+    background: rgba(102, 8, 116, 0.12);
     padding: 2px 5px;
     border-radius: 4px;
     line-height: 1;
