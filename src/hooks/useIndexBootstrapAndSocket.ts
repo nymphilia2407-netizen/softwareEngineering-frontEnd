@@ -4,6 +4,7 @@ import { BACKENDURL, DEFAULT_AVATAR } from '../constants/string';
 import { mapChatRoom, mapFriendSummary } from '../mappers/chat';
 import { getChatRooms, getUnreadMentions } from '../services/chat';
 import { getFriendList, getReceivedFriendRequests } from '../services/friend';
+import { getMyInvitations } from '../services/group';
 import { getCurrentUser } from '../services/user';
 import { createChatWebSocketClient, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import type { ChatListItem } from '../types/chat';
@@ -42,6 +43,7 @@ export type IndexBootstrapSocketParams = {
     setPendingFriendRequestCount: Dispatch<SetStateAction<number>>;
     setMentionToast: Dispatch<SetStateAction<string | null>>;
     setMentionCount: Dispatch<SetStateAction<number>>;
+    setMyInvitationCount: Dispatch<SetStateAction<number>>;
 };
 
 export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
@@ -70,6 +72,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setPendingFriendRequestCount,
         setMentionToast,
         setMentionCount,
+        setMyInvitationCount,
     } = params;
 
     useEffect(() => {
@@ -163,6 +166,14 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                     );
                 }
                 setMentionCount(mentions.length);
+            })
+            .catch(() => {});
+
+        getMyInvitations()
+            .then((invitations) => {
+                if (!cancelled) {
+                    setMyInvitationCount(invitations.length);
+                }
             })
             .catch(() => {});
 
@@ -273,6 +284,43 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                     } else if (d.action === 'avatar_updated') {
                         const displayName = d.group_name?.trim() || '群聊';
                         setGroupSyncToast(`「${displayName}」群头像已更新`);
+                    } else if (d.action === 'member_joined') {
+                        const displayName = d.group_name?.trim() || '群聊';
+                        const joinedNames = d.joined_usernames?.join(', ') || '';
+                        const operator = d.operator_username?.trim();
+                        const selfName = userNameRef.current?.trim();
+                        const joinedSelf = d.joined_user_ids?.includes(currentUserIdRef.current);
+                        if (joinedSelf) {
+                            setGroupSyncToast(`你已被 ${operator} 邀请加入群聊「${displayName}」`);
+                            setMessageStore((prev) => {
+                                const next = { ...prev };
+                                delete next[d.conversation_id];
+                                return next;
+                            });
+                            void syncChatRoomsAndGroups();
+                        } else if (operator && operator === selfName) {
+                            setGroupSyncToast(`你已将 ${joinedNames} 加入群聊「${displayName}」`);
+                        } else {
+                            setGroupSyncToast(`${joinedNames} 加入了群聊「${displayName}」`);
+                        }
+                    } else if (d.action === 'invitation_pending') {
+                        const displayName = d.group_name?.trim() || '群聊';
+                        const inviter = d.inviter_username?.trim() || '';
+                        const isInvitee = d.invitee_user_ids?.includes(currentUserIdRef.current);
+                        if (isInvitee) {
+                            setGroupSyncToast(`${inviter} 邀请你加入群聊「${displayName}」`);
+                            getMyInvitations()
+                                .then((list) => setMyInvitationCount(list.length))
+                                .catch(() => {});
+                        } else {
+                            setGroupSyncToast(`${inviter} 在「${displayName}」中发起了成员邀请，请前往会话信息审核`);
+                        }
+                    }
+
+                    if (d.action !== 'avatar_updated') {
+                        getMyInvitations()
+                            .then((list) => setMyInvitationCount(list.length))
+                            .catch(() => {});
                     }
 
                     void syncChatRoomsAndGroups();
@@ -342,6 +390,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setMentionToast,
         setMessageStore,
         setMyAvatar,
+        setMyInvitationCount,
         setPendingFriendRequestCount,
         setProfileAddress,
         setProfileBirthday,

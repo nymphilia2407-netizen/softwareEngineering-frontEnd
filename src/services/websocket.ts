@@ -29,12 +29,22 @@ export interface ChatReadReceiptData {
 
 /** Django ChatConsumer.group_sync 推送的 data */
 export interface GroupSyncEventData {
-    action: 'created' | 'avatar_updated';
+    action: 'created' | 'avatar_updated' | 'member_joined' | 'invitation_pending' | 'mute_updated';
     conversation_id: number;
     group_name?: string;
     avatar?: string;
     /** 建群时由后端附带，用于提示文案 */
     creator_username?: string;
+    /** member_joined 时附带 */
+    joined_usernames?: string[];
+    joined_user_ids?: number[];
+    operator_username?: string;
+    /** invitation_pending 时附带 */
+    inviter_username?: string;
+    invitee_user_ids?: number[];
+    /** mute_updated 时附带 */
+    user_id?: number;
+    muted_until?: string | null;
 }
 
 /** Django ChatConsumer.chat_message 推送的 data 形状 */

@@ -27,3 +27,34 @@ export interface MentionSocketData {
     content_preview: string;
     mentioned_users: number[];
 }
+
+export interface InvitationData {
+    invitation_id: number;
+    inviter: {
+        user_id: number;
+        username: string;
+        avatar: string;
+    };
+    invitee: {
+        user_id: number;
+        username: string;
+        avatar: string;
+    };
+    status: 'pending' | 'accepted' | 'rejected';
+    created_at: string;
+}
+
+export interface MyInvitationData {
+    invitation_id: number;
+    group: {
+        group_id: number;
+        group_name: string;
+        member_count: number;
+    };
+    inviter: {
+        user_id: number;
+        username: string;
+        avatar: string;
+    };
+    created_at: string;
+}

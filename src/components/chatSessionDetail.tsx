@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
-import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole, muteMember } from '../services/group';
+import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole, muteMember, removeMember, inviteMembers, getGroupInvitations, processInvitation } from '../services/group';
 import { getFriendDetail, deleteFriend } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 import type { GroupDetailData } from '../services/group';
+import type { InvitationData } from '../types/chat';
+import type { User } from '../types/entity';
 
 import '../styles/chatSessionDetail.css';
 
@@ -18,6 +20,7 @@ export interface ChatSessionDetailProps {
     onConversationPinnedChange: (pinned: boolean) => Promise<void>;
     onBack: () => void;
     onDeleted?: () => void;
+    friends?: User[];
 }
 
 export default function ChatSessionDetail({
@@ -31,6 +34,7 @@ export default function ChatSessionDetail({
     onConversationMutedChange,
     conversationPinned,
     onConversationPinnedChange,
+    friends = [],
 }: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
@@ -45,6 +49,12 @@ export default function ChatSessionDetail({
     const roleMenuRef = useRef<HTMLDivElement | null>(null); // 点击其它位置的时候让菜单缩回
     const [muteMenuOpenFor, setMuteMenuOpenFor] = useState<number | null>(null);
     const muteMenuRef = useRef<HTMLDivElement | null>(null);
+
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [inviteSearchText, setInviteSearchText] = useState('');
+    const [selectedInviteUserIds, setSelectedInviteUserIds] = useState<Set<number>>(new Set());
+    const [inviteSubmitting, setInviteSubmitting] = useState(false);
+    const [pendingInvitations, setPendingInvitations] = useState<InvitationData[]>([]);
 
     const currentMember = groupDetail?.members.find(m => m.user_id === currentUserId);
     const currentUserRole = currentMember?.role;
@@ -80,6 +90,18 @@ export default function ChatSessionDetail({
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
+    useEffect(() => {
+        if (!isGroup) return;
+        const cpr = currentUserRole;
+        if (cpr !== 'owner' && cpr !== 'admin') {
+            setPendingInvitations([]);
+            return;
+        }
+        getGroupInvitations(roomId)
+            .then(setPendingInvitations)
+            .catch(() => setPendingInvitations([]));
+    }, [roomId, isGroup, currentUserRole]);
+
     const refreshGroupDetail = async () => {
         try {
             const detail = await getGroupDetail(roomId);
@@ -114,6 +136,44 @@ export default function ChatSessionDetail({
                 : null;
             await muteMember(roomId, userId, mutedUntil);
             await refreshGroupDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '操作失败');
+        }
+    };
+
+    const handleRemove = async (userId: number, username: string) => {
+        if (!globalThis.confirm(`确认将 ${username} 移出群聊？`)) return;
+        try {
+            await removeMember(roomId, userId);
+            await refreshGroupDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '移除失败');
+        }
+    };
+
+    const handleInviteMembers = async () => {
+        if (selectedInviteUserIds.size === 0) return;
+        setInviteSubmitting(true);
+        try {
+            await inviteMembers(roomId, [...selectedInviteUserIds]);
+            alert('邀请已发送');
+            setShowInviteModal(false);
+            setSelectedInviteUserIds(new Set());
+            setInviteSearchText('');
+            await refreshGroupDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '邀请失败');
+        } finally {
+            setInviteSubmitting(false);
+        }
+    };
+
+    const handleProcessInvitation = async (invitationId: number, action: 'accept' | 'reject') => {
+        try {
+            await processInvitation(roomId, invitationId, action);
+            await refreshGroupDetail();
+            const updated = await getGroupInvitations(roomId);
+            setPendingInvitations(updated);
         } catch (err) {
             alert(err instanceof Error ? err.message : '操作失败');
         }
@@ -266,6 +326,18 @@ export default function ChatSessionDetail({
                                                     {(currentUserRole === 'owner' || currentUserRole === 'admin') &&
                                                         m.role !== 'owner' &&
                                                         !(currentUserRole === 'admin' && m.role === 'admin') && (
+                                                            <button
+                                                                type="button"
+                                                                className="member-action-button member-action-button--danger"
+                                                                onClick={() => handleRemove(m.user_id, m.username)}
+                                                            >
+                                                                移出
+                                                            </button>
+                                                        )}
+
+                                                    {(currentUserRole === 'owner' || currentUserRole === 'admin') &&
+                                                        m.role !== 'owner' &&
+                                                        !(currentUserRole === 'admin' && m.role === 'admin') && (
                                                             <div className="role-menu-wrapper">
                                                                 <button
                                                                     type="button"
@@ -306,6 +378,55 @@ export default function ChatSessionDetail({
                                 </div>
                             )}
                         </dl>
+
+                        {currentUserRole && (
+                            <div className="invite-section">
+                                <button
+                                    type="button"
+                                    className="invite-members-button"
+                                    onClick={() => {
+                                        setInviteSearchText('');
+                                        setSelectedInviteUserIds(new Set());
+                                        setShowInviteModal(true);
+                                    }}
+                                >
+                                    邀请成员
+                                </button>
+                            </div>
+                        )}
+
+                        {pendingInvitations.length > 0 && (
+                            <div className="pending-invitations">
+                                <div className="pending-invitations-title">
+                                    待审核邀请 ({pendingInvitations.length})
+                                </div>
+                                {pendingInvitations.map((inv) => (
+                                    <div key={inv.invitation_id} className="pending-invitation-row">
+                                        <span className="pending-invitation-info">
+                                            <span className="pending-invitation-inviter">{inv.inviter.username}</span>
+                                            {' 邀请 '}
+                                            <span className="pending-invitation-invitee">{inv.invitee.username}</span>
+                                        </span>
+                                        <span className="pending-invitation-actions">
+                                            <button
+                                                type="button"
+                                                className="pending-invitation-accept"
+                                                onClick={() => handleProcessInvitation(inv.invitation_id, 'accept')}
+                                            >
+                                                批准
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="pending-invitation-reject"
+                                                onClick={() => handleProcessInvitation(inv.invitation_id, 'reject')}
+                                            >
+                                                拒绝
+                                            </button>
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {conversationPinRow}
                         {conversationMuteRow}
@@ -457,6 +578,85 @@ export default function ChatSessionDetail({
                     </>
                 )}
             </div>
+
+            {showInviteModal && (
+                <div className="invite-modal-overlay" onClick={() => setShowInviteModal(false)}>
+                    <div className="invite-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="invite-modal-header">
+                            <span>邀请成员加入群聊</span>
+                            <button
+                                type="button"
+                                className="invite-modal-close"
+                                onClick={() => setShowInviteModal(false)}
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        <input
+                            type="text"
+                            className="invite-modal-search"
+                            placeholder="搜索好友..."
+                            value={inviteSearchText}
+                            onChange={(e) => setInviteSearchText(e.target.value)}
+                        />
+                        <div className="invite-modal-list">
+                            {friends
+                                .filter((f) => {
+                                    if (groupDetail?.members.some((m) => m.user_id === f.id)) return false;
+                                    const q = inviteSearchText.trim().toLowerCase();
+                                    return !q || f.username.toLowerCase().includes(q);
+                                })
+                                .map((f) => {
+                                    const isSelected = selectedInviteUserIds.has(f.id);
+                                    return (
+                                        <label key={f.id} className="invite-modal-friend">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => {
+                                                    setSelectedInviteUserIds((prev) => {
+                                                        const next = new Set(prev);
+                                                        if (isSelected) {
+                                                            next.delete(f.id);
+                                                        } else {
+                                                            next.add(f.id);
+                                                        }
+                                                        return next;
+                                                    });
+                                                }}
+                                            />
+                                            <span>{f.username}</span>
+                                        </label>
+                                    );
+                                })}
+                            {friends.filter((f) => {
+                                if (groupDetail?.members.some((m) => m.user_id === f.id)) return false;
+                                const q = inviteSearchText.trim().toLowerCase();
+                                return !q || f.username.toLowerCase().includes(q);
+                            }).length === 0 && (
+                                <p className="invite-modal-empty">暂无可邀请的好友</p>
+                            )}
+                        </div>
+                        <div className="invite-modal-footer">
+                            <button
+                                type="button"
+                                className="invite-modal-cancel"
+                                onClick={() => setShowInviteModal(false)}
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="button"
+                                className="invite-modal-confirm"
+                                disabled={selectedInviteUserIds.size === 0 || inviteSubmitting}
+                                onClick={handleInviteMembers}
+                            >
+                                {inviteSubmitting ? '邀请中...' : `确认邀请 (${selectedInviteUserIds.size})`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

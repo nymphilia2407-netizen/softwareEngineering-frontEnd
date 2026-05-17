@@ -16,12 +16,12 @@ import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket'
 import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
 import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomList } from '../mappers/chat';
 import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage, clearConversationMessages, getUnreadMentions } from '../services/chat';
-import { createGroup, getGroupList, getGroupDetail, updateGroupAvatar } from '../services/group';
+import { createGroup, getGroupList, getGroupDetail, updateGroupAvatar, getMyInvitations, respondToInvitation } from '../services/group';
 import { getFriendList } from '../services/friend';
 import { deleteUser } from '../services/user';
 import { markMentionRead } from '../services/chat';
 import type { ChatWebSocketClient } from '../services/websocket';
-import type { ActiveTabType, ChatListItem } from '../types/chat';
+import type { ActiveTabType, ChatListItem, MyInvitationData } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import { resolvedUserAvatar } from '../utils/avatar';
@@ -54,6 +54,8 @@ export default function Index() {
     const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0);
     const [mentionCount, setMentionCount] = useState(0);
     const [mentionToast, setMentionToast] = useState<string | null>(null);
+    const [myInvitationCount, setMyInvitationCount] = useState(0);
+    const [myInvitationsData, setMyInvitationsData] = useState<MyInvitationData[]>([]);
     const [groupMembersCache, setGroupMembersCache] = useState<Record<number, { id: number; username: string }[]>>({});
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
@@ -302,6 +304,7 @@ export default function Index() {
         setPendingFriendRequestCount,
         setMentionToast,
         setMentionCount,
+        setMyInvitationCount,
     });
 
     const chatListData: ChatListItem[] = chatRooms;
@@ -598,10 +601,35 @@ export default function Index() {
         [setMessageStore, setChatRooms]
     );
 
+    useEffect(() => {
+        if (myInvitationCount > 0) {
+            getMyInvitations()
+                .then(setMyInvitationsData)
+                .catch(() => {});
+        } else {
+            setMyInvitationsData([]);
+        }
+    }, [myInvitationCount]);
+
+    const handleRespondToInvitation = async (invitationId: number, action: 'accept' | 'reject') => {
+        try {
+            await respondToInvitation(invitationId, action);
+            const updated = await getMyInvitations();
+            setMyInvitationsData(updated);
+            setMyInvitationCount(updated.length);
+            if (action === 'accept') {
+                void syncChatRoomsAndGroups();
+            }
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '操作失败');
+        }
+    };
+
     return (
         <div className="main">
             {groupSyncToast ? <GroupSyncToast message={groupSyncToast} /> : null}
             {mentionToast ? <GroupSyncToast message={mentionToast} /> : null}
+
             <MainSidebar
                 myAvatar={myAvatar}
                 userName={userName}
@@ -758,6 +786,7 @@ export default function Index() {
                             onConversationPinnedChange={handleConversationPinnedChange}
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
+                            friends={friends}
                         />
                     ) : (
                         <ChatWindow
@@ -776,6 +805,31 @@ export default function Index() {
                             onDeleteMessage={handleDeleteMessage}   // 新增
                         />
                     )
+                ) : myInvitationsData.length > 0 ? (
+                    <div className="invitation-cards-area">
+                        <p className="invitation-cards-title">群聊邀请</p>
+                        {myInvitationsData.map((inv) => (
+                            <div key={inv.invitation_id} className="invitation-card">
+                                <p className="invitation-card-inviter">
+                                    <span className="invitation-card-inviter-name">{inv.inviter.username}</span>
+                                    {' 邀请你加入群聊'}
+                                </p>
+                                <div className="invitation-card-group">
+                                    <div className="invitation-card-group-info">
+                                        <span className="invitation-card-group-name">{inv.group.group_name}</span>
+                                        <span className="invitation-card-group-count">{inv.group.member_count} 名成员</span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="invitation-card-join"
+                                        onClick={() => handleRespondToInvitation(inv.invitation_id, 'accept')}
+                                    >
+                                        加入
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 ) : (
                     <div className="empty-chat-placeholder">
                         <p>选择一个联系人开始聊天</p>

@@ -116,6 +116,93 @@
     font-size: 14px;
 }
 
+.invitation-cards-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    overflow-y: auto;
+}
+
+.invitation-cards-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+.invitation-card {
+    width: 100%;
+    max-width: 420px;
+    padding: 18px 20px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #e8eaed;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.invitation-card + .invitation-card {
+    margin-top: 14px;
+}
+
+.invitation-card-inviter {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: #666;
+}
+
+.invitation-card-inviter-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.invitation-card-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    background: #f7f8fa;
+    border-radius: 10px;
+    border: 1px solid #e8eaed;
+}
+
+.invitation-card-group-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.invitation-card-group-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.invitation-card-group-count {
+    font-size: 12px;
+    color: #999;
+}
+
+.invitation-card-join {
+    flex-shrink: 0;
+    padding: 7px 20px;
+    border: none;
+    border-radius: 6px;
+    background: #07c160;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.invitation-card-join:hover {
+    background: #06ad56;
+}
+
 .user-avatar{
     position: relative;
     margin: 0 auto 44px;

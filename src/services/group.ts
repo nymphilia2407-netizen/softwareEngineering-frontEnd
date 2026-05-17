@@ -2,6 +2,7 @@ import request from '../utils/request';
 
 import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
 import { getChatRooms } from './chat';
+import type { InvitationData, MyInvitationData } from '../types/chat';
 
 export interface GroupSummaryData {
     room_id: number;
@@ -187,6 +188,14 @@ export const updateMemberRole = async (
     assertApiSuccess(response, '操作失败');
 };
 
+export const removeMember = async (groupId: number, userId: number): Promise<void> => {
+    const response = await request.delete<unknown, ApiResponse<null>>(
+        `/api/groups/${groupId}/members/`,
+        { data: { user_id: userId } },
+    );
+    assertApiSuccess(response, '移除成员失败');
+};
+
 // 禁言功能
 export const muteMember = async (groupId: number, userId: number, mutedUntil: string | null): Promise<void> => {
     const response = await request.patch<unknown, ApiResponse<null>>(
@@ -194,4 +203,49 @@ export const muteMember = async (groupId: number, userId: number, mutedUntil: st
         { muted_until: mutedUntil },
     );
     assertApiSuccess(response, '操作失败');
+};
+
+export const inviteMembers = async (groupId: number, userIds: number[]): Promise<void> => {
+    const response = await request.post<unknown, ApiResponse<null>>(
+        `/api/groups/${groupId}/members/`,
+        { user_ids: userIds },
+    );
+    assertApiSuccess(response, '邀请成员失败');
+};
+
+export const getGroupInvitations = async (groupId: number): Promise<InvitationData[]> => {
+    const response = await request.get<unknown, ApiResponse<InvitationData[]>>(
+        `/api/groups/${groupId}/invitations/`,
+    );
+    return unwrapApiData(response, '获取邀请列表失败');
+};
+
+export const processInvitation = async (
+    groupId: number,
+    invitationId: number,
+    action: 'accept' | 'reject',
+): Promise<void> => {
+    const response = await request.put<unknown, ApiResponse<null>>(
+        `/api/groups/${groupId}/invitations/${invitationId}/`,
+        { action },
+    );
+    assertApiSuccess(response, '处理邀请失败');
+};
+
+export const getMyInvitations = async (): Promise<MyInvitationData[]> => {
+    const response = await request.get<unknown, ApiResponse<MyInvitationData[]>>(
+        '/api/user/invitations/',
+    );
+    return unwrapApiData(response, '获取邀请列表失败');
+};
+
+export const respondToInvitation = async (
+    invitationId: number,
+    action: 'accept' | 'reject',
+): Promise<void> => {
+    const response = await request.put<unknown, ApiResponse<null>>(
+        `/api/user/invitations/${invitationId}/`,
+        { action },
+    );
+    assertApiSuccess(response, '处理邀请失败');
 };
