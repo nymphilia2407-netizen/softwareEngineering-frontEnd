@@ -581,10 +581,6 @@ export default function ChatWindow({
         const value = e.target.value;
         setInputText(value);
 
-        if (replyTarget && !value.startsWith(`@${replyTarget.senderUsername} `)) {
-            setReplyTarget(null);
-        }
-
         const ta = e.target;
         ta.style.height = 'auto';
         ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
@@ -909,15 +905,44 @@ return (
                 )}
 
             <div className="window-footer">
-                <textarea
-                    ref={textareaRef}
-                    value={inputText}
-                    placeholder="输入消息...(Shift + Enter 以换行)"
-                    onChange={handleInputChange}
-                    onKeyDown={handleKeyDown}
-                    rows={1}
-                />
-                <button onClick={handleSend} disabled={!inputText.trim()}>发送</button>
+                {replyTarget && (
+                    <div className="reply-preview-bar">
+                        <div className="reply-preview-content">
+                            <span className="reply-preview-sender">{replyTarget.senderUsername}</span>
+                            <span className="reply-preview-text">
+                                {replyTarget.content.length > 50
+                                    ? replyTarget.content.slice(0, 50) + '...'
+                                    : replyTarget.content}
+                            </span>
+                        </div>
+                        <button
+                            className="reply-preview-close"
+                            aria-label="取消回复"
+                            onClick={() => {
+                                const prefix = `@${replyTarget.senderUsername} `;
+                                setReplyTarget(null);
+                                setInputText((prev) =>
+                                    prev.startsWith(prefix) ? prev.slice(prefix.length) : prev,
+                                );
+                                mentionStartPosRef.current = -1;
+                                setTimeout(() => textareaRef.current?.focus(), 0);
+                            }}
+                        >
+                            &#10005;
+                        </button>
+                    </div>
+                )}
+                <div className="footer-input-row">
+                    <textarea
+                        ref={textareaRef}
+                        value={inputText}
+                        placeholder="输入消息...(Shift + Enter 以换行)"
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
+                        rows={1}
+                    />
+                    <button onClick={handleSend} disabled={!inputText.trim()}>发送</button>
+                </div>
             </div>
         </div>
     );

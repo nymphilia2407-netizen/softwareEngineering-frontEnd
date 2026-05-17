@@ -302,13 +302,19 @@
 }
 
 .window-footer {
-    padding: 15px 20px;
+    padding: 0;
     flex-shrink: 0;
     background-color: #fff;
     border-top: 1px solid #e6e8eb;
     display: flex;
-    align-items: flex-end; 
+    flex-direction: column;
+}
+
+.footer-input-row {
+    display: flex;
+    align-items: flex-end;
     gap: 12px;
+    padding: 15px 20px;
 }
 
 .unread-jump-button {
@@ -318,7 +324,7 @@
     z-index: 20;
 }
 
-.window-footer textarea {
+.footer-input-row textarea {
     flex: 1;
     border: 1px solid #ddd;
     border-radius: 8px;
@@ -331,16 +337,16 @@
     background-color: #f9f9f9;
     transition: all 0.2s ease;
     min-height: 40px;
-    max-height: 150px; 
+    max-height: 150px;
 }
 
-.window-footer textarea:focus {
+.footer-input-row textarea:focus {
     border-color: #007bff;
     background-color: #fff;
     box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
 }
 
-.window-footer button {
+.footer-input-row button {
     padding: 0 20px;
     height: 40px;
     background-color: #007bff;
@@ -353,11 +359,11 @@
     flex-shrink: 0;
 }
 
-.window-footer button:hover:not(:disabled) {
+.footer-input-row button:hover:not(:disabled) {
     background-color: #0056b3;
 }
 
-.window-footer button:disabled {
+.footer-input-row button:disabled {
     background-color: #e0e0e0;
     color: #a0a0a0;
     cursor: not-allowed;
@@ -508,4 +514,63 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.reply-preview-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 14px;
+    background: #f5f6f7;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+}
+
+.reply-preview-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 0 2px 10px;
+    border-left: 3px solid #5867dd;
+}
+
+.reply-preview-sender {
+    font-size: 12px;
+    color: #5867dd;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reply-preview-text {
+    font-size: 12px;
+    color: #8e9297;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.reply-preview-close {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: #8e9297;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    padding: 0;
+}
+
+.reply-preview-close:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: #333;
 }
