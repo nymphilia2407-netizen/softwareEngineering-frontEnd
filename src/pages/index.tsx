@@ -142,7 +142,19 @@ export default function Index() {
         try {
             const [friendList, roomList] = await Promise.all([getFriendList(), getChatRooms()]);
             setFriends(friendList.map(mapFriendSummary));
-            setChatRooms(sortChatRoomsForDisplay(roomList.map(mapChatRoom)));
+            setChatRooms((prev) => {
+                const prevMap = new Map(prev.map((r) => [r.id, r]));
+                return sortChatRoomsForDisplay(
+                    roomList.map((room) => {
+                        const mapped = mapChatRoom(room);
+                        const existing = prevMap.get(mapped.id);
+                        if (existing?.hasUnreadMention) {
+                            mapped.hasUnreadMention = true;
+                        }
+                        return mapped;
+                    }),
+                );
+            });
         } catch (error) {
             console.error('刷新好友或会话失败:', error);
         }
@@ -151,7 +163,19 @@ export default function Index() {
     const syncChatRoomsAndGroups = useCallback(async () => {
         try {
             const roomList = await getChatRooms();
-            setChatRooms(sortChatRoomsForDisplay(roomList.map(mapChatRoom)));
+            setChatRooms((prev) => {
+                const prevMap = new Map(prev.map((r) => [r.id, r]));
+                return sortChatRoomsForDisplay(
+                    roomList.map((room) => {
+                        const mapped = mapChatRoom(room);
+                        const existing = prevMap.get(mapped.id);
+                        if (existing?.hasUnreadMention) {
+                            mapped.hasUnreadMention = true;
+                        }
+                        return mapped;
+                    }),
+                );
+            });
             setGroups(groupSummariesFromRoomList(roomList));
         } catch (error) {
             console.error('同步群会话列表失败:', error);

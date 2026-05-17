@@ -139,7 +139,18 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 }
 
                 const mappedRooms = roomList.map(mapChatRoom);
-                setChatRooms(sortChatRoomsForDisplay(mappedRooms));
+                setChatRooms((prev) => {
+                    const prevMap = new Map(prev.map((r) => [r.id, r]));
+                    return sortChatRoomsForDisplay(
+                        mappedRooms.map((mapped) => {
+                            const existing = prevMap.get(mapped.id);
+                            if (existing?.hasUnreadMention) {
+                                mapped.hasUnreadMention = true;
+                            }
+                            return mapped;
+                        }),
+                    );
+                });
                 setActiveChatId((currentActiveChatId) => currentActiveChatId || mappedRooms[0]?.id || 0);
             } catch (error) {
                 console.error('获取会话列表失败:', error);
