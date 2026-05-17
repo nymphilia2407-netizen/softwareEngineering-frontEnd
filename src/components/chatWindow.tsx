@@ -395,13 +395,11 @@ export default function ChatWindow({
                     const incomingMessageKeys = messages
                         .filter((msg) => isOtherMemberMessage(msg, currentUserId))
                         .map((msg) => messageRowKey(msg));
-                    /** 只跟踪「当前页里、且至多 initialUnread 条」对方消息，条数与顶栏 N 严格一致 */
                     const takeCount = Math.min(roomEntryUnreadCountRef.current, incomingMessageKeys.length);
                     headerUnreadKeysRef.current = takeCount > 0 ? incomingMessageKeys.slice(-takeCount) : [];
                     setHeaderUnreadCount(headerUnreadKeysRef.current.length);
                 }
                 hasSeededRoomUnreadRef.current = true;
-                /** 等 scrollToBottom 与布局稳定后再同步一次可见性，减少首帧误删 key */
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {
                         const inner = scrollRef.current;
@@ -410,6 +408,9 @@ export default function ChatWindow({
                         }
                     });
                 });
+            }
+            if (messages.length > 0 && !scrollToMessageId) {
+                scrollToBottom('auto');
             }
             lastMessageKeyRef.current = nextLastMessageKey;
             syncUnreadFloatingVisibility(listEl);
