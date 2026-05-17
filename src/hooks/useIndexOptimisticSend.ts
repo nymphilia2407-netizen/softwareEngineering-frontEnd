@@ -63,7 +63,7 @@ export function useIndexOptimisticSend(
     );
 
     const sendMessageDirect = useCallback(
-        (convId: number, content: string, mentionedUserIds?: number[]) => {
+        (convId: number, content: string, mentionedUserIds?: number[], replyToId?: number) => {
             if (!convId || !content.trim()) {
                 return;
             }
@@ -87,6 +87,19 @@ export function useIndexOptimisticSend(
                 isRead: false,
                 clientId,
                 mentionedUserIds,
+                replyTo: replyToId
+                    ? (() => {
+                          const msgs = r.messageStoreRef.current[convId] ?? [];
+                          const target = msgs.find((m) => m.id === replyToId);
+                          return target
+                              ? {
+                                    messageId: target.id,
+                                    senderUsername: target.senderUsername || '',
+                                    content: target.content,
+                                }
+                              : undefined;
+                      })()
+                    : undefined,
             };
 
             setMessageStore((prev) => appendOptimisticMessage(prev, convId, optimisticMsg));
@@ -106,6 +119,7 @@ export function useIndexOptimisticSend(
                     content,
                     client_id: clientId,
                     mentioned_user_ids: mentionedUserIds,
+                    reply_to_id: replyToId,
                 },
             });
         },
@@ -122,7 +136,7 @@ export function useIndexOptimisticSend(
     );
 
     const handleSendMessage = useCallback(
-        (content: string, mentionedUserIds?: number[]) => {
+        (content: string, mentionedUserIds?: number[], replyToId?: number) => {
             if (!activeChatId || !content.trim()) {
                 return;
             }
@@ -146,6 +160,19 @@ export function useIndexOptimisticSend(
                 isRead: false,
                 clientId,
                 mentionedUserIds,
+                replyTo: replyToId
+                    ? (() => {
+                          const msgs = r.messageStoreRef.current[activeChatId] ?? [];
+                          const target = msgs.find((m) => m.id === replyToId);
+                          return target
+                              ? {
+                                    messageId: target.id,
+                                    senderUsername: target.senderUsername || '',
+                                    content: target.content,
+                                }
+                              : undefined;
+                      })()
+                    : undefined,
             };
 
             setMessageStore((prev) => appendOptimisticMessage(prev, activeChatId, optimisticMsg));
@@ -168,6 +195,7 @@ export function useIndexOptimisticSend(
                     content,
                     client_id: clientId,
                     mentioned_user_ids: mentionedUserIds,
+                    reply_to_id: replyToId,
                 },
             });
         },
@@ -198,7 +226,7 @@ export function useIndexOptimisticSend(
                         ...prev,
                         [convId]: prev[convId].filter((m) => m.clientId !== clientId),
                     }));
-                    sendMessageDirect(convId, orig.content, orig.mentionedUserIds);
+                    sendMessageDirect(convId, orig.content, orig.mentionedUserIds, orig.replyTo?.messageId);
                     return;
                 }
             }

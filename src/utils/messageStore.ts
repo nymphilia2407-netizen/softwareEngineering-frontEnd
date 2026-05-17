@@ -23,6 +23,7 @@ export const formatIncomingMessage = (message: ChatIncomingMessage): Message => 
         isRead: false,
         clientId: message.client_id,
         mentionedUserIds: message.mentioned_users,
+        replyTo: message.reply_to ?? undefined,
     };
 };
 

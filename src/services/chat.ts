@@ -1,6 +1,7 @@
 import request from '../utils/request';
 
 import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
+import type { ReplyToData } from '../types/entity';
 
 export interface ChatRoomSummaryData {
     room_id: number;
@@ -25,6 +26,7 @@ export interface ChatMessageData {
     content: string;
     created_at: string;
     is_read: boolean;
+    reply_to?: ReplyToData | null;
 }
 
 /** 后端 GET /api/conversations/ 单条 */
@@ -47,7 +49,7 @@ interface BackendMessageRow {
     sender: { user_id: number; username: string; avatar?: string } | null;
     content: string;
     timestamp: string;
-    reply_to?: unknown;
+    reply_to?: { message_id: number; sender_username: string; content: string } | null;
     reply_count?: number;
 }
 
@@ -81,6 +83,9 @@ function mapMessageRow(convId: number, row: BackendMessageRow): ChatMessageData 
         content: row.content,
         created_at: row.timestamp,
         is_read: false,
+        reply_to: row.reply_to
+            ? { messageId: row.reply_to.message_id, senderUsername: row.reply_to.sender_username, content: row.reply_to.content }
+            : undefined,
     };
 }
 

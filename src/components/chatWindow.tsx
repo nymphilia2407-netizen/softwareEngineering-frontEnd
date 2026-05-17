@@ -30,7 +30,7 @@ interface ChatWindowProps{
     groupMembers?: { id: number; username: string }[];
     /** @提醒已读回调 */
     onReadMentions?: (convId: number) => void;
-    onSendMessage: (content: string, mentionedUserIds?: number[]) => void
+    onSendMessage: (content: string, mentionedUserIds?: number[], replyToId?: number) => void
     onReadMessage: (convId: number, lastMsgId: number) => void;
     onRetryMessage?: (clientId: string) => void;
     /** 右上角「…」打开好友/群聊资料（由父级处理路由或占位页） */
@@ -103,6 +103,12 @@ export default function ChatWindow({
     const mentionSuggestRef = useRef<HTMLDivElement>(null);
     const mentionFilterRef = useRef<string>('');
     const mentionStartPosRef = useRef<number>(-1);
+
+    const [replyTarget, setReplyTarget] = useState<{
+        messageId: number;
+        senderUsername: string;
+        content: string;
+    } | null>(null);
 
     useEffect(() => {
         if (onReadMentions && activeChatId) {
@@ -363,6 +369,10 @@ export default function ChatWindow({
     }, [activeChatId, initialUnreadCount, scrollToBottom, closeMessageActionMenu]);
 
     useLayoutEffect(() => {
+        setReplyTarget(null);
+    }, [activeChatId]);
+
+    useLayoutEffect(() => {
         messagesRef.current = messages;
         const listEl = scrollRef.current;
         if (!listEl) return;
@@ -537,9 +547,10 @@ export default function ChatWindow({
     const handleSend = () => {
         if(!inputText.trim()) return;
         const mentionedUserIds = extractMentionedUserIds(inputText);
-        onSendMessage(inputText, mentionedUserIds);
+        onSendMessage(inputText, mentionedUserIds, replyTarget?.messageId);
         setInputText('');
         setMentionSuggest(null);
+        setReplyTarget(null);
         mentionStartPosRef.current = -1;
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
@@ -673,7 +684,22 @@ export default function ChatWindow({
                         }, MESSAGE_ACTION_LEAVE_CLOSE_MS);
                     }}
                 >
-                    <button type="button" className="message-action-btn" role="menuitem">
+                    <button
+                        type="button"
+                        className="message-action-btn"
+                        role="menuitem"
+                        onClick={() => {
+                            if (targetMsg) {
+                                setReplyTarget({
+                                    messageId: targetMsg.id,
+                                    senderUsername: targetMsg.senderUsername || '用户',
+                                    content: targetMsg.content,
+                                });
+                                textareaRef.current?.focus();
+                            }
+                            closeMessageActionMenu();
+                        }}
+                    >
                         回复
                     </button>
                     {canDelete && (
@@ -784,6 +810,18 @@ return (
                                 <span className="msg-time-row">{msg.time ?? ""}</span>
                             </div>
                             <div className="message-bubble">
+                                {msg.replyTo && (
+                                    <div className="reply-quote">
+                                        <span className="reply-quote-sender">
+                                            {msg.replyTo.senderUsername}
+                                        </span>
+                                        <span className="reply-quote-text">
+                                            {msg.replyTo.content.length > 80
+                                                ? msg.replyTo.content.slice(0, 80) + '...'
+                                                : msg.replyTo.content}
+                                        </span>
+                                    </div>
+                                )}
                                 <p className="message-text">
                                     {msg.content.split(/(@\S+?)(?=\s|$)/g).map((part, i) =>
                                         part.startsWith('@') &&
@@ -858,6 +896,28 @@ return (
                 )}
 
             <div className="window-footer">
+                {replyTarget && (
+                    <div className="reply-preview-bar">
+                        <div className="reply-preview-content">
+                            <span className="reply-preview-label">
+                                回复 {replyTarget.senderUsername}：
+                            </span>
+                            <span className="reply-preview-text">
+                                {replyTarget.content.length > 50
+                                    ? replyTarget.content.slice(0, 50) + '...'
+                                    : replyTarget.content}
+                            </span>
+                        </div>
+                        <button
+                            type="button"
+                            className="reply-preview-close"
+                            onClick={() => setReplyTarget(null)}
+                            aria-label="取消回复"
+                        >
+                            ×
+                        </button>
+                    </div>
+                )}
                 <textarea
                     ref={textareaRef}
                     value={inputText}

@@ -1,5 +1,5 @@
 import type { MentionSocketData } from '../types/chat';
-import type { WsAction } from '../types/entity';
+import type { ReplyToData, WsAction } from '../types/entity';
 
 export interface ChatWebSocketOptions {
     backendUrl: string;
@@ -18,6 +18,7 @@ export interface ChatIncomingMessage {
     created_at: string;
     client_id?: string;
     mentioned_users?: number[];
+    reply_to?: ReplyToData | null;
 }
 
 export interface ChatReadReceiptData {
@@ -45,6 +46,7 @@ interface BackendNewMessagePayload {
     timestamp: string;
     client_id?: string | null;
     mentioned_users?: number[];
+    reply_to?: ReplyToData | null;
 }
 
 function normalizeSocketEvent(message: ChatSocketEvent): ChatSocketEvent {
@@ -67,6 +69,9 @@ function normalizeSocketEvent(message: ChatSocketEvent): ChatSocketEvent {
                 created_at: b.timestamp,
                 client_id: b.client_id ?? undefined,
                 mentioned_users: b.mentioned_users,
+                reply_to: b.reply_to
+                    ? { messageId: b.reply_to.message_id, senderUsername: b.reply_to.sender_username, content: b.reply_to.content }
+                    : undefined,
             },
         };
     }
