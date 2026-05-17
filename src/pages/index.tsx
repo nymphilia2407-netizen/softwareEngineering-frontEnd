@@ -852,6 +852,11 @@ export default function Index() {
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
                             friends={friends}
+                            onNavigateToChat={(convId: number) => {
+                                setChatSessionInfoOpen(false);
+                                setChatRooms((prev) => clearUnreadRoom(prev, convId));
+                                setActiveChatId(convId);
+                            }}
                         />
                     ) : (
                         <ChatWindow

@@ -58,3 +58,16 @@ export interface MyInvitationData {
     };
     created_at: string;
 }
+
+export interface SearchResultData {
+    message_id: number;
+    conversation_id: number;
+    conversation_name: string;
+    sender: {
+        user_id: number;
+        username: string;
+        avatar: string;
+    };
+    content: string;
+    timestamp: string;
+}

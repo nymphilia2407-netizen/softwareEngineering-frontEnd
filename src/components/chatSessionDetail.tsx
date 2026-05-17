@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole, muteMember, removeMember, inviteMembers, getGroupInvitations, processInvitation } from '../services/group';
+import { searchMessages } from '../services/chat';
 import { getFriendDetail, deleteFriend } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
 import type { GroupDetailData } from '../services/group';
-import type { InvitationData } from '../types/chat';
+import type { InvitationData, SearchResultData } from '../types/chat';
 import type { User } from '../types/entity';
 
 import '../styles/chatSessionDetail.css';
@@ -21,6 +22,7 @@ export interface ChatSessionDetailProps {
     onBack: () => void;
     onDeleted?: () => void;
     friends?: User[];
+    onNavigateToChat?: (convId: number) => void;
 }
 
 export default function ChatSessionDetail({
@@ -35,6 +37,7 @@ export default function ChatSessionDetail({
     conversationPinned,
     onConversationPinnedChange,
     friends = [],
+    onNavigateToChat,
 }: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
@@ -55,6 +58,11 @@ export default function ChatSessionDetail({
     const [selectedInviteUserIds, setSelectedInviteUserIds] = useState<Set<number>>(new Set());
     const [inviteSubmitting, setInviteSubmitting] = useState(false);
     const [pendingInvitations, setPendingInvitations] = useState<InvitationData[]>([]);
+    const [showSearchModal, setShowSearchModal] = useState(false);
+    const [searchKeyword, setSearchKeyword] = useState('');
+    const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [searchTotal, setSearchTotal] = useState(0);
 
     const currentMember = groupDetail?.members.find(m => m.user_id === currentUserId);
     const currentUserRole = currentMember?.role;
@@ -176,6 +184,21 @@ export default function ChatSessionDetail({
             setPendingInvitations(updated);
         } catch (err) {
             alert(err instanceof Error ? err.message : '操作失败');
+        }
+    };
+
+    const handleSearch = async () => {
+        const q = searchKeyword.trim();
+        if (!q) return;
+        setSearchLoading(true);
+        try {
+            const data = await searchMessages(q, 1, 50);
+            setSearchResults(data.results);
+            setSearchTotal(data.total);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '搜索失败');
+        } finally {
+            setSearchLoading(false);
         }
     };
 
@@ -394,6 +417,21 @@ export default function ChatSessionDetail({
                                 </button>
                             </div>
                         )}
+
+                        <div className="invite-section">
+                            <button
+                                type="button"
+                                className="invite-members-button"
+                                onClick={() => {
+                                    setSearchKeyword('');
+                                    setSearchResults([]);
+                                    setSearchTotal(0);
+                                    setShowSearchModal(true);
+                                }}
+                            >
+                                搜索消息
+                            </button>
+                        </div>
 
                         {pendingInvitations.length > 0 && (
                             <div className="pending-invitations">
@@ -653,6 +691,75 @@ export default function ChatSessionDetail({
                             >
                                 {inviteSubmitting ? '邀请中...' : `确认邀请 (${selectedInviteUserIds.size})`}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showSearchModal && (
+                <div className="invite-modal-overlay" onClick={() => setShowSearchModal(false)}>
+                    <div className="search-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="invite-modal-header">
+                            <span>搜索消息</span>
+                            <button
+                                type="button"
+                                className="invite-modal-close"
+                                onClick={() => setShowSearchModal(false)}
+                            >
+                                &times;
+                            </button>
+                        </div>
+                        <div className="search-modal-input-row">
+                            <input
+                                type="text"
+                                className="search-modal-input"
+                                placeholder="输入关键词搜索..."
+                                value={searchKeyword}
+                                onChange={(e) => setSearchKeyword(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSearch();
+                                }}
+                            />
+                            <button
+                                type="button"
+                                className="search-modal-btn"
+                                disabled={!searchKeyword.trim() || searchLoading}
+                                onClick={handleSearch}
+                            >
+                                {searchLoading ? '搜索中...' : '搜索'}
+                            </button>
+                        </div>
+                        <div className="invite-modal-list">
+                            {searchResults.length === 0 && !searchLoading ? (
+                                <p className="invite-modal-empty">
+                                    {searchKeyword.trim() ? '未找到匹配的消息' : '请输入关键词进行搜索'}
+                                </p>
+                            ) : (
+                                <>
+                                    {searchTotal > 0 && (
+                                        <p className="search-result-count">共 {searchTotal} 条结果</p>
+                                    )}
+                                    {searchResults.map((result) => (
+                                        <div
+                                            key={result.message_id}
+                                            className="search-result-item"
+                                            onClick={() => {
+                                                setShowSearchModal(false);
+                                                onNavigateToChat?.(result.conversation_id);
+                                            }}
+                                        >
+                                            <div className="search-result-header">
+                                                <span className="search-result-conv">{result.conversation_name}</span>
+                                                <span className="search-result-sender">{result.sender.username}</span>
+                                            </div>
+                                            <p className="search-result-content">{result.content}</p>
+                                            <span className="search-result-time">
+                                                {new Date(result.timestamp).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>

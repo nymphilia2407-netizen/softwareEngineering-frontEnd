@@ -2,6 +2,7 @@ import request from '../utils/request';
 
 import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
 import type { ReplyToData } from '../types/entity';
+import type { SearchResultData } from '../types/chat';
 
 export interface ChatRoomSummaryData {
     room_id: number;
@@ -169,4 +170,14 @@ export const getUnreadMentions = async (): Promise<UnreadMentionData[]> => {
 
 export const markMentionRead = async (mentionId: number): Promise<void> => {
     await request.post(`/api/conversations/mentions/${mentionId}/read/`);
+};
+
+export const searchMessages = async (keyword: string, page = 1, pageSize = 20) => {
+    const response = await request.get<
+        unknown,
+        ApiResponse<{ results: SearchResultData[]; total: number }>
+    >('/api/conversations/messages/search/', {
+        params: { q: keyword, page, page_size: pageSize },
+    });
+    return unwrapApiData(response, '搜索消息失败');
 };
