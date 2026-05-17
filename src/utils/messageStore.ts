@@ -22,6 +22,7 @@ export const formatIncomingMessage = (message: ChatIncomingMessage): Message => 
         time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isRead: false,
         clientId: message.client_id,
+        mentionedUserIds: message.mentioned_users,
     };
 };
 

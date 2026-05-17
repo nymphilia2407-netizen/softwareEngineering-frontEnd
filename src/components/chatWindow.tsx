@@ -26,7 +26,11 @@ interface ChatWindowProps{
     messages: Message[];
     initialUnreadCount?: number;
     currentUserId: number;
-    onSendMessage: (content: string) => void
+    /** 群成员列表，用于@建议弹窗（私聊时可为对方用户名） */
+    groupMembers?: { id: number; username: string }[];
+    /** @提醒已读回调 */
+    onReadMentions?: (convId: number) => void;
+    onSendMessage: (content: string, mentionedUserIds?: number[]) => void
     onReadMessage: (convId: number, lastMsgId: number) => void;
     onRetryMessage?: (clientId: string) => void;
     /** 右上角「…」打开好友/群聊资料（由父级处理路由或占位页） */
@@ -41,6 +45,8 @@ export default function ChatWindow({
     messages,
     initialUnreadCount = 0,
     currentUserId,
+    groupMembers,
+    onReadMentions,
     onSendMessage,
     onReadMessage,
     onRetryMessage,
@@ -86,6 +92,23 @@ export default function ChatWindow({
     const messageHoverOpenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const messageHoverLeaveCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const messageHoverRowRef = useRef<{ key: string; el: HTMLElement } | null>(null);
+
+    /** @建议弹窗状态 */
+    const [mentionSuggest, setMentionSuggest] = useState<{
+        visible: boolean;
+        filter: string;
+        members: { id: number; username: string }[];
+        selectedIndex: number;
+    } | null>(null);
+    const mentionSuggestRef = useRef<HTMLDivElement>(null);
+    const mentionFilterRef = useRef<string>('');
+    const mentionStartPosRef = useRef<number>(-1);
+
+    useEffect(() => {
+        if (onReadMentions && activeChatId) {
+            onReadMentions(activeChatId);
+        }
+    }, [activeChatId, onReadMentions]);
 
     const clearMessageHoverOpenTimer = useCallback(() => {
         if (messageHoverOpenTimerRef.current !== null) {
@@ -497,16 +520,123 @@ export default function ChatWindow({
         jumpToFirstUnreadFromKeys(ordered);
     };
 
+    const extractMentionedUserIds = (text: string): number[] | undefined => {
+        if (!groupMembers || groupMembers.length === 0) return undefined;
+        const mentionedPattern = /@(\S+?)(?=\s|$)/g;
+        let match: RegExpExecArray | null;
+        const names = new Set<string>();
+        while ((match = mentionedPattern.exec(text)) !== null) {
+            names.add(match[1]);
+        }
+        const ids = groupMembers
+            .filter((m) => names.has(m.username))
+            .map((m) => m.id);
+        return ids.length > 0 ? ids : undefined;
+    };
+
     const handleSend = () => {
         if(!inputText.trim()) return;
-        onSendMessage(inputText);
+        const mentionedUserIds = extractMentionedUserIds(inputText);
+        onSendMessage(inputText, mentionedUserIds);
         setInputText('');
+        setMentionSuggest(null);
+        mentionStartPosRef.current = -1;
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
         }
     };
 
+    const selectMentionedMember = (index: number) => {
+        if (!mentionSuggest || !textareaRef.current) return;
+        const member = mentionSuggest.members[index];
+        if (!member) return;
+        const textarea = textareaRef.current;
+        const beforeMention = inputText.slice(0, mentionStartPosRef.current);
+        const afterFilter = inputText.slice(
+            mentionStartPosRef.current + 1 + mentionFilterRef.current.length,
+        );
+        const newText = `${beforeMention}@${member.username} ${afterFilter}`;
+        setInputText(newText);
+        setMentionSuggest(null);
+        mentionStartPosRef.current = -1;
+        setTimeout(() => {
+            textarea.focus();
+            const cursorPos = beforeMention.length + member.username.length + 2;
+            textarea.setSelectionRange(cursorPos, cursorPos);
+        }, 0);
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        setInputText(value);
+        const ta = e.target;
+        ta.style.height = 'auto';
+        ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
+
+        const cursorPos = ta.selectionStart;
+        const textBeforeCursor = value.slice(0, cursorPos);
+        const atIndex = textBeforeCursor.lastIndexOf('@');
+
+        if (
+            atIndex !== -1 &&
+            (atIndex === 0 || textBeforeCursor[atIndex - 1] === ' ' || textBeforeCursor[atIndex - 1] === '\n')
+        ) {
+            const filterText = textBeforeCursor.slice(atIndex + 1);
+            const hasSpaceOrEnd = /^[^\s]*$/.test(filterText);
+            if (hasSpaceOrEnd && groupMembers && groupMembers.length > 0) {
+                const lowerFilter = filterText.toLowerCase();
+                const filtered = groupMembers
+                    .filter((m) => m.id !== currentUserId && m.username.toLowerCase().includes(lowerFilter))
+                    .slice(0, 8);
+                const prevFilter = mentionFilterRef.current;
+                mentionFilterRef.current = filterText;
+                mentionStartPosRef.current = atIndex;
+                if (filtered.length > 0) {
+                    setMentionSuggest((prev) => ({
+                        visible: true,
+                        filter: filterText,
+                        members: filtered,
+                        selectedIndex:
+                            prev?.visible && prev.filter === filterText
+                                ? Math.min(prev.selectedIndex, filtered.length - 1)
+                                : 0,
+                    }));
+                } else {
+                    setMentionSuggest(null);
+                }
+                return;
+            }
+        }
+        setMentionSuggest(null);
+        mentionStartPosRef.current = -1;
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (mentionSuggest?.visible) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setMentionSuggest((prev) =>
+                    prev ? { ...prev, selectedIndex: Math.min(prev.selectedIndex + 1, prev.members.length - 1) } : null,
+                );
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setMentionSuggest((prev) =>
+                    prev ? { ...prev, selectedIndex: Math.max(prev.selectedIndex - 1, 0) } : null,
+                );
+                return;
+            }
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                selectMentionedMember(mentionSuggest.selectedIndex);
+                return;
+            }
+            if (e.key === 'Escape') {
+                setMentionSuggest(null);
+                return;
+            }
+        }
         if(e.key === 'Enter' && !e.shiftKey){
             e.preventDefault();
             handleSend();
@@ -654,7 +784,20 @@ return (
                                 <span className="msg-time-row">{msg.time ?? ""}</span>
                             </div>
                             <div className="message-bubble">
-                                <p className="message-text">{msg.content}</p>
+                                <p className="message-text">
+                                    {msg.content.split(/(@\S+?)(?=\s|$)/g).map((part, i) =>
+                                        part.startsWith('@') &&
+                                        groupMembers?.some(
+                                            (m) => `@${m.username}` === part,
+                                        ) ? (
+                                            <span key={i} className="mention-highlight">
+                                                {part}
+                                            </span>
+                                        ) : (
+                                            part
+                                        ),
+                                    )}
+                                </p>
                                 {showSelfMeta && (
                                     <div className="message-meta">
                                         {isGroupChat ? (
@@ -690,17 +833,36 @@ return (
 
             {messageActionMenuPortal}
 
+            {mentionSuggest?.visible &&
+                createPortal(
+                    <div ref={mentionSuggestRef} className="mention-suggestions" role="listbox" aria-label="选择要@的成员">
+                        {mentionSuggest.members.map((member, index) => (
+                            <div
+                                key={member.id}
+                                role="option"
+                                aria-selected={index === mentionSuggest.selectedIndex}
+                                className={`mention-suggestion-item${index === mentionSuggest.selectedIndex ? ' mention-suggestion-item--active' : ''}`}
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    selectMentionedMember(index);
+                                }}
+                                onMouseEnter={() =>
+                                    setMentionSuggest((prev) => (prev ? { ...prev, selectedIndex: index } : null))
+                                }
+                            >
+                                <span className="mention-suggestion-name">@{member.username}</span>
+                            </div>
+                        ))}
+                    </div>,
+                    document.body,
+                )}
+
             <div className="window-footer">
                 <textarea
                     ref={textareaRef}
                     value={inputText}
                     placeholder="输入消息...(Shift + Enter 以换行)"
-                    onChange={(e) => {
-                        setInputText(e.target.value);
-                        const ta = e.target;
-                        ta.style.height = 'auto';
-                        ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
-                    }}
+                    onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     rows={1}
                 />

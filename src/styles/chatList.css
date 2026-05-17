@@ -144,3 +144,12 @@
     background: rgba(0, 0, 0, 0.05);
     border-radius: 10px;
 }
+
+.mention-badge {
+    color: #ef4444;
+    font-weight: 600;
+    font-size: 12px;
+    margin-right: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}

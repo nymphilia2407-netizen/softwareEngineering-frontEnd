@@ -35,11 +35,12 @@ export type Message = {
     time?: string;
     isRead?: boolean;
     clientId?: string;
+    mentionedUserIds?: number[];
 };
 
 // 上行消息格式 (Client -> Server)
 export type WsAction =
-    | { type: 'send_message'; data: { conversation_id: number; content: string; client_id?: string } }
+    | { type: 'send_message'; data: { conversation_id: number; content: string; client_id?: string; mentioned_user_ids?: number[] } }
     /** 与 Django ChatConsumer.handle_read_message 一致：last_read_message_id */
     | { type: 'read_message'; data: { conversation_id: number; last_read_message_id: number } }
     /** 建群/入群后加入 room_<id>，无需整页刷新即可收 new_message */

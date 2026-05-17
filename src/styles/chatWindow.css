@@ -423,3 +423,61 @@
     outline: none;
     background: #e8f1ff;
 }
+
+/* @建议弹窗 */
+.mention-suggestions {
+    position: fixed;
+    z-index: 200;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+    max-height: 220px;
+    overflow-y: auto;
+    min-width: 160px;
+    bottom: 140px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 4px 0;
+}
+
+.mention-suggestion-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.1s ease;
+}
+
+.mention-suggestion-item:hover,
+.mention-suggestion-item--active {
+    background-color: #f0f4ff;
+    color: #2563eb;
+}
+
+.mention-suggestion-name {
+    font-weight: 500;
+}
+
+/* 消息中 @高亮 */
+.mention-highlight {
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.08);
+    padding: 1px 4px;
+    border-radius: 4px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* [有人@你] badge */
+.mention-badge {
+    color: #ef4444;
+    font-weight: 600;
+    font-size: 12px;
+    margin-right: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}

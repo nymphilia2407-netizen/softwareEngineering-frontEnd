@@ -13,6 +13,17 @@ export interface ChatListItem {
     isMuted?: boolean;
     /** 会话置顶：显示在列表顶部 */
     isPinned?: boolean;
+    /** 有人@我（用于 "[有人@你]" 显示） */
+    hasUnreadMention?: boolean;
 }
 
 export type ActiveTabType = 'chat' | 'contacts' | 'settings';
+
+export interface MentionSocketData {
+    message_id: number;
+    conversation_id: number;
+    from_user_id: number;
+    from_username: string;
+    content_preview: string;
+    mentioned_users: number[];
+}

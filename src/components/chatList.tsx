@@ -110,6 +110,9 @@ export default function ChatList({ chats, activeId, onChatClick, onClearChat }: 
                                     <span className="item-time">{chat.lastTime}</span>
                                 </div>
                                 <div className="content-bottom">
+                                    {chat.hasUnreadMention && (
+                                        <span className="mention-badge">[有人@你]</span>
+                                    )}
                                     <span className="last-message">{chat.lastMessage}</span>
                                 </div>
                             </div>

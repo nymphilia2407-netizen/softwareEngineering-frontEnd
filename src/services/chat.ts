@@ -144,3 +144,24 @@ export const clearConversationMessages = async (conversationId: number): Promise
     await request.delete(`/api/conversations/${conversationId}/messages/`);
     // 后端返回 204 No Content，无需处理返回值
 };
+
+export interface UnreadMentionData {
+    mention_id: number;
+    message_id: number;
+    conversation_id: number;
+    from_user_id: number;
+    from_username: string;
+    content_preview: string;
+    created_at: string;
+}
+
+export const getUnreadMentions = async (): Promise<UnreadMentionData[]> => {
+    const response = await request.get<unknown, ApiResponse<UnreadMentionData[]>>(
+        '/api/conversations/mentions/unread/',
+    );
+    return unwrapApiData(response, '获取未读@提醒失败');
+};
+
+export const markMentionRead = async (mentionId: number): Promise<void> => {
+    await request.post(`/api/conversations/mentions/${mentionId}/read/`);
+};

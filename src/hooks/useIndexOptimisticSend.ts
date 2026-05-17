@@ -63,7 +63,7 @@ export function useIndexOptimisticSend(
     );
 
     const sendMessageDirect = useCallback(
-        (convId: number, content: string) => {
+        (convId: number, content: string, mentionedUserIds?: number[]) => {
             if (!convId || !content.trim()) {
                 return;
             }
@@ -86,6 +86,7 @@ export function useIndexOptimisticSend(
                 time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isRead: false,
                 clientId,
+                mentionedUserIds,
             };
 
             setMessageStore((prev) => appendOptimisticMessage(prev, convId, optimisticMsg));
@@ -98,7 +99,15 @@ export function useIndexOptimisticSend(
                 return;
             }
 
-            socket.send({ type: 'send_message', data: { conversation_id: convId, content, client_id: clientId } });
+            socket.send({
+                type: 'send_message',
+                data: {
+                    conversation_id: convId,
+                    content,
+                    client_id: clientId,
+                    mentioned_user_ids: mentionedUserIds,
+                },
+            });
         },
         [
             clearPendingSendTimer,
@@ -113,7 +122,7 @@ export function useIndexOptimisticSend(
     );
 
     const handleSendMessage = useCallback(
-        (content: string) => {
+        (content: string, mentionedUserIds?: number[]) => {
             if (!activeChatId || !content.trim()) {
                 return;
             }
@@ -136,6 +145,7 @@ export function useIndexOptimisticSend(
                 time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 isRead: false,
                 clientId,
+                mentionedUserIds,
             };
 
             setMessageStore((prev) => appendOptimisticMessage(prev, activeChatId, optimisticMsg));
@@ -157,6 +167,7 @@ export function useIndexOptimisticSend(
                     conversation_id: activeChatId,
                     content,
                     client_id: clientId,
+                    mentioned_user_ids: mentionedUserIds,
                 },
             });
         },
@@ -187,7 +198,7 @@ export function useIndexOptimisticSend(
                         ...prev,
                         [convId]: prev[convId].filter((m) => m.clientId !== clientId),
                     }));
-                    sendMessageDirect(convId, orig.content);
+                    sendMessageDirect(convId, orig.content, orig.mentionedUserIds);
                     return;
                 }
             }

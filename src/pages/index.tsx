@@ -15,10 +15,11 @@ import { useActiveChatHistory } from '../hooks/useActiveChatHistory';
 import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket';
 import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
 import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomList } from '../mappers/chat';
-import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage, clearConversationMessages } from '../services/chat';
-import { createGroup, getGroupList, updateGroupAvatar } from '../services/group';
+import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage, clearConversationMessages, getUnreadMentions } from '../services/chat';
+import { createGroup, getGroupList, getGroupDetail, updateGroupAvatar } from '../services/group';
 import { getFriendList } from '../services/friend';
 import { deleteUser } from '../services/user';
+import { markMentionRead } from '../services/chat';
 import type { ChatWebSocketClient } from '../services/websocket';
 import type { ActiveTabType, ChatListItem } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
@@ -51,6 +52,9 @@ export default function Index() {
     const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
     const [groupSyncToast, setGroupSyncToast] = useState<string | null>(null);
     const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0);
+    const [mentionCount, setMentionCount] = useState(0);
+    const [mentionToast, setMentionToast] = useState<string | null>(null);
+    const [groupMembersCache, setGroupMembersCache] = useState<Record<number, { id: number; username: string }[]>>({});
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -96,6 +100,40 @@ export default function Index() {
     const activeChatIsGroup = useMemo(
         () => chatRooms.find((room) => room.id === activeChatId)?.isGroup ?? false,
         [chatRooms, activeChatId]
+    );
+
+    useEffect(() => {
+        if (!activeChatId || !activeChatIsGroup) return;
+        if (groupMembersCache[activeChatId]) return;
+        getGroupDetail(activeChatId)
+            .then((detail) => {
+                setGroupMembersCache((prev) => ({
+                    ...prev,
+                    [activeChatId]: detail.members.map((m) => ({
+                        id: m.user_id,
+                        username: m.username,
+                    })),
+                }));
+            })
+            .catch(() => {});
+    }, [activeChatId, activeChatIsGroup, groupMembersCache]);
+
+    const activeGroupMembers = activeChatId ? groupMembersCache[activeChatId] : undefined;
+
+    const handleReadMentions = useCallback(
+        (convId: number) => {
+            setChatRooms((prev) =>
+                prev.map((r) => (r.id === convId ? { ...r, hasUnreadMention: false } : r)),
+            );
+            setMentionCount(0);
+            getUnreadMentions()
+                .then((mentions) => {
+                    const roomMentions = mentions.filter((m) => m.conversation_id === convId);
+                    return Promise.all(roomMentions.map((m) => markMentionRead(m.mention_id)));
+                })
+                .catch(() => {});
+        },
+        [],
     );
 
     const refreshFriendsAndRooms = useCallback(async () => {
@@ -147,6 +185,15 @@ export default function Index() {
         const timer = globalThis.setTimeout(() => setGroupSyncToast(null), 4800);
         return () => globalThis.clearTimeout(timer);
     }, [groupSyncToast]);
+
+    useEffect(() => {
+        if (!mentionToast) {
+            return;
+        }
+
+        const timer = globalThis.setTimeout(() => setMentionToast(null), 4800);
+        return () => globalThis.clearTimeout(timer);
+    }, [mentionToast]);
 
     /** 对方同意好友请求后发起方无推送：切到联系人或回到前台时同步列表 */
     useEffect(() => {
@@ -253,6 +300,8 @@ export default function Index() {
         setGroupSyncToast,
         setGroups,
         setPendingFriendRequestCount,
+        setMentionToast,
+        setMentionCount,
     });
 
     const chatListData: ChatListItem[] = chatRooms;
@@ -552,12 +601,14 @@ export default function Index() {
     return (
         <div className="main">
             {groupSyncToast ? <GroupSyncToast message={groupSyncToast} /> : null}
+            {mentionToast ? <GroupSyncToast message={mentionToast} /> : null}
             <MainSidebar
                 myAvatar={myAvatar}
                 userName={userName}
                 activeTab={activeTab}
                 totalUnreadCount={totalUnreadCount}
                 pendingFriendRequestCount={pendingFriendRequestCount}
+                mentionCount={mentionCount}
                 chatIcon={CHATICON}
                 contactIcon={CONTACTICON}
                 configIcon={CONFIGICON}
@@ -716,6 +767,8 @@ export default function Index() {
                             messages={messages}
                             initialUnreadCount={entryUnreadHintCount}
                             currentUserId={currentUserId}
+                            groupMembers={activeGroupMembers}
+                            onReadMentions={handleReadMentions}
                             onSendMessage={handleSendMessage}
                             onReadMessage={handleReadMessage}
                             onRetryMessage={handleRetryMessage}

@@ -2,7 +2,7 @@ import { useEffect, type Dispatch, type MutableRefObject, type RefObject, type S
 
 import { BACKENDURL, DEFAULT_AVATAR } from '../constants/string';
 import { mapChatRoom, mapFriendSummary } from '../mappers/chat';
-import { getChatRooms } from '../services/chat';
+import { getChatRooms, getUnreadMentions } from '../services/chat';
 import { getFriendList, getReceivedFriendRequests } from '../services/friend';
 import { getCurrentUser } from '../services/user';
 import { createChatWebSocketClient, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
@@ -40,6 +40,8 @@ export type IndexBootstrapSocketParams = {
     setGroupSyncToast: Dispatch<SetStateAction<string | null>>;
     setGroups: Dispatch<SetStateAction<Group[]>>;
     setPendingFriendRequestCount: Dispatch<SetStateAction<number>>;
+    setMentionToast: Dispatch<SetStateAction<string | null>>;
+    setMentionCount: Dispatch<SetStateAction<number>>;
 };
 
 export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
@@ -66,6 +68,8 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setGroupSyncToast,
         setGroups,
         setPendingFriendRequestCount,
+        setMentionToast,
+        setMentionCount,
     } = params;
 
     useEffect(() => {
@@ -146,6 +150,21 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         void syncFriendList();
         void syncChatRooms();
         void syncGroupList();
+
+        getUnreadMentions()
+            .then((mentions) => {
+                if (cancelled) return;
+                const convIds = new Set(mentions.map((m) => m.conversation_id));
+                if (convIds.size > 0) {
+                    setChatRooms((prev) =>
+                        prev.map((r) =>
+                            convIds.has(r.id) ? { ...r, hasUnreadMention: true } : r,
+                        ),
+                    );
+                }
+                setMentionCount(mentions.length);
+            })
+            .catch(() => {});
 
         if (token) {
             const client = createChatWebSocketClient({
@@ -262,6 +281,19 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 if (event.type === 'friend_request') {
                     setPendingFriendRequestCount((prev) => prev + 1);
                 }
+
+                if (event.type === 'mention') {
+                    const d = event.data;
+                    setChatRooms((prev) =>
+                        prev.map((r) =>
+                            r.id === d.conversation_id ? { ...r, hasUnreadMention: true } : r,
+                        ),
+                    );
+                    setMentionCount((prev) => prev + 1);
+                    setMentionToast(
+                        `${d.from_username} 在群聊中@了你`,
+                    );
+                }
             });
 
             const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
@@ -306,6 +338,8 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setFriends,
         setGroupSyncToast,
         setGroups,
+        setMentionCount,
+        setMentionToast,
         setMessageStore,
         setMyAvatar,
         setPendingFriendRequestCount,
