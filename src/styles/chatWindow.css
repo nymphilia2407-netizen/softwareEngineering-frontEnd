@@ -482,55 +482,6 @@
     flex-shrink: 0;
 }
 
-/* 回复预览条 */
-.reply-preview-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #f0f4ff;
-    border-bottom: 1px solid #dde4f0;
-    padding: 6px 12px;
-    font-size: 13px;
-    gap: 8px;
-}
-
-.reply-preview-content {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.reply-preview-label {
-    color: #3b82f6;
-    font-weight: 500;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.reply-preview-text {
-    color: #666;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.reply-preview-close {
-    background: none;
-    border: none;
-    color: #999;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 0 4px;
-    line-height: 1;
-    flex-shrink: 0;
-}
-
-.reply-preview-close:hover {
-    color: #333;
-}
-
 /* 消息气泡中的引用块 */
 .reply-quote {
     background: rgba(0, 0, 0, 0.04);

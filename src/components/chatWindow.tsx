@@ -580,6 +580,11 @@ export default function ChatWindow({
     const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const value = e.target.value;
         setInputText(value);
+
+        if (replyTarget && !value.startsWith(`@${replyTarget.senderUsername} `)) {
+            setReplyTarget(null);
+        }
+
         const ta = e.target;
         ta.style.height = 'auto';
         ta.style.height = `${Math.min(ta.scrollHeight, 150)}px`;
@@ -695,7 +700,15 @@ export default function ChatWindow({
                                     senderUsername: targetMsg.senderUsername || '用户',
                                     content: targetMsg.content,
                                 });
-                                textareaRef.current?.focus();
+                                const prefix = `@${targetMsg.senderUsername || '用户'} `;
+                                setInputText((prev) => prefix + prev);
+                                setTimeout(() => {
+                                    const ta = textareaRef.current;
+                                    if (ta) {
+                                        ta.focus();
+                                        ta.setSelectionRange(prefix.length, prefix.length);
+                                    }
+                                }, 0);
                             }
                             closeMessageActionMenu();
                         }}
@@ -896,28 +909,6 @@ return (
                 )}
 
             <div className="window-footer">
-                {replyTarget && (
-                    <div className="reply-preview-bar">
-                        <div className="reply-preview-content">
-                            <span className="reply-preview-label">
-                                回复 {replyTarget.senderUsername}：
-                            </span>
-                            <span className="reply-preview-text">
-                                {replyTarget.content.length > 50
-                                    ? replyTarget.content.slice(0, 50) + '...'
-                                    : replyTarget.content}
-                            </span>
-                        </div>
-                        <button
-                            type="button"
-                            className="reply-preview-close"
-                            onClick={() => setReplyTarget(null)}
-                            aria-label="取消回复"
-                        >
-                            ×
-                        </button>
-                    </div>
-                )}
                 <textarea
                     ref={textareaRef}
                     value={inputText}
