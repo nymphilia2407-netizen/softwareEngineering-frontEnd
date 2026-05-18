@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 
 import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
-import { sameUserId } from '../utils/messageStore';
+import { sameUserId, formatMessageTime } from '../utils/messageStore';
 import { resolvedUserAvatar } from '../utils/avatar';
 
 import '../styles/chatWindow.css'
@@ -860,7 +860,9 @@ return (
                                 {isGroupChat && (
                                     <span className={`message-sender-name${isSelf ? " self" : ""}`}>{senderLabel}</span>
                                 )}
-                                <span className="msg-time-row">{msg.time ?? ""}</span>
+                                <span className="msg-time-row">
+                                    {formatMessageTime(msg.timestamp)}
+                                </span>
                             </div>
                             <div className="message-bubble">
                                 {msg.replyTo && (

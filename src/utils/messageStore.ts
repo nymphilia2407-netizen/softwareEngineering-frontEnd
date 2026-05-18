@@ -113,3 +113,17 @@ export const appendOptimisticMessage = (
     ...store,
     [conversationId]: sortMessagesByTime([...(store[conversationId] ?? []), message]),
 });
+
+/** 时间处理：今天内显示时间，否则显示 月日 + 时间 */
+export const formatMessageTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const isSameDay =
+        date.getFullYear() === now.getFullYear() &&
+        date.getMonth() === now.getMonth() &&
+        date.getDate() === now.getDate();
+    if (isSameDay) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return `${date.getMonth() + 1}月${date.getDate()}日 ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+};
