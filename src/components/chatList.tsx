@@ -80,7 +80,7 @@ export default function ChatList({ chats, activeId, onChatClick, onClearChat, on
                 <div className="search-container">
                     <input
                         type="text"
-                        placeholder="搜索消息"
+                        placeholder="搜索会话"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />

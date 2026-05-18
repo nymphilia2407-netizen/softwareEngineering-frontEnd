@@ -39,7 +39,7 @@ export const mapChatRoom = (room: ChatRoomSummaryData): ChatListItem => ({
     name: room.name,
     avatar: resolvedUserAvatar(room.avatar),
     lastMessage: room.last_message || '[最近暂无消息]',
-    lastTime: room.last_time ? new Date(room.last_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '刚刚',
+    lastTime: room.last_time ? new Date(room.last_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
     unreadCount: room.unread_count,
     otherUserId: room.other_user_id ?? null,
     status: undefined,
