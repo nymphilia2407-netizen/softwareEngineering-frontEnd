@@ -74,7 +74,7 @@ export const getGroupList = async () => {
                 group_name: r.name,
                 avatar: r.avatar || '',
                 owner_id: null,
-                member_count: 0,
+                member_count: r.member_count,
                 created_at: r.last_time && r.last_time.length > 0 ? r.last_time : new Date().toISOString(),
             }),
         );

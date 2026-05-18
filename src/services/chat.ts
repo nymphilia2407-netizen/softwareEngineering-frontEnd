@@ -9,6 +9,7 @@ export interface ChatRoomSummaryData {
     is_group: boolean;
     name: string;
     avatar: string;
+    member_count: number;
     other_user_id?: number | null;
     last_message: string;
     last_time: string;
@@ -30,7 +31,7 @@ export interface ChatMessageData {
     reply_to?: ReplyToData | null;
 }
 
-/** 后端 GET /api/conversations/ 单条 */
+/** 后端 GET /api/conversations/ */
 interface BackendConversationRow {
     conversation_id: number;
     type: 'group' | 'private';
@@ -40,6 +41,7 @@ interface BackendConversationRow {
     last_message: { content: string; timestamp: string } | null;
     name: string;
     avatar: string;
+    member_count: number;
     /** 私聊时对方用户 id，供联系人列表打开已有会话 */
     other_user_id?: number;
 }
@@ -62,6 +64,7 @@ function mapConversationRow(row: BackendConversationRow): ChatRoomSummaryData {
         is_group: row.type === 'group',
         name: row.name,
         avatar: row.avatar || '',
+        member_count: row.member_count ?? 0,
         other_user_id:
             row.type === 'private' && typeof otherId === 'number' && Number.isFinite(otherId) ? otherId : null,
         last_message: last?.content ?? '',
