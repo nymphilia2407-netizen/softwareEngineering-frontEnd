@@ -109,6 +109,7 @@ export default function ChatWindow({
     const mentionSuggestRef = useRef<HTMLDivElement>(null);
     const mentionFilterRef = useRef<string>('');
     const mentionStartPosRef = useRef<number>(-1);
+    const [mentionPosition, setMentionPosition] = useState<{ x: number; y: number } | null>(null);
 
     const [replyTarget, setReplyTarget] = useState<{
         messageId: number;
@@ -351,6 +352,31 @@ export default function ChatWindow({
             return;
         }
         el.scrollTo({ top: el.scrollHeight, behavior });
+    }, []);
+
+    const getCaretCoordinates = useCallback((textarea: HTMLTextAreaElement, position: number) => {
+        const style = getComputedStyle(textarea);
+        const paddingLeft = parseFloat(style.paddingLeft) || 0;
+        const paddingTop = parseFloat(style.paddingTop) || 0;
+        const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+        const fontSize = parseFloat(style.fontSize);
+
+        const text = textarea.value.slice(0, position);
+        const lines = text.split('\n');
+        const lineIndex = lines.length - 1;
+        const lastLine = lines[lineIndex];
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+        ctx.font = `${fontSize}px ${style.fontFamily}`;
+        const textWidth = ctx.measureText(lastLine).width;
+
+        const rect = textarea.getBoundingClientRect();
+
+        return {
+            x: rect.left + paddingLeft + textWidth,
+            y: rect.top + paddingTop + lineIndex * lineHeight,
+        };
     }, []);
 
     useLayoutEffect(() => {
@@ -605,10 +631,13 @@ export default function ChatWindow({
         const textBeforeCursor = value.slice(0, cursorPos);
         const atIndex = textBeforeCursor.lastIndexOf('@');
 
-        if (
-            atIndex !== -1 &&
-            (atIndex === 0 || textBeforeCursor[atIndex - 1] === ' ' || textBeforeCursor[atIndex - 1] === '\n')
-        ) {
+        const coords = getCaretCoordinates(e.target, atIndex + 1); // +1 在 @ 后面
+        setMentionPosition({
+            x: coords.x,
+            y: coords.y - 4,
+        });
+
+        if (atIndex !== -1) {
             const filterText = textBeforeCursor.slice(atIndex + 1);
             const hasSpaceOrEnd = /^[^\s]*$/.test(filterText);
             if (hasSpaceOrEnd && groupMembers && groupMembers.length > 0) {
@@ -616,7 +645,6 @@ export default function ChatWindow({
                 const filtered = groupMembers
                     .filter((m) => m.id !== currentUserId && m.username.toLowerCase().includes(lowerFilter))
                     .slice(0, 8);
-                const prevFilter = mentionFilterRef.current;
                 mentionFilterRef.current = filterText;
                 mentionStartPosRef.current = atIndex;
                 if (filtered.length > 0) {
@@ -926,13 +954,29 @@ return (
 
             {messageActionMenuPortal}
 
-            {mentionSuggest?.visible &&
+            {mentionSuggest?.visible && mentionPosition && 
                 createPortal(
-                    <div ref={mentionSuggestRef} className="mention-suggestions" role="listbox" aria-label="选择要@的成员">
+                    <div 
+                        ref={mentionSuggestRef}
+                        className="mention-suggestions"
+                        role="listbox"
+                        style={{
+                            position: 'fixed',
+                            left: mentionPosition.x,
+                            top: mentionPosition.y,
+                            transform: 'translateY(-100%)',
+                        }}
+                    >
                         {mentionSuggest.members.map((member, index) => (
                             <div
                                 key={member.id}
                                 role="option"
+                                style={{
+                                    padding: '8px 16px',
+                                    cursor: 'pointer',
+                                    fontSize: 14,
+                                    lineHeight: 1.5,
+                                }}
                                 aria-selected={index === mentionSuggest.selectedIndex}
                                 className={`mention-suggestion-item${index === mentionSuggest.selectedIndex ? ' mention-suggestion-item--active' : ''}`}
                                 onMouseDown={(e) => {
