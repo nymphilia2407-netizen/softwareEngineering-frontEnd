@@ -24,6 +24,7 @@ export const formatIncomingMessage = (message: ChatIncomingMessage): Message => 
         clientId: message.client_id,
         mentionedUserIds: message.mentioned_users,
         replyTo: message.reply_to ?? undefined,
+        replyCount: message.reply_to?.replyCount ?? 0,
     };
 };
 

@@ -37,12 +37,14 @@ export type Message = {
     clientId?: string;
     mentionedUserIds?: number[];
     replyTo?: ReplyToData;
+    replyCount?: number;
 };
 
 export interface ReplyToData {
     messageId: number;
     senderUsername: string;
     content: string;
+    replyCount?: number;
 }
 
 export type WsAction =

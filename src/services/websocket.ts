@@ -56,7 +56,7 @@ interface BackendNewMessagePayload {
     timestamp: string;
     client_id?: string | null;
     mentioned_users?: number[];
-    reply_to?: ReplyToData | null;
+    reply_to?: { message_id: number; sender_username: string; content: string; reply_count?: number } | null;
 }
 
 function normalizeSocketEvent(message: ChatSocketEvent): ChatSocketEvent {
@@ -80,7 +80,7 @@ function normalizeSocketEvent(message: ChatSocketEvent): ChatSocketEvent {
                 client_id: b.client_id ?? undefined,
                 mentioned_users: b.mentioned_users,
                 reply_to: b.reply_to
-                    ? { messageId: b.reply_to.message_id, senderUsername: b.reply_to.sender_username, content: b.reply_to.content }
+                    ? { messageId: b.reply_to.message_id, senderUsername: b.reply_to.sender_username, content: b.reply_to.content, replyCount: b.reply_to.reply_count }
                     : undefined,
             },
         };

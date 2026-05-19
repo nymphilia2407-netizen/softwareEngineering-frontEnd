@@ -713,6 +713,12 @@
     border-radius: 0 6px 6px 0;
     max-width: 100%;
     overflow: hidden;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.reply-quote:hover {
+    background: rgba(0, 0, 0, 0.08);
 }
 
 .reply-quote-sender {
@@ -730,6 +736,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.reply-quote-count {
+    display: block;
+    font-size: 11px;
+    color: #5867dd;
+    margin-top: 3px;
 }
 
 .self .reply-quote {

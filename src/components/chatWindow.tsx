@@ -42,6 +42,7 @@ interface ChatWindowProps{
     mentionTargetMessageId?: number;
     onClearMentionTarget?: () => void;
     onNavigateToChat?: (convId: number, messageId?: number, timestamp?: string) => void;
+    onScrollComplete?: () => void;
 }
 
 export default function ChatWindow({
@@ -62,6 +63,7 @@ export default function ChatWindow({
     mentionTargetMessageId,
     onClearMentionTarget,
     onNavigateToChat,
+    onScrollComplete,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
@@ -126,6 +128,7 @@ export default function ChatWindow({
     const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [draftSenderId, setDraftSenderId] = useState(0);
+    const [localScrollTarget, setLocalScrollTarget] = useState<number | null>(null);
     const [draftStartDate, setDraftStartDate] = useState('');
     const [draftEndDate, setDraftEndDate] = useState('');
     const [filterResults, setFilterResults] = useState<SearchResultData[]>([]);
@@ -431,13 +434,16 @@ export default function ChatWindow({
     }, [activeChatId]);
 
     useEffect(() => {
-        if (!scrollToMessageId || !scrollRef.current) return;
-        const key = `id:${scrollToMessageId}`;
+        const targetId = localScrollTarget || scrollToMessageId;
+        if (!targetId || !scrollRef.current) return;
+        const key = `id:${targetId}`;
         const el = scrollRef.current.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(key)}"]`);
         if (el) {
             el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            if (localScrollTarget) setLocalScrollTarget(null);
+            if (scrollToMessageId) onScrollComplete?.();
         }
-    }, [scrollToMessageId, messages]);
+    }, [localScrollTarget, scrollToMessageId, messages, onScrollComplete]);
 
     useLayoutEffect(() => {
         messagesRef.current = messages;
@@ -1063,7 +1069,10 @@ return (
                             </div>
                             <div className="message-bubble">
                                 {msg.replyTo && (
-                                    <div className="reply-quote">
+                                    <div
+                                        className="reply-quote"
+                                        onClick={() => setLocalScrollTarget(msg.replyTo!.messageId)}
+                                    >
                                         <span className="reply-quote-sender">
                                             {msg.replyTo.senderUsername}
                                         </span>
@@ -1082,6 +1091,9 @@ return (
                                                 ),
                                             )}
                                         </span>
+                                        {(msg.replyTo.replyCount ?? 0) > 0 && (
+                                            <span className="reply-quote-count">{msg.replyTo.replyCount} 条回复</span>
+                                        )}
                                     </div>
                                 )}
                                 <p className="message-text">
@@ -1209,7 +1221,8 @@ return (
                             aria-label="取消回复"
                             onClick={() => {
                                 const prefix = `@${replyTarget.senderUsername} `;
-                                setReplyTarget(null);
+        setReplyTarget(null);
+        setLocalScrollTarget(null);
                                 setInputText((prev) =>
                                     prev.startsWith(prefix) ? prev.slice(prefix.length) : prev,
                                 );

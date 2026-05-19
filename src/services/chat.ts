@@ -29,6 +29,7 @@ export interface ChatMessageData {
     created_at: string;
     is_read: boolean;
     reply_to?: ReplyToData | null;
+    reply_count?: number;
 }
 
 /** 后端 GET /api/conversations/ */
@@ -88,8 +89,9 @@ function mapMessageRow(convId: number, row: BackendMessageRow): ChatMessageData 
         created_at: row.timestamp,
         is_read: false,
         reply_to: row.reply_to
-            ? { messageId: row.reply_to.message_id, senderUsername: row.reply_to.sender_username, content: row.reply_to.content }
+            ? { messageId: row.reply_to.message_id, senderUsername: row.reply_to.sender_username, content: row.reply_to.content, replyCount: row.reply_count }
             : undefined,
+        reply_count: row.reply_count,
     };
 }
 

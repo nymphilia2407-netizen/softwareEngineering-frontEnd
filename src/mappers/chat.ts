@@ -31,6 +31,7 @@ export const mapHistoryMessage = (roomId: number, message: ChatMessageData): Mes
         time: new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         isRead: message.is_read,
         replyTo: message.reply_to ?? undefined,
+        replyCount: message.reply_count ?? 0,
     };
 };
 

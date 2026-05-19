@@ -878,6 +878,7 @@ export default function Index() {
                             onOpenSessionInfo={() => setChatSessionInfoOpen(true)}
                             onDeleteMessage={handleDeleteMessage}
                             scrollToMessageId={scrollTarget?.convId === activeChatId ? scrollTarget.messageId : undefined}
+                            onScrollComplete={() => setScrollTarget(null)}
                             mentionTargetMessageId={activeChatId ? mentionTargetMap[activeChatId] : undefined}
                             onClearMentionTarget={() => {
                                 setMentionTargetMap((prev) => {
