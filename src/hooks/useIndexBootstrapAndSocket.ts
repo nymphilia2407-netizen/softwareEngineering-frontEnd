@@ -41,8 +41,6 @@ export type IndexBootstrapSocketParams = {
     setGroupSyncToast: Dispatch<SetStateAction<string | null>>;
     setGroups: Dispatch<SetStateAction<Group[]>>;
     setPendingFriendRequestCount: Dispatch<SetStateAction<number>>;
-    setMentionToast: Dispatch<SetStateAction<string | null>>;
-    setMentionCount: Dispatch<SetStateAction<number>>;
     setMyInvitationCount: Dispatch<SetStateAction<number>>;
     setMentionTargetMap: Dispatch<SetStateAction<Record<number, number>>>;
 };
@@ -71,8 +69,6 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setGroupSyncToast,
         setGroups,
         setPendingFriendRequestCount,
-        setMentionToast,
-        setMentionCount,
         setMyInvitationCount,
         setMentionTargetMap,
     } = params;
@@ -170,15 +166,17 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         getUnreadMentions()
             .then((mentions) => {
                 if (cancelled) return;
+                const activeConv = activeChatIdRef.current;
                 const convIds = new Set(mentions.map((m) => m.conversation_id));
                 if (convIds.size > 0) {
                     setChatRooms((prev) =>
                         prev.map((r) =>
-                            convIds.has(r.id) ? { ...r, hasUnreadMention: true } : r,
+                            convIds.has(r.id) && r.id !== activeConv
+                                ? { ...r, hasUnreadMention: true }
+                                : r,
                         ),
                     );
                 }
-                setMentionCount(mentions.length);
             })
             .catch(() => {});
 
@@ -346,15 +344,13 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 if (event.type === 'mention') {
                     const d = event.data;
                     setMentionTargetMap((prev) => ({ ...prev, [d.conversation_id]: d.message_id }));
-                    setChatRooms((prev) =>
-                        prev.map((r) =>
-                            r.id === d.conversation_id ? { ...r, hasUnreadMention: true } : r,
-                        ),
-                    );
-                    setMentionCount((prev) => prev + 1);
-                    setMentionToast(
-                        `${d.from_username} 在群聊中@了你`,
-                    );
+                    if (d.conversation_id !== activeChatIdRef.current) {
+                        setChatRooms((prev) =>
+                            prev.map((r) =>
+                                r.id === d.conversation_id ? { ...r, hasUnreadMention: true } : r,
+                            ),
+                        );
+                    }
                 }
             });
 
@@ -400,9 +396,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setFriends,
         setGroupSyncToast,
         setGroups,
-        setMentionCount,
         setMentionTargetMap,
-        setMentionToast,
         setMessageStore,
         setMyAvatar,
         setMyInvitationCount,

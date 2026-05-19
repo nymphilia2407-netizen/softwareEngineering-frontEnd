@@ -52,8 +52,6 @@ export default function Index() {
     const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
     const [groupSyncToast, setGroupSyncToast] = useState<string | null>(null);
     const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0);
-    const [mentionCount, setMentionCount] = useState(0);
-    const [mentionToast, setMentionToast] = useState<string | null>(null);
     const [myInvitationCount, setMyInvitationCount] = useState(0);
     const [myInvitationsData, setMyInvitationsData] = useState<MyInvitationData[]>([]);
     const [groupMembersCache, setGroupMembersCache] = useState<Record<number, { id: number; username: string }[]>>({});
@@ -129,7 +127,11 @@ export default function Index() {
             setChatRooms((prev) =>
                 prev.map((r) => (r.id === convId ? { ...r, hasUnreadMention: false } : r)),
             );
-            setMentionCount(0);
+            setMentionTargetMap((prev) => {
+                const next = { ...prev };
+                delete next[convId];
+                return next;
+            });
             getUnreadMentions()
                 .then((mentions) => {
                     const roomMentions = mentions.filter((m) => m.conversation_id === convId);
@@ -213,15 +215,6 @@ export default function Index() {
         const timer = globalThis.setTimeout(() => setGroupSyncToast(null), 4800);
         return () => globalThis.clearTimeout(timer);
     }, [groupSyncToast]);
-
-    useEffect(() => {
-        if (!mentionToast) {
-            return;
-        }
-
-        const timer = globalThis.setTimeout(() => setMentionToast(null), 4800);
-        return () => globalThis.clearTimeout(timer);
-    }, [mentionToast]);
 
     /** 对方同意好友请求后发起方无推送：切到联系人或回到前台时同步列表 */
     useEffect(() => {
@@ -328,8 +321,6 @@ export default function Index() {
         setGroupSyncToast,
         setGroups,
         setPendingFriendRequestCount,
-        setMentionToast,
-        setMentionCount,
         setMyInvitationCount,
         setMentionTargetMap,
     });
@@ -342,6 +333,10 @@ export default function Index() {
     const hasMutedUnread = useMemo(
         () => chatListData.some((room) => room.isMuted === true && (room.unreadCount || 0) > 0),
         [chatListData]
+    );
+    const mentionCount = useMemo(
+        () => chatListData.filter((r) => r.hasUnreadMention === true).length,
+        [chatListData],
     );
     const messages = messageStore[activeChatId] ?? [];
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
@@ -693,7 +688,6 @@ export default function Index() {
     return (
         <div className="main">
             {groupSyncToast ? <GroupSyncToast message={groupSyncToast} /> : null}
-            {mentionToast ? <GroupSyncToast message={mentionToast} /> : null}
 
             <MainSidebar
                 myAvatar={myAvatar}
