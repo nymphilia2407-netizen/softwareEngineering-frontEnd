@@ -18,6 +18,8 @@ export interface GroupMemberData {
     username: string;
     avatar: string;
     role: 'owner' | 'admin' | 'member';
+    muted_until: string | null;
+    is_muted: boolean;
 }
 
 export interface GroupDetailData {
@@ -55,7 +57,7 @@ interface CreateGroupResponseData {
 interface BackendGroupDetailData {
     group_name: string;
     avatar?: string;
-    members: Array<{ user_id: number; username: string; role: string }>;
+    members: Array<{ user_id: number; username: string; role: string; muted_until?: string | null; is_muted?: boolean }>;
     announcements: Array<{
         author_username: string;
         content: string;
@@ -141,6 +143,8 @@ export const getGroupDetail = async (roomId: number) => {
             username: m.username,
             avatar: '',
             role: m.role as 'owner' | 'admin' | 'member',
+            muted_until: m.muted_until ?? null,
+            is_muted: m.is_muted === true,
         })),
         announcements: raw.announcements.map((a, index) => ({
             id: index + 1,

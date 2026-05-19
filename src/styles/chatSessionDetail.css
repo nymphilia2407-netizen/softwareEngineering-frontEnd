@@ -645,6 +645,13 @@
     font-weight: 600;
 }
 
+.member-mute-badge {
+    font-size: 11px;
+    color: #f59e0b;
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
 .contact-group-avatar-file-input {
     position: absolute;
     width: 0;

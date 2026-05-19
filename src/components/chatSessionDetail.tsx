@@ -297,6 +297,18 @@ export default function ChatSessionDetail({
                                                     {m.username}
                                                     {m.role === 'owner' && ' (群主)'}
                                                     {m.role === 'admin' && ' (管理员)'}
+                                                    {m.is_muted && m.muted_until && (
+                                                        <span className="member-mute-badge">
+                                                            已禁言（
+                                                            {(() => {
+                                                                const remaining = Math.max(0, Math.ceil((new Date(m.muted_until!).getTime() - Date.now()) / 60000));
+                                                                return remaining >= 60
+                                                                    ? `剩余${Math.floor(remaining / 60)}小时${remaining % 60}分钟`
+                                                                    : `剩余${remaining}分钟`;
+                                                            })()}
+                                                            ）
+                                                        </span>
+                                                    )}
                                                 </span>
                                                 <span className="member-actions">
                                                     {showRoleMenu && (
