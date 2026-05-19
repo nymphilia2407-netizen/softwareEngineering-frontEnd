@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole, muteMember, removeMember, inviteMembers, getGroupInvitations, processInvitation } from '../services/group';
+import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole, muteMember, removeMember, inviteMembers, getGroupInvitations, processInvitation, updateAnnouncement, deleteAnnouncement } from '../services/group';
 import { searchMessages } from '../services/chat';
 import { getFriendDetail, deleteFriend } from '../services/friend';
 import type { FriendDetail } from '../services/friend';
@@ -63,6 +63,8 @@ export default function ChatSessionDetail({
     const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [searchTotal, setSearchTotal] = useState(0);
+    const [editingAnnouncementId, setEditingAnnouncementId] = useState<number | null>(null);
+    const [editAnnouncementContent, setEditAnnouncementContent] = useState('');
 
     const currentMember = groupDetail?.members.find(m => m.user_id === currentUserId);
     const currentUserRole = currentMember?.role;
@@ -184,6 +186,29 @@ export default function ChatSessionDetail({
             setPendingInvitations(updated);
         } catch (err) {
             alert(err instanceof Error ? err.message : '操作失败');
+        }
+    };
+
+    const handleEditAnnouncement = async () => {
+        if (!editAnnouncementContent.trim() || editingAnnouncementId == null) return;
+        try {
+            await updateAnnouncement(roomId, editingAnnouncementId, editAnnouncementContent.trim());
+            alert('公告已修改');
+            setEditingAnnouncementId(null);
+            setEditAnnouncementContent('');
+            await refreshGroupDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '修改失败');
+        }
+    };
+
+    const handleDeleteAnnouncement = async (announcementId: number) => {
+        if (!globalThis.confirm('确认删除该公告？')) return;
+        try {
+            await deleteAnnouncement(roomId, announcementId);
+            await refreshGroupDetail();
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '删除失败');
         }
     };
 
@@ -408,8 +433,74 @@ export default function ChatSessionDetail({
                             </div>
                             {groupDetail.announcements.length > 0 && (
                                 <div>
-                                    <dt>公告</dt>
-                                    <dd>{groupDetail.announcements[0].content}</dd>
+                                    <dt>公告 ({groupDetail.announcements.length})</dt>
+                                    <dd>
+                                        <div className="announcement-list">
+                                            {groupDetail.announcements.map((a) => (
+                                                <div key={a.id} className="announcement-item">
+                                                    <div className="announcement-item-header">
+                                                        <span className="announcement-item-author">{a.author_name}</span>
+                                                        <span className="announcement-item-time">
+                                                            {new Date(a.created_at).toLocaleString()}
+                                                        </span>
+                                                        {(currentUserRole === 'owner' || currentUserRole === 'admin') && (
+                                                            <span className="announcement-item-actions">
+                                                                <button
+                                                                    type="button"
+                                                                    className="announcement-edit-btn"
+                                                                    onClick={() => {
+                                                                        setEditingAnnouncementId(a.id);
+                                                                        setEditAnnouncementContent(a.content);
+                                                                    }}
+                                                                >
+                                                                    编辑
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="announcement-delete-btn"
+                                                                    onClick={() => handleDeleteAnnouncement(a.id)}
+                                                                >
+                                                                    删除
+                                                                </button>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {editingAnnouncementId === a.id ? (
+                                                        <div className="announcement-edit-row">
+                                                            <textarea
+                                                                className="announcement-edit-input"
+                                                                value={editAnnouncementContent}
+                                                                onChange={(e) => setEditAnnouncementContent(e.target.value)}
+                                                                rows={3}
+                                                            />
+                                                            <div className="announcement-edit-actions">
+                                                                <button
+                                                                    type="button"
+                                                                    className="announcement-edit-cancel"
+                                                                    onClick={() => {
+                                                                        setEditingAnnouncementId(null);
+                                                                        setEditAnnouncementContent('');
+                                                                    }}
+                                                                >
+                                                                    取消
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="announcement-edit-save"
+                                                                    disabled={!editAnnouncementContent.trim()}
+                                                                    onClick={handleEditAnnouncement}
+                                                                >
+                                                                    保存
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="announcement-item-content">{a.content}</p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </dd>
                                 </div>
                             )}
                         </dl>

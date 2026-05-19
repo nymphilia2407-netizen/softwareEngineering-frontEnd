@@ -59,6 +59,8 @@ interface BackendGroupDetailData {
     avatar?: string;
     members: Array<{ user_id: number; username: string; role: string; muted_until?: string | null; is_muted?: boolean }>;
     announcements: Array<{
+        id?: number;
+        author_id?: number;
         author_username: string;
         content: string;
         created_at: string;
@@ -146,11 +148,11 @@ export const getGroupDetail = async (roomId: number) => {
             muted_until: m.muted_until ?? null,
             is_muted: m.is_muted === true,
         })),
-        announcements: raw.announcements.map((a, index) => ({
-            id: index + 1,
+        announcements: raw.announcements.map((a) => ({
+            id: a.id ?? 0,
             content: a.content,
             created_at: a.created_at,
-            author_id: 0,
+            author_id: a.author_id ?? 0,
             author_name: a.author_username,
         })),
     };
@@ -177,6 +179,21 @@ export const publishAnnouncement = async (groupId: number, content: string): Pro
         { content },
     );
     assertApiSuccess(response, '发布公告失败');
+};
+
+export const updateAnnouncement = async (groupId: number, announcementId: number, content: string): Promise<void> => {
+    const response = await request.put<unknown, ApiResponse<null>>(
+        `/api/groups/${groupId}/announcements/${announcementId}/`,
+        { content },
+    );
+    assertApiSuccess(response, '修改公告失败');
+};
+
+export const deleteAnnouncement = async (groupId: number, announcementId: number): Promise<void> => {
+    const response = await request.delete<unknown, ApiResponse<null>>(
+        `/api/groups/${groupId}/announcements/${announcementId}/`,
+    );
+    assertApiSuccess(response, '删除公告失败');
 };
 
 /** 更新成员角色（转让群主 / 设管理员 / 取消管理员） */
