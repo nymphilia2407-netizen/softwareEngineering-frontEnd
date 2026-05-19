@@ -326,6 +326,23 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                         } else {
                             setGroupSyncToast(`${inviter} 在「${displayName}」中发起了成员邀请，请前往会话信息审核`);
                         }
+                    } else if (d.action === 'mute_updated') {
+                        const displayName = d.group_name?.trim() || '群聊';
+                        const isSelf = d.user_id === currentUserIdRef.current;
+                        if (d.muted_until) {
+                            const until = new Date(d.muted_until);
+                            const minutes = Math.round((until.getTime() - Date.now()) / 60000);
+                            const duration = minutes >= 60
+                                ? `${Math.floor(minutes / 60)}小时${minutes % 60}分钟`
+                                : `${minutes}分钟`;
+                            if (isSelf) {
+                                setGroupSyncToast(`你已被禁言${duration}（群聊[${displayName}]）`);
+                            }
+                        } else {
+                            if (isSelf) {
+                                setGroupSyncToast(`你已被解除禁言（群聊[${displayName}]）`);
+                            }
+                        }
                     }
 
                     if (d.action !== 'avatar_updated') {
