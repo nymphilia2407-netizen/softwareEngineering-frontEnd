@@ -99,13 +99,13 @@ export const getChatRooms = async () => {
     return rows.map(mapConversationRow);
 };
 
-export const getChatMessages = async (roomId: number, limit = 50, offset = 0, startTime?: string) => {
+export const getChatMessages = async (roomId: number, limit = 50, offset = 0, startTime?: string, senderId?: number, endTime?: string) => {
     const page = Math.floor(offset / limit) + 1;
     const pageSize = limit;
     const params: Record<string, string | number> = { page, page_size: pageSize };
-    if (startTime) {
-        params.start_time = startTime;
-    }
+    if (startTime) params.start_time = startTime;
+    if (senderId) params.sender_id = senderId;
+    if (endTime) params.end_time = endTime;
     const response = await request.get<
         unknown,
         ApiResponse<{ messages: BackendMessageRow[]; total_pages: number; current_page: number }>

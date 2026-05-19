@@ -342,7 +342,11 @@ export default function Index() {
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
 
-    useActiveChatHistory(activeChatId, setMessageStore, scrollTarget?.convId === activeChatId ? scrollTarget.timestamp : undefined);
+    useActiveChatHistory(
+        activeChatId,
+        setMessageStore,
+        scrollTarget?.convId === activeChatId ? scrollTarget.timestamp : undefined,
+    );
 
     const optimisticRefs = useMemo<IndexOptimisticRefs>(
         () => ({
@@ -881,6 +885,14 @@ export default function Index() {
                                     delete next[activeChatId];
                                     return next;
                                 });
+                            }}
+                            onNavigateToChat={(convId: number, messageId?: number, timestamp?: string) => {
+                                setChatSessionInfoOpen(false);
+                                setChatRooms((prev) => clearUnreadRoom(prev, convId));
+                                setActiveChatId(convId);
+                                if (messageId && timestamp) {
+                                    setScrollTarget({ convId, messageId, timestamp });
+                                }
                             }}
                         />
                     )

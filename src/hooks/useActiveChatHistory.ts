@@ -8,6 +8,8 @@ export function useActiveChatHistory(
     activeChatId: number,
     setMessageStore: Dispatch<SetStateAction<Record<number, Message[]>>>,
     targetTimestamp?: string,
+    filterSenderId?: number,
+    filterEndTime?: string,
 ) {
     useEffect(() => {
         if (!activeChatId) {
@@ -18,7 +20,7 @@ export function useActiveChatHistory(
 
         const loadMessages = async () => {
             try {
-                const history = await getChatMessages(activeChatId, 100, 0, targetTimestamp);
+                const history = await getChatMessages(activeChatId, 100, 0, targetTimestamp, filterSenderId, filterEndTime);
 
                 if (cancelled) {
                     return;
@@ -42,5 +44,5 @@ export function useActiveChatHistory(
         return () => {
             cancelled = true;
         };
-    }, [activeChatId, setMessageStore, targetTimestamp]);
+    }, [activeChatId, setMessageStore, targetTimestamp, filterSenderId, filterEndTime]);
 }

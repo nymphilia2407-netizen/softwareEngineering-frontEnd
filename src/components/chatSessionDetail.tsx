@@ -521,21 +521,6 @@ export default function ChatSessionDetail({
                             </div>
                         )}
 
-                        <div className="invite-section">
-                            <button
-                                type="button"
-                                className="invite-members-button"
-                                onClick={() => {
-                                    setSearchKeyword('');
-                                    setSearchResults([]);
-                                    setSearchTotal(0);
-                                    setShowSearchModal(true);
-                                }}
-                            >
-                                搜索消息
-                            </button>
-                        </div>
-
                         {pendingInvitations.length > 0 && (
                             <div className="pending-invitations">
                                 <div className="pending-invitations-title">

@@ -3,7 +3,9 @@ import { createPortal } from "react-dom";
 
 import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
-import { sameUserId, formatMessageTime } from '../utils/messageStore';
+import type { SearchResultData } from "../types/chat";
+import { searchMessages, getChatMessages } from "../services/chat";
+import { sameUserId } from '../utils/messageStore';
 import { resolvedUserAvatar } from '../utils/avatar';
 
 import '../styles/chatWindow.css'
@@ -39,6 +41,7 @@ interface ChatWindowProps{
     scrollToMessageId?: number;
     mentionTargetMessageId?: number;
     onClearMentionTarget?: () => void;
+    onNavigateToChat?: (convId: number, messageId?: number, timestamp?: string) => void;
 }
 
 export default function ChatWindow({
@@ -58,6 +61,7 @@ export default function ChatWindow({
     scrollToMessageId,
     mentionTargetMessageId,
     onClearMentionTarget,
+    onNavigateToChat,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
@@ -116,6 +120,17 @@ export default function ChatWindow({
         senderUsername: string;
         content: string;
     } | null>(null);
+
+    const [showSearchPanel, setShowSearchPanel] = useState(false);
+    const [searchKeyword, setSearchKeyword] = useState('');
+    const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const [draftSenderId, setDraftSenderId] = useState(0);
+    const [draftStartDate, setDraftStartDate] = useState('');
+    const [draftEndDate, setDraftEndDate] = useState('');
+    const [filterResults, setFilterResults] = useState<SearchResultData[]>([]);
+    const [filterLoading, setFilterLoading] = useState(false);
+    const searchPanelRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (onReadMentions && activeChatId) {
@@ -231,6 +246,17 @@ export default function ChatWindow({
     }, [messageActionMenu, closeMessageActionMenu]);
 
     useEffect(() => () => closeMessageActionMenu(), [closeMessageActionMenu]);
+
+    useEffect(() => {
+        if (!showSearchPanel) return;
+        const handleClick = (e: MouseEvent) => {
+            if (searchPanelRef.current && !searchPanelRef.current.contains(e.target as Node)) {
+                setShowSearchPanel(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [showSearchPanel]);
 
     const resolveReadCursorId = useCallback((msgs: Message[]) => {
         for (let i = msgs.length - 1; i >= 0; i -= 1) {
@@ -562,6 +588,50 @@ export default function ChatWindow({
         jumpToFirstUnreadFromKeys(orderKeysByMessageTop(headerUnreadKeysRef.current));
     };
 
+    const handleApplyFilter = async () => {
+        setFilterLoading(true);
+        try {
+            const startTime = draftStartDate ? draftStartDate + 'T00:00:00' : undefined;
+            const endTime = draftEndDate ? draftEndDate + 'T23:59:59' : undefined;
+            const data = await getChatMessages(activeChatId, 200, 0, startTime, draftSenderId || undefined, endTime);
+            const results: SearchResultData[] = data.messages.map((m) => ({
+                message_id: m.id,
+                conversation_id: activeChatId,
+                conversation_name: activeChatName,
+                sender: { user_id: m.sender_id, username: m.sender_username || '', avatar: m.sender_avatar || '' },
+                content: m.content,
+                timestamp: m.created_at,
+            }));
+            results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            setFilterResults(results);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '筛选失败');
+        } finally {
+            setFilterLoading(false);
+        }
+    };
+
+    const handleClearFilter = () => {
+        setDraftSenderId(0);
+        setDraftStartDate('');
+        setDraftEndDate('');
+        setFilterResults([]);
+    };
+
+    const handleSearch = async () => {
+        const q = searchKeyword.trim();
+        if (!q) return;
+        setSearchLoading(true);
+        try {
+            const data = await searchMessages(q, 1, 50);
+            setSearchResults(data.results);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : '搜索失败');
+        } finally {
+            setSearchLoading(false);
+        }
+    };
+
     const handleFloatingJumpToUnread = () => {
         canConsumeUnreadRef.current = true;
         const ordered = orderKeysByMessageTop(floatingUnreadKeysRef.current);
@@ -787,6 +857,135 @@ return (
                         上方未读 {headerUnreadCount > 99 ? '99+' : headerUnreadCount}
                     </button>
                 ) : null}
+                <div className="chat-header-search-wrap" ref={searchPanelRef}>
+                    <button
+                        type="button"
+                        className="chat-header-search-btn"
+                        aria-label="搜索与筛选"
+                        onClick={() => {
+                            setShowSearchPanel((prev) => {
+                                if (prev) {
+                                    setSearchKeyword('');
+                                    setSearchResults([]);
+                                }
+                                return !prev;
+                            });
+                        }}
+                    >
+                        &#128269;
+                    </button>
+                    {showSearchPanel && (
+                        <div className="chat-header-search-panel">
+                            <div className="search-panel-section">
+                                <div className="search-panel-label">搜索消息</div>
+                                <div className="search-panel-keyword-row">
+                                    <input
+                                        type="text"
+                                        className="search-panel-input"
+                                        placeholder="输入关键词..."
+                                        value={searchKeyword}
+                                        onChange={(e) => setSearchKeyword(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="search-panel-search-btn"
+                                        disabled={!searchKeyword.trim() || searchLoading}
+                                        onClick={handleSearch}
+                                    >
+                                        {searchLoading ? '...' : '搜索'}
+                                    </button>
+                                </div>
+                                {searchResults.length > 0 && (
+                                    <div className="search-panel-results">
+                                        {searchResults.map((r) => (
+                                            <div
+                                                key={r.message_id}
+                                                className="search-panel-result-item"
+                                                onClick={() => {
+                                                    setShowSearchPanel(false);
+                                                    setSearchKeyword('');
+                                                    setSearchResults([]);
+                                                    onNavigateToChat?.(r.conversation_id, r.message_id, r.timestamp);
+                                                }}
+                                            >
+                                                <span className="search-panel-result-conv">{r.conversation_name}</span>
+                                                <span className="search-panel-result-sender">{r.sender.username}</span>
+                                                <span className="search-panel-result-text">{r.content.slice(0, 60)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="search-panel-section">
+                                <div className="search-panel-label">筛选当前会话</div>
+                                <div className="search-panel-filter-row">
+                                    <label className="search-panel-filter-label">发送人:</label>
+                                    <select
+                                        className="search-panel-select"
+                                        value={draftSenderId}
+                                        onChange={(e) => setDraftSenderId(Number(e.target.value))}
+                                    >
+                                        <option value={0}>全部</option>
+                                        {groupMembers?.map((m) => (
+                                            <option key={m.id} value={m.id}>{m.username}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="search-panel-filter-row">
+                                    <label className="search-panel-filter-label">起始:</label>
+                                    <input
+                                        type="date"
+                                        className="search-panel-date"
+                                        value={draftStartDate}
+                                        onChange={(e) => setDraftStartDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="search-panel-filter-row">
+                                    <label className="search-panel-filter-label">截止:</label>
+                                    <input
+                                        type="date"
+                                        className="search-panel-date"
+                                        value={draftEndDate}
+                                        onChange={(e) => setDraftEndDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="search-panel-filter-actions">
+                                    <button type="button" className="search-panel-filter-apply" disabled={filterLoading} onClick={handleApplyFilter}>
+                                        {filterLoading ? '筛选...' : '应用筛选'}
+                                    </button>
+                                    <button type="button" className="search-panel-filter-clear" onClick={handleClearFilter}>
+                                        清除
+                                    </button>
+                                </div>
+                                {filterResults.length > 0 && (
+                                    <div className="search-panel-results" style={{ marginTop: 12 }}>
+                                        <div className="search-panel-label">筛选结果 ({filterResults.length} 条)</div>
+                                        {filterResults.map((r) => (
+                                            <div
+                                                key={r.message_id}
+                                                className="search-panel-result-item"
+                                                onClick={() => {
+                                                    setShowSearchPanel(false);
+                                                    setFilterResults([]);
+                                                    setDraftSenderId(0);
+                                                    setDraftStartDate('');
+                                                    setDraftEndDate('');
+                                                    onNavigateToChat?.(r.conversation_id, r.message_id, r.timestamp);
+                                                }}
+                                            >
+                                                <span className="search-panel-result-sender">
+                                                    {new Date(r.timestamp).toLocaleDateString()} {new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} {r.sender.username}
+                                                </span>
+                                                <span className="search-panel-result-text">{r.content.slice(0, 80)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
                 {onOpenSessionInfo && (
                     <button
                         type="button"
@@ -860,9 +1059,7 @@ return (
                                 {isGroupChat && (
                                     <span className={`message-sender-name${isSelf ? " self" : ""}`}>{senderLabel}</span>
                                 )}
-                                <span className="msg-time-row">
-                                    {formatMessageTime(msg.timestamp)}
-                                </span>
+                                <span className="msg-time-row">{msg.time ?? ""}</span>
                             </div>
                             <div className="message-bubble">
                                 {msg.replyTo && (
