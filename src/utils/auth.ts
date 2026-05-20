@@ -28,6 +28,7 @@ export interface UserProfileCache {
     birthday: string;
     address: string;
     signature: string;
+    phone: string;
 }
 
 export function readUserProfileCache(): UserProfileCache | null {
@@ -48,6 +49,7 @@ export function readUserProfileCache(): UserProfileCache | null {
             birthday: typeof p.birthday === 'string' ? p.birthday : '',
             address: typeof p.address === 'string' ? p.address : '',
             signature: typeof p.signature === 'string' ? p.signature : '',
+            phone: typeof p.phone === 'string' ? p.phone : '',
         };
     } catch {
         return null;
@@ -61,6 +63,7 @@ export function persistUserProfile(updates: {
     birthday?: string;
     address?: string;
     signature?: string;
+    phone?: string;
 }): void {
     const prev = readUserProfileCache();
     const sameUser = prev !== null && prev.username === updates.username;
@@ -75,6 +78,8 @@ export function persistUserProfile(updates: {
             updates.address !== undefined ? updates.address : sameUser ? prev.address : '',
         signature:
             updates.signature !== undefined ? updates.signature : sameUser ? prev.signature : '',
+        phone:
+            updates.phone !== undefined ? updates.phone : sameUser ? prev.phone : '',
     };
 
     localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(next));

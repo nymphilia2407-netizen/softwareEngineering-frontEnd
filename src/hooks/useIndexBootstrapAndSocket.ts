@@ -33,6 +33,7 @@ export type IndexBootstrapSocketParams = {
     setProfileBirthday: Dispatch<SetStateAction<string>>;
     setProfileAddress: Dispatch<SetStateAction<string>>;
     setProfileSignature: Dispatch<SetStateAction<string>>;
+    setProfilePhone: Dispatch<SetStateAction<string>>;
     setUserEmail: Dispatch<SetStateAction<string>>;
     setFriends: Dispatch<SetStateAction<User[]>>;
     setChatRooms: Dispatch<SetStateAction<ChatListItem[]>>;
@@ -61,6 +62,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setProfileBirthday,
         setProfileAddress,
         setProfileSignature,
+        setProfilePhone,
         setUserEmail,
         setFriends,
         setChatRooms,
@@ -92,6 +94,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 setProfileBirthday(currentUser.birthday);
                 setProfileAddress(currentUser.address);
                 setProfileSignature(currentUser.signature);
+                setProfilePhone(currentUser.phone ?? '');
                 setUserEmail(currentUser.email ?? '');
                 persistUserProfile({
                     username: currentUser.username,
@@ -99,6 +102,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                     birthday: currentUser.birthday ?? '',
                     address: currentUser.address ?? '',
                     signature: currentUser.signature ?? '',
+                    phone: currentUser.phone ?? '',
                 });
             } catch (error) {
                 console.error('获取当前用户失败:', error);
@@ -421,6 +425,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setProfileAddress,
         setProfileBirthday,
         setProfileSignature,
+        setProfilePhone,
         setUserEmail,
         setUserName,
         socketRef,

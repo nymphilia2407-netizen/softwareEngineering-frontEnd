@@ -10,6 +10,7 @@ export interface CurrentUserData {
     birthday: string;
     address: string;
     signature: string;
+    phone: string;
 }
 
 export const getCurrentUser = async () => {
@@ -26,6 +27,7 @@ export interface UpdateProfilePayload {
     birthday?: string;
     address?: string;
     signature?: string;
+    phone?: string;
 }
 
 export const updateUserProfile = async (payload: UpdateProfilePayload) => {

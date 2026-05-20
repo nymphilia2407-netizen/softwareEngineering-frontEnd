@@ -50,6 +50,7 @@ export default function Index() {
     const [profileBirthday, setProfileBirthday] = useState<string>(profileBoot.profileBirthday);
     const [profileAddress, setProfileAddress] = useState<string>(profileBoot.profileAddress);
     const [profileSignature, setProfileSignature] = useState<string>(profileBoot.profileSignature);
+    const [profilePhone, setProfilePhone] = useState<string>(profileBoot.profilePhone);
     const [entryUnreadHintCount, setEntryUnreadHintCount] = useState<number>(0);
     const [groupSyncToast, setGroupSyncToast] = useState<string | null>(null);
     const [pendingFriendRequestCount, setPendingFriendRequestCount] = useState(0);
@@ -314,6 +315,7 @@ export default function Index() {
         setProfileBirthday,
         setProfileAddress,
         setProfileSignature,
+        setProfilePhone,
         setUserEmail,
         setFriends,
         setChatRooms,
@@ -814,19 +816,22 @@ export default function Index() {
                             birthday: profileBirthday,
                             address: profileAddress,
                             signature: profileSignature,
+                            phone: profilePhone,
                         }}
                         onAvatarUpdated={setMyAvatar}
                         onEmailUpdated={setUserEmail}
-                        onProfileFieldsSaved={({ birthday, address, signature }) => {
+                        onProfileFieldsSaved={({ birthday, address, signature, phone }) => {
                             setProfileBirthday(birthday);
                             setProfileAddress(address);
                             setProfileSignature(signature);
+                            setProfilePhone(phone);
                             persistUserProfile({
                                 username: userName,
                                 avatar: myAvatar,
                                 birthday,
                                 address,
                                 signature,
+                                phone,
                             });
                         }}
                         onLogout={handleLogout}

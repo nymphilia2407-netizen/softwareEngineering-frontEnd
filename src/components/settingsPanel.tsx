@@ -24,9 +24,10 @@ export interface SettingsPanelProps {
 		birthday: string;
 		address: string;
 		signature: string;
+		phone: string;
 	};
 	onAvatarUpdated: (avatar: string) => void;
-	onProfileFieldsSaved: (fields: { birthday: string; address: string; signature: string }) => void;
+	onProfileFieldsSaved: (fields: { birthday: string; address: string; signature: string; phone: string }) => void;
 	onEmailUpdated: (email: string) => void;
 	onLogout: () => void;
 	onDeleteAccount: () => Promise<void>;
@@ -49,6 +50,7 @@ export default function SettingsPanel({
 	const [profileBirthday, setProfileBirthday] = useState(currentUser.birthday);
 	const [profileAddress, setProfileAddress] = useState(currentUser.address);
 	const [profileSignature, setProfileSignature] = useState(currentUser.signature);
+	const [profilePhone, setProfilePhone] = useState(currentUser.phone);
 	const [isSaving, setIsSaving] = useState(false);
 	const [avatar, setAvatar] = useState(currentUser.avatar);
 	const [profileAvatarSaving, setProfileAvatarSaving] = useState(false);
@@ -84,7 +86,8 @@ export default function SettingsPanel({
 		setProfileBirthday(currentUser.birthday);
 		setProfileAddress(currentUser.address);
 		setProfileSignature(currentUser.signature);
-	}, [currentUser.avatar, currentUser.address, currentUser.birthday, currentUser.signature]);
+		setProfilePhone(currentUser.phone);
+	}, [currentUser.avatar, currentUser.address, currentUser.birthday, currentUser.signature, currentUser.phone]);
 
 	useEffect(() => {
 		if (isOpen && panelView === 'security') {
@@ -113,11 +116,13 @@ export default function SettingsPanel({
 				birthday: profileBirthday,
 				address: profileAddress,
 				signature: profileSignature,
+				phone: profilePhone,
 			});
 			onProfileFieldsSaved({
 				birthday: profileBirthday,
 				address: profileAddress,
 				signature: profileSignature,
+				phone: profilePhone,
 			});
 			alert('保存成功');
 			goPanel('menu');
@@ -361,7 +366,7 @@ export default function SettingsPanel({
 						</button>
 
 						<div className="profile-settings-actions">
-							<button type="button" className="config-nav-button config-nav-button--secondary" onClick={() => goPanel('menu')}>
+							<button type="button" className="config-nav-button config-nav-button--secondary" onClick={() => showMenuInMain ? goPanel('menu') : onClose()}>
 								返回
 							</button>
 						</div>
@@ -413,11 +418,21 @@ export default function SettingsPanel({
 							onChange={(e) => setProfileSignature(e.target.value)}
 						/>
 
+						<div className="profile-settings-title">手机号</div>
+						<input
+							type="tel"
+							className="profile-settings-input"
+							value={profilePhone}
+							placeholder="输入你的手机号"
+							title="手机号"
+							onChange={(e) => setProfilePhone(e.target.value)}
+						/>
+
 						<div className="profile-settings-actions">
 							<button type="button" className="config-nav-button" onClick={handleSaveProfile}>
 								{isSaving ? '保存中...' : '保存并提交'}
 							</button>
-							<button type="button" className="config-nav-button config-nav-button--secondary" onClick={() => goPanel('menu')}>
+							<button type="button" className="config-nav-button config-nav-button--secondary" onClick={() => showMenuInMain ? goPanel('menu') : onClose()}>
 								返回
 							</button>
 						</div>

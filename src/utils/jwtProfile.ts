@@ -38,6 +38,7 @@ export const readInitialUserFromLocalCache = () => {
             profileBirthday: '',
             profileAddress: '',
             profileSignature: '',
+            profilePhone: '',
         };
     }
 
@@ -46,5 +47,6 @@ export const readInitialUserFromLocalCache = () => {
         profileBirthday: cache.birthday,
         profileAddress: cache.address,
         profileSignature: cache.signature,
+        profilePhone: cache.phone,
     };
 };
