@@ -73,6 +73,7 @@ export default function ChatWindow({
     /** 顶栏「上方未读」= 进会话时按 initialUnread 种下的对方消息，上滑读历史时递减 */
     const [headerUnreadCount, setHeaderUnreadCount] = useState(0);
     const [showHeaderUnreadButton, setShowHeaderUnreadButton] = useState(false);
+    const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const onReadMessageRef = useRef(onReadMessage);
@@ -442,6 +443,8 @@ export default function ChatWindow({
         const el = scrollRef.current.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(key)}"]`);
         if (el) {
             el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            setHighlightMessageId(targetId);
+            setTimeout(() => setHighlightMessageId(null), 2000);
             if (localScrollTarget) setLocalScrollTarget(null);
             if (scrollToMessageId) onScrollComplete?.();
         }
@@ -1059,7 +1062,7 @@ return (
                     <div
                         key={msgKey}
                         data-message-key={msgKey}
-                        className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}`}
+                        className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}${highlightMessageId === msg.id ? " message-highlight" : ""}`}
                         onPointerEnter={(e) => handleMessageRowPointerEnter(msgKey, e)}
                         onPointerLeave={() => handleMessageRowPointerLeave(msgKey)}
                         onContextMenu={(e) => handleMessageRowContextMenu(msgKey, e)}
