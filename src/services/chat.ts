@@ -1,6 +1,7 @@
 import request from '../utils/request';
 
 import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
+import { mergeUserAvatars, getCachedAvatar } from '../utils/avatar';
 import type { ReplyToData } from '../types/entity';
 import type { SearchResultData } from '../types/chat';
 
@@ -78,7 +79,8 @@ function mapConversationRow(row: BackendConversationRow): ChatRoomSummaryData {
 
 function mapMessageRow(convId: number, row: BackendMessageRow): ChatMessageData {
     const sender = row.sender;
-    const rawAvatar = sender?.avatar?.trim();
+    const avatarFromCache = sender ? getCachedAvatar(sender.user_id) : undefined;
+    const rawAvatar = avatarFromCache?.trim();
     return {
         id: row.message_id,
         room_id: convId,
@@ -114,7 +116,9 @@ export const getChatMessages = async (roomId: number, limit = 50, offset = 0, st
     >(`/api/conversations/${roomId}/messages/`, { params });
 
     const payload = unwrapApiData(response, '获取聊天记录失败');
-    const { messages } = payload;
+    const { messages, user_avatars } = payload as { messages: BackendMessageRow[]; user_avatars?: Record<string, string> };
+    // 将服务端返回的头像映射合并到本地缓存，保证同一 user_id 只保留一份头像
+    mergeUserAvatars(user_avatars);
     return {
         room_id: roomId,
         count: messages.length,

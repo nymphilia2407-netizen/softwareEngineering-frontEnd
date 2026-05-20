@@ -31,3 +31,25 @@ export async function readAvatarFileAsDataUrl(file: File): Promise<string> {
         reader.readAsDataURL(file);
     });
 }
+
+// 简单的内存级头像缓存，按 user_id 存储原始 avatar 字符串
+const avatarCache: Record<string, string> = {};
+
+export function setCachedAvatar(userId: number, avatar: string | null | undefined) {
+    const v = (avatar ?? '').trim();
+    if (v.length > 0) {
+        avatarCache[String(userId)] = v;
+    }
+}
+
+export function getCachedAvatar(userId: number): string | undefined {
+    return avatarCache[String(userId)];
+}
+
+export function mergeUserAvatars(map: Record<string, string> | undefined) {
+    if (!map) return;
+    Object.keys(map).forEach((k) => {
+        const v = (map[k] ?? '').trim();
+        if (v.length > 0) avatarCache[k] = v;
+    });
+}
