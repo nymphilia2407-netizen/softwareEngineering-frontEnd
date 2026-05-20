@@ -43,6 +43,7 @@ interface ChatWindowProps{
     onClearMentionTarget?: () => void;
     onNavigateToChat?: (convId: number, messageId?: number, timestamp?: string) => void;
     onScrollComplete?: () => void;
+    onAddFriend?: (userId: number, username: string) => void;
 }
 
 export default function ChatWindow({
@@ -64,6 +65,7 @@ export default function ChatWindow({
     onClearMentionTarget,
     onNavigateToChat,
     onScrollComplete,
+    onAddFriend,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
     /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
@@ -831,6 +833,21 @@ export default function ChatWindow({
                     >
                         回复
                     </button>
+                    {isGroupChat && targetMsg && isOtherMemberMessage(targetMsg, currentUserId) && onAddFriend && (
+                        <button
+                            type="button"
+                            className="message-action-btn"
+                            role="menuitem"
+                            onClick={() => {
+                                if (globalThis.confirm(`发送好友请求给 ${targetMsg.senderUsername || '用户'}？`)) {
+                                    onAddFriend(targetMsg.senderId, targetMsg.senderUsername || '用户');
+                                }
+                                closeMessageActionMenu();
+                            }}
+                        >
+                            添加好友
+                        </button>
+                    )}
                     {canDelete && (
                         <button
                             type="button"

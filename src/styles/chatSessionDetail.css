@@ -492,6 +492,18 @@
     background: #ff4d4f;
 }
 
+.member-action-button--friend {
+    color: #52c41a;
+    border-color: #52c41a;
+    background: #f6ffed;
+}
+
+.member-action-button--friend:hover {
+    border-color: #52c41a;
+    color: #fff;
+    background: #52c41a;
+}
+
 .role-menu-wrapper {
     position: relative;
 }

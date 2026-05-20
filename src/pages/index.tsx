@@ -18,6 +18,7 @@ import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomL
 import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage, clearConversationMessages, getUnreadMentions } from '../services/chat';
 import { createGroup, getGroupList, getGroupDetail, updateGroupAvatar, getMyInvitations, respondToInvitation } from '../services/group';
 import { getFriendList } from '../services/friend';
+import { sendFriendRequest } from '../services/friend';
 import { deleteUser } from '../services/user';
 import { markMentionRead } from '../services/chat';
 import type { ChatWebSocketClient } from '../services/websocket';
@@ -675,6 +676,18 @@ export default function Index() {
         [],
     );
 
+    const handleAddFriend = useCallback(
+        async (userId: number, username: string) => {
+            try {
+                await sendFriendRequest(userId);
+                alert(`好友请求已发送给 ${username}`);
+            } catch (err) {
+                alert(err instanceof Error ? err.message : '发送失败');
+            }
+        },
+        [],
+    );
+
     const handleRespondToInvitation = async (invitationId: number, action: 'accept' | 'reject') => {
         try {
             await respondToInvitation(invitationId, action);
@@ -853,6 +866,7 @@ export default function Index() {
                             onBack={() => setChatSessionInfoOpen(false)}
                             onDeleted={handleChatDeleted}
                             friends={friends}
+                            onAddFriend={handleAddFriend}
                             onNavigateToChat={(convId: number, messageId?: number, timestamp?: string) => {
                                 setChatSessionInfoOpen(false);
                                 setChatRooms((prev) => clearUnreadRoom(prev, convId));
@@ -879,6 +893,7 @@ export default function Index() {
                             onDeleteMessage={handleDeleteMessage}
                             scrollToMessageId={scrollTarget?.convId === activeChatId ? scrollTarget.messageId : undefined}
                             onScrollComplete={() => setScrollTarget(null)}
+                            onAddFriend={handleAddFriend}
                             mentionTargetMessageId={activeChatId ? mentionTargetMap[activeChatId] : undefined}
                             onClearMentionTarget={() => {
                                 setMentionTargetMap((prev) => {

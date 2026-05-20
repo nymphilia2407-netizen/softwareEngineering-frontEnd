@@ -23,6 +23,7 @@ export interface ChatSessionDetailProps {
     onDeleted?: () => void;
     friends?: User[];
     onNavigateToChat?: (convId: number, messageId?: number, timestamp?: string) => void;
+    onAddFriend?: (userId: number, username: string) => void;
 }
 
 export default function ChatSessionDetail({
@@ -38,6 +39,7 @@ export default function ChatSessionDetail({
     onConversationPinnedChange,
     friends = [],
     onNavigateToChat,
+    onAddFriend,
 }: ChatSessionDetailProps) {
     const [groupDetail, setGroupDetail] = useState<GroupDetailData | null>(null);
     const [friendDetail, setFriendDetail] = useState<FriendDetail | null>(null);
@@ -336,6 +338,19 @@ export default function ChatSessionDetail({
                                                     )}
                                                 </span>
                                                 <span className="member-actions">
+                                                    {!isSelf && !friends.some((f) => f.id === m.user_id) && onAddFriend && (
+                                                        <button
+                                                            type="button"
+                                                            className="member-action-button member-action-button--friend"
+                                                            onClick={() => {
+                                                                if (globalThis.confirm(`发送好友请求给 ${m.username}？`)) {
+                                                                    onAddFriend(m.user_id, m.username);
+                                                                }
+                                                            }}
+                                                        >
+                                                            加好友
+                                                        </button>
+                                                    )}
                                                     {showRoleMenu && (
                                                         <div className="role-menu-wrapper"
                                                             ref={roleMenuOpenFor === m.user_id ? roleMenuRef : undefined}
