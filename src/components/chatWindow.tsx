@@ -73,7 +73,7 @@ export default function ChatWindow({
     /** 顶栏「上方未读」= 进会话时按 initialUnread 种下的对方消息，上滑读历史时递减 */
     const [headerUnreadCount, setHeaderUnreadCount] = useState(0);
     const [showHeaderUnreadButton, setShowHeaderUnreadButton] = useState(false);
-    const [highlightMessageId, setHighlightMessageId] = useState<number | null>(null);
+    const [highlightMessageKey, setHighlightMessageKey] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const onReadMessageRef = useRef(onReadMessage);
@@ -131,7 +131,7 @@ export default function ChatWindow({
     const [searchResults, setSearchResults] = useState<SearchResultData[]>([]);
     const [searchLoading, setSearchLoading] = useState(false);
     const [draftSenderId, setDraftSenderId] = useState(0);
-    const [localScrollTarget, setLocalScrollTarget] = useState<number | null>(null);
+    const [localScrollTarget, setLocalScrollTarget] = useState<string | null>(null);
     const [draftStartDate, setDraftStartDate] = useState('');
     const [draftEndDate, setDraftEndDate] = useState('');
     const [filterResults, setFilterResults] = useState<SearchResultData[]>([]);
@@ -437,18 +437,21 @@ export default function ChatWindow({
     }, [activeChatId]);
 
     useEffect(() => {
-        const targetId = localScrollTarget || scrollToMessageId;
-        if (!targetId || !scrollRef.current) return;
-        const key = `id:${targetId}`;
-        const el = scrollRef.current.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(key)}"]`);
+        const key = localScrollTarget || (scrollToMessageId ? `id:${scrollToMessageId}` : null);
+        if (!key || !scrollRef.current) return;
+
+        const el = scrollRef.current.querySelector<HTMLElement>(
+            `[data-message-key="${CSS.escape(key)}"]`
+        );
+        
         if (el) {
             el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            setHighlightMessageId(targetId);
-            setTimeout(() => setHighlightMessageId(null), 2000);
+            setHighlightMessageKey(key);
+            setTimeout(() => setHighlightMessageKey(null), 2000);
             if (localScrollTarget) setLocalScrollTarget(null);
             if (scrollToMessageId) onScrollComplete?.();
         }
-    }, [localScrollTarget, scrollToMessageId, messages, onScrollComplete]);
+    }, [localScrollTarget, scrollToMessageId]);
 
     useLayoutEffect(() => {
         messagesRef.current = messages;
@@ -1062,7 +1065,7 @@ return (
                     <div
                         key={msgKey}
                         data-message-key={msgKey}
-                        className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}${highlightMessageId === msg.id ? " message-highlight" : ""}`}
+                        className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}${highlightMessageKey === msgKey ? " message-highlight" : ""}`}
                         onPointerEnter={(e) => handleMessageRowPointerEnter(msgKey, e)}
                         onPointerLeave={() => handleMessageRowPointerLeave(msgKey)}
                         onContextMenu={(e) => handleMessageRowContextMenu(msgKey, e)}
@@ -1093,7 +1096,13 @@ return (
                                 {msg.replyTo && (
                                     <div
                                         className="reply-quote"
-                                        onClick={() => setLocalScrollTarget(msg.replyTo!.messageId)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const targetMsg = messages.find(m => m.id === msg.replyTo!.messageId);
+                                            if (targetMsg) {
+                                                setLocalScrollTarget(messageRowKey(targetMsg));
+                                            }
+                                        }}
                                     >
                                         <span className="reply-quote-sender">
                                             {msg.replyTo.senderUsername}
