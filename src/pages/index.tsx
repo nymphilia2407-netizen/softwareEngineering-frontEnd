@@ -136,7 +136,10 @@ function IndexPage() {
             .catch(() => {});
     }, [activeChatId, activeChatIsGroup, groupMembersCache]);
 
-    const activeGroupMembers = activeChatId ? groupMembersCache[activeChatId] : undefined;
+    const activeGroupMembers = useMemo(
+        () => (activeChatId ? groupMembersCache[activeChatId] : undefined),
+        [activeChatId, groupMembersCache],
+    );
 
     const handleReadMentions = useCallback(
         (convId: number) => {
@@ -165,6 +168,7 @@ function IndexPage() {
             cacheAvatarsFromChatRooms(roomList);
             setFriends(friendList.map(mapFriendSummary));
             setChatRooms((prev) => mergeChatRoomsFromServer(prev, roomList.map(mapChatRoom)));
+            setGroups((prev) => mergeGroupsFromRoomSync(roomList, prev));
         } catch (error) {
             console.error('刷新好友或会话失败:', error);
         }
@@ -187,6 +191,18 @@ function IndexPage() {
 
         socketRef.current?.send({
             type: 'subscribe_room',
+            data: { conversation_id: conversationId },
+        });
+    }, []);
+
+    const unsubscribeWsRoom = useCallback((conversationId: number) => {
+        if (!conversationId || !subscribedWsRoomsRef.current.has(conversationId)) {
+            return;
+        }
+
+        subscribedWsRoomsRef.current.delete(conversationId);
+        socketRef.current?.send({
+            type: 'unsubscribe_room',
             data: { conversation_id: conversationId },
         });
     }, []);
@@ -261,8 +277,18 @@ function IndexPage() {
         setSettingsPanel('menu');
     }, []);
 
-    /** 订阅全部会话 room，保证非当前会话也能即时收到 new_message；连接建立由后端 lazy，此处按需补订 */
+    /** 订阅全部会话 room，保证非当前会话也能即时收到 new_message；移除的会话退订 */
     useEffect(() => {
+        const activeIds = new Set(
+            chatRooms.map((room) => room.id).filter((id): id is number => Boolean(id)),
+        );
+
+        for (const subscribedId of [...subscribedWsRoomsRef.current]) {
+            if (!activeIds.has(subscribedId)) {
+                unsubscribeWsRoom(subscribedId);
+            }
+        }
+
         for (const room of chatRooms) {
             if (!room.id || subscribedWsRoomsRef.current.has(room.id)) {
                 continue;
@@ -270,7 +296,16 @@ function IndexPage() {
             subscribedWsRoomsRef.current.add(room.id);
             subscribeWsRoom(room.id);
         }
-    }, [chatRooms, subscribeWsRoom]);
+    }, [chatRooms, subscribeWsRoom, unsubscribeWsRoom]);
+
+    useEffect(() => {
+        return () => {
+            Object.values(pendingAnnouncementDebounceRef.current).forEach((timer) => {
+                clearTimeout(timer);
+            });
+            pendingAnnouncementDebounceRef.current = {};
+        };
+    }, []);
 
     useEffect(() => {
         if (!groupSyncToast) {
@@ -426,6 +461,83 @@ function IndexPage() {
     );
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
+
+    const activePendingGroupAnnouncement = useMemo(
+        () => (activeChatIsGroup ? (pendingGroupAnnouncements[activeChatId] ?? null) : null),
+        [activeChatIsGroup, activeChatId, pendingGroupAnnouncements],
+    );
+
+    const activeScrollToMessageId = useMemo(
+        () => (scrollTarget?.convId === activeChatId ? scrollTarget.messageId : undefined),
+        [scrollTarget, activeChatId],
+    );
+
+    const activeMentionTargetMessageId = useMemo(
+        () => (activeChatId ? mentionTargetMap[activeChatId] : undefined),
+        [activeChatId, mentionTargetMap],
+    );
+
+    const handleChatListClick = useCallback((chat: ChatListItem) => {
+        const hint = Math.max(0, chat.unreadCount || 0);
+        setEntryUnreadHintCount(hint);
+        setChatRooms((prev) => clearUnreadRoom(prev, chat.id));
+        setActiveChatId(chat.id);
+        setSelectedContact(null);
+        setChatSessionInfoOpen(false);
+        setActiveTab('chat');
+    }, []);
+
+    const handleContactItemClick = useCallback((item: User | Group, type: 'user' | 'group') => {
+        if (type === 'user') {
+            setSelectedContact(item as User);
+            setContactDetailGroupId(null);
+            setContactDetailUserId((item as User).id);
+            return;
+        }
+
+        setSelectedContact(null);
+        setContactDetailUserId(null);
+        setContactDetailGroupId((item as Group).id);
+        setChatSessionInfoOpen(false);
+    }, []);
+
+    const navigateToChat = useCallback((convId: number, messageId?: number, timestamp?: string) => {
+        setChatSessionInfoOpen(false);
+        setChatRooms((prev) => clearUnreadRoom(prev, convId));
+        setActiveChatId(convId);
+        if (messageId && timestamp) {
+            setScrollTarget({ convId, messageId, timestamp });
+        }
+    }, []);
+
+    const handleOpenChatSessionInfo = useCallback(() => {
+        setChatSessionInfoOpen(true);
+    }, []);
+
+    const handleClearActiveMentionTarget = useCallback(() => {
+        setMentionTargetMap((prev) => {
+            if (!activeChatIdRef.current) {
+                return prev;
+            }
+            const next = { ...prev };
+            delete next[activeChatIdRef.current];
+            return next;
+        });
+    }, []);
+
+    const handleChatWindowScrollComplete = useCallback(() => {
+        setScrollTarget(null);
+    }, []);
+
+    const handleAcknowledgeActiveGroupAnnouncement = useCallback(
+        (announcementId: number) => handleAcknowledgeGroupAnnouncement(activeChatId, announcementId),
+        [activeChatId, handleAcknowledgeGroupAnnouncement],
+    );
+
+    const handleSelectSecuritySettings = useCallback(() => {
+        setActiveTab('settings');
+        setSettingsPanel('security');
+    }, []);
 
     const settingsCurrentUser = useMemo(
         () => ({
@@ -596,19 +708,21 @@ function IndexPage() {
         setSelectedContact(null);
         setContactDetailUserId(null);
         setContactDetailGroupId(null);
-        
+
+        if (convId) {
+            unsubscribeWsRoom(convId);
+        }
+
         // 清除该会话，并删除本地存储的消息（目前只能实现一侧的，另一侧需要手动刷新）
-        setChatRooms(prev => prev.filter(room => room.id !== convId));
-        setMessageStore(prev => {
+        setChatRooms((prev) => prev.filter((room) => room.id !== convId));
+        setMessageStore((prev) => {
             const next = { ...prev };
             delete next[convId];
             return next;
         });
 
-        // 刷新列表
         void refreshFriendsAndRooms();
-        void syncGroupList();
-    }, [refreshFriendsAndRooms, syncGroupList]);
+    }, [refreshFriendsAndRooms, unsubscribeWsRoom, setMessageStore]);
 
     const handleLogout = () => {
         const isConfirmed = globalThis.confirm('确认要退出登录吗？');
@@ -646,18 +760,19 @@ function IndexPage() {
         setSelectedContact(null);
         
         // 清理对应会话
-        const convId = chatRooms.find(r => r.otherUserId === userId)?.id;
+        const convId = chatRooms.find((r) => r.otherUserId === userId)?.id;
         if (convId) {
-            setChatRooms(prev => prev.filter(r => r.id !== convId));
-            setMessageStore(prev => {
+            unsubscribeWsRoom(convId);
+            setChatRooms((prev) => prev.filter((r) => r.id !== convId));
+            setMessageStore((prev) => {
                 const next = { ...prev };
                 delete next[convId];
                 return next;
             });
         }
-        
+
         void refreshFriendsAndRooms();
-    }, [contactDetailUserId, chatRooms, refreshFriendsAndRooms]);
+    }, [contactDetailUserId, chatRooms, refreshFriendsAndRooms, unsubscribeWsRoom, setMessageStore]);
 
     // 在好友详情界面进入聊天
     const handleEnterChat = useCallback((userId: number) => {
@@ -692,6 +807,7 @@ function IndexPage() {
 
     const handleContactGroupLeftOrDissolved = useCallback(
         (roomId: number) => {
+            unsubscribeWsRoom(roomId);
             setActiveChatId((id) => (id === roomId ? 0 : id));
             setMessageStore((prev) => {
                 const next = { ...prev };
@@ -700,9 +816,8 @@ function IndexPage() {
             });
             setChatRooms((prev) => prev.filter((r) => r.id !== roomId));
             void refreshFriendsAndRooms();
-            void syncGroupList();
         },
-        [refreshFriendsAndRooms, syncGroupList],
+        [refreshFriendsAndRooms, unsubscribeWsRoom, setMessageStore],
     );
 
     const handleClearChatMessages = useCallback(
@@ -847,10 +962,7 @@ function IndexPage() {
                         setActiveTab('settings');
                         setSettingsPanel('profile');
                     }}
-                    onSelectSecurity={() => {
-                        setActiveTab('settings');
-                        setSettingsPanel('security');
-                    }}
+                    onSelectSecurity={handleSelectSecuritySettings}
                     onLogout={handleLogout}
                     onDeleteAccount={handleDeleteAccount}
                 />
@@ -859,16 +971,7 @@ function IndexPage() {
                     <ChatList
                         chats={chatListData}
                         activeId={activeChatId}
-                        onChatClick={(chat) => {
-                            const hint = Math.max(0, chat.unreadCount || 0);
-                            setEntryUnreadHintCount(hint);
-                            /** 与消息窗口内未读提示同源：点进会话即清列表角标，窗口内仍用 hint 跟踪直到读完 */
-                            setChatRooms((prev) => clearUnreadRoom(prev, chat.id));
-                            setActiveChatId(chat.id);
-                            setSelectedContact(null);
-                            setChatSessionInfoOpen(false);
-                            setActiveTab('chat');
-                        }}
+                        onChatClick={handleChatListClick}
                         onClearChat={handleClearChatMessages}
                         onPinChat={handlePinChat}
                         onMuteChat={handleMuteChat}
@@ -879,21 +982,7 @@ function IndexPage() {
                         friends={friends}
                         groups={groups}
                         currentUserId={currentUserId}
-                        onItemClick={(item, type) => {
-                            if (type === 'user') {
-                                const userItem = item as User;
-                                setSelectedContact(userItem);
-                                setContactDetailGroupId(null);
-                                setContactDetailUserId(userItem.id);
-                                return;
-                            }
-
-                            const groupItem = item as { id: number };
-                            setSelectedContact(null);
-                            setContactDetailUserId(null);
-                            setContactDetailGroupId(groupItem.id);
-                            setChatSessionInfoOpen(false);
-                        }}
+                        onItemClick={handleContactItemClick}
                         onCreateGroup={handleCreateGroup}
                         onContactsChanged={refreshFriendsAndRooms}
                         pendingFriendRequestCount={pendingFriendRequestCount}
@@ -955,25 +1044,16 @@ function IndexPage() {
                             onDeleted={handleChatDeleted}
                             friends={friends}
                             onAddFriend={handleAddFriend}
-                            onNavigateToChat={(convId: number, messageId?: number, timestamp?: string) => {
-                                setChatSessionInfoOpen(false);
-                                setChatRooms((prev) => clearUnreadRoom(prev, convId));
-                                setActiveChatId(convId);
-                                if (messageId && timestamp) {
-                                    setScrollTarget({ convId, messageId, timestamp });
-                                }
-                            }}
+                            onNavigateToChat={navigateToChat}
                         />
                     ) : (
                         <ChatWindow
                             activeChatId={activeChatId}
                             activeChatName={activeChatName}
                             isGroupChat={activeChatIsGroup}
-                            pendingGroupAnnouncement={activeChatIsGroup ? (pendingGroupAnnouncements[activeChatId] ?? null) : null}
+                            pendingGroupAnnouncement={activePendingGroupAnnouncement}
                             onAcknowledgeGroupAnnouncement={
-                                activeChatIsGroup
-                                    ? (announcementId) => handleAcknowledgeGroupAnnouncement(activeChatId, announcementId)
-                                    : undefined
+                                activeChatIsGroup ? handleAcknowledgeActiveGroupAnnouncement : undefined
                             }
                             initialUnreadCount={entryUnreadHintCount}
                             currentUserId={currentUserId}
@@ -982,27 +1062,14 @@ function IndexPage() {
                             onSendMessage={handleSendMessage}
                             onReadMessage={handleReadMessage}
                             onRetryMessage={handleRetryMessage}
-                            onOpenSessionInfo={() => setChatSessionInfoOpen(true)}
+                            onOpenSessionInfo={handleOpenChatSessionInfo}
                             onDeleteMessage={handleDeleteMessage}
-                            scrollToMessageId={scrollTarget?.convId === activeChatId ? scrollTarget.messageId : undefined}
-                            onScrollComplete={() => setScrollTarget(null)}
+                            scrollToMessageId={activeScrollToMessageId}
+                            onScrollComplete={handleChatWindowScrollComplete}
                             onAddFriend={handleAddFriend}
-                            mentionTargetMessageId={activeChatId ? mentionTargetMap[activeChatId] : undefined}
-                            onClearMentionTarget={() => {
-                                setMentionTargetMap((prev) => {
-                                    const next = { ...prev };
-                                    delete next[activeChatId];
-                                    return next;
-                                });
-                            }}
-                            onNavigateToChat={(convId: number, messageId?: number, timestamp?: string) => {
-                                setChatSessionInfoOpen(false);
-                                setChatRooms((prev) => clearUnreadRoom(prev, convId));
-                                setActiveChatId(convId);
-                                if (messageId && timestamp) {
-                                    setScrollTarget({ convId, messageId, timestamp });
-                                }
-                            }}
+                            mentionTargetMessageId={activeMentionTargetMessageId}
+                            onClearMentionTarget={handleClearActiveMentionTarget}
+                            onNavigateToChat={navigateToChat}
                         />
                     )
                 ) : myInvitationsData.length > 0 ? (

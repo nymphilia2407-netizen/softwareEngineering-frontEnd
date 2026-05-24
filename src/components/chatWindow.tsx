@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from "react";
+import React, { memo, useState, useRef, useLayoutEffect, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useVirtualizer } from "@tanstack/react-virtual";
 
@@ -44,7 +44,7 @@ interface ChatWindowProps{
     onAddFriend?: (userId: number, username: string) => void;
 }
 
-export default function ChatWindow({
+function ChatWindow({
     activeChatId,
     activeChatName,
     isGroupChat = false,
@@ -1271,3 +1271,5 @@ return (
         </div>
     );
 }
+
+export default memo(ChatWindow);
