@@ -52,4 +52,6 @@ export type WsAction =
     /** 与 Django ChatConsumer.handle_read_message 一致：last_read_message_id */
     | { type: 'read_message'; data: { conversation_id: number; last_read_message_id: number } }
     /** 建群/入群后加入 room_<id>，无需整页刷新即可收 new_message */
-    | { type: 'subscribe_room'; data: { conversation_id: number } };
+    | { type: 'subscribe_room'; data: { conversation_id: number } }
+    /** 离开非活跃会话 room group，配合后端懒订阅 */
+    | { type: 'unsubscribe_room'; data: { conversation_id: number } };

@@ -139,12 +139,17 @@ export const getChatMessages = async (
     startTime?: string,
     senderId?: number,
     endTime?: string,
-    options?: GetChatMessagesOptions,
+    options?: GetChatMessagesOptions & { beforeMessageId?: number },
 ) => {
-    const page = Math.floor(offset / limit) + 1;
-    const pageSize = limit;
     const includeAvatars = options?.includeAvatars === true;
-    const params: Record<string, string | number> = { page, page_size: pageSize };
+    const params: Record<string, string | number> = { page_size: limit };
+
+    if (options?.beforeMessageId) {
+        params.before_message_id = options.beforeMessageId;
+    } else {
+        params.page = Math.floor(offset / limit) + 1;
+    }
+
     if (!includeAvatars) {
         params.include_avatars = 0;
     }
@@ -153,14 +158,25 @@ export const getChatMessages = async (
     if (endTime) params.end_time = endTime;
     const response = await request.get<
         unknown,
-        ApiResponse<{ messages: BackendMessageRow[]; total_pages: number; current_page: number }>
+        ApiResponse<{
+            messages: BackendMessageRow[];
+            total_pages: number;
+            current_page: number;
+            has_more?: boolean;
+            oldest_message_id?: number | null;
+        }>
     >(`/api/conversations/${roomId}/messages/`, {
         params,
         ...heavyRequestConfig(options?.timeoutMs),
     });
 
     const payload = unwrapApiData(response, '获取聊天记录失败');
-    const { messages, user_avatars } = payload as { messages: BackendMessageRow[]; user_avatars?: Record<string, string> };
+    const { messages, user_avatars, has_more, oldest_message_id } = payload as {
+        messages: BackendMessageRow[];
+        user_avatars?: Record<string, string>;
+        has_more?: boolean;
+        oldest_message_id?: number | null;
+    };
     if (includeAvatars) {
         mergeUserAvatars(user_avatars);
     }
@@ -168,6 +184,8 @@ export const getChatMessages = async (
         room_id: roomId,
         count: messages.length,
         messages: messages.map((m) => mapMessageRow(roomId, m)),
+        hasMore: has_more ?? false,
+        oldestMessageId: oldest_message_id ?? null,
     };
 };
 

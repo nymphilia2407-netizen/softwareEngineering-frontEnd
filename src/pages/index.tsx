@@ -261,6 +261,7 @@ function IndexPage() {
         setSettingsPanel('menu');
     }, []);
 
+    /** 订阅全部会话 room，保证非当前会话也能即时收到 new_message；连接建立由后端 lazy，此处按需补订 */
     useEffect(() => {
         for (const room of chatRooms) {
             if (!room.id || subscribedWsRoomsRef.current.has(room.id)) {
