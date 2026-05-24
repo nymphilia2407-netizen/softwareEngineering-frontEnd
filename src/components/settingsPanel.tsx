@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, memo, type ChangeEvent } from 'react';
 
 import { updateUserProfile } from '../services/user';
 import { getPasswordStrengthDisplay, isPasswordAllowedForRegister, isValidEmailFormat, persistUserProfile } from '../utils/auth';
@@ -33,7 +33,7 @@ export interface SettingsPanelProps {
 	onDeleteAccount: () => Promise<void>;
 }
 
-export default function SettingsPanel({
+function SettingsPanel({
 	isOpen,
 	onClose,
 	initialView,
@@ -442,3 +442,5 @@ export default function SettingsPanel({
 		</div>
 	);
 }
+
+export default memo(SettingsPanel);

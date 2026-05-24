@@ -426,6 +426,38 @@ function IndexPage() {
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
 
+    const settingsCurrentUser = useMemo(
+        () => ({
+            userId: currentUserId,
+            username: userName,
+            email: userEmail,
+            avatar: myAvatar,
+            birthday: profileBirthday,
+            address: profileAddress,
+            signature: profileSignature,
+            phone: profilePhone,
+        }),
+        [currentUserId, userName, userEmail, myAvatar, profileBirthday, profileAddress, profileSignature, profilePhone],
+    );
+
+    const handleSettingsProfileFieldsSaved = useCallback(
+        ({ birthday, address, signature, phone }: { birthday: string; address: string; signature: string; phone: string }) => {
+            setProfileBirthday(birthday);
+            setProfileAddress(address);
+            setProfileSignature(signature);
+            setProfilePhone(phone);
+            persistUserProfile({
+                username: userName,
+                avatar: myAvatar,
+                birthday,
+                address,
+                signature,
+                phone,
+            });
+        },
+        [myAvatar, userName],
+    );
+
     useActiveChatHistory(
         activeChatId,
         scrollTarget?.convId === activeChatId ? scrollTarget.timestamp : undefined,
@@ -878,32 +910,10 @@ function IndexPage() {
                         showMenuInMain={false}
                         onClose={() => setActiveTab('chat')}
                         onSubpanelChange={setSettingsPanel}
-                        currentUser={{
-                            userId: currentUserId,
-                            username: userName,
-                            email: userEmail,
-                            avatar: myAvatar,
-                            birthday: profileBirthday,
-                            address: profileAddress,
-                            signature: profileSignature,
-                            phone: profilePhone,
-                        }}
+                        currentUser={settingsCurrentUser}
                         onAvatarUpdated={setMyAvatar}
                         onEmailUpdated={setUserEmail}
-                        onProfileFieldsSaved={({ birthday, address, signature, phone }) => {
-                            setProfileBirthday(birthday);
-                            setProfileAddress(address);
-                            setProfileSignature(signature);
-                            setProfilePhone(phone);
-                            persistUserProfile({
-                                username: userName,
-                                avatar: myAvatar,
-                                birthday,
-                                address,
-                                signature,
-                                phone,
-                            });
-                        }}
+                        onProfileFieldsSaved={handleSettingsProfileFieldsSaved}
                         onLogout={handleLogout}
                         onDeleteAccount={handleDeleteAccount}
                     />
