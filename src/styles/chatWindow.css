@@ -348,11 +348,12 @@
     flex: 1;
     overflow-y: auto;
     padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    scroll-behavior: smooth;
     overflow-x: hidden;
+    scroll-behavior: smooth;
+}
+
+.message-list-virtual-item {
+    padding-bottom: 16px;
 }
 
 .message-list::-webkit-scrollbar {

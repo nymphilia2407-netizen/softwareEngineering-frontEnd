@@ -1,13 +1,14 @@
 import React, { useState, useRef, useLayoutEffect, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useVirtualizer } from "@tanstack/react-virtual";
 
-import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
 import type { SearchResultData } from "../types/chat";
 import { searchMessages, getChatMessages, CHAT_FILTER_PAGE_SIZE } from "../services/chat";
 import type { PendingGroupAnnouncement } from '../services/group';
-import { sameUserId, formatMessageTime } from '../utils/messageStore';
-import { resolvedUserAvatar } from '../utils/avatar';
+import { useConversationMessages } from '../contexts/MessageStoreContext';
+import MessageRow from './chatWindow/MessageRow';
+import { isOtherMemberMessage, messageRowKey } from './chatWindow/messageRowUtils';
 
 import '../styles/chatWindow.css'
 
@@ -15,18 +16,11 @@ import '../styles/chatWindow.css'
 const MESSAGE_ACTION_HOVER_MS = 600;
 const MESSAGE_ACTION_LEAVE_CLOSE_MS = 220;
 
-function messageRowKey(msg: Message) {
-    return msg.clientId ? `client:${msg.clientId}` : `id:${msg.id}`;
-}
-
-const isOtherMemberMessage = (msg: Message, currentUserId: number) => !sameUserId(msg.senderId, currentUserId);
-
 interface ChatWindowProps{
     activeChatId: number;
     activeChatName: string;
     /** 群聊时在每条消息旁展示发送者头像与用户名 */
     isGroupChat?: boolean;
-    messages: Message[];
     initialUnreadCount?: number;
     currentUserId: number;
     /** 群成员列表，用于@建议弹窗（私聊时可为对方用户名） */
@@ -54,7 +48,6 @@ export default function ChatWindow({
     activeChatId,
     activeChatName,
     isGroupChat = false,
-    messages,
     initialUnreadCount = 0,
     currentUserId,
     groupMembers,
@@ -73,6 +66,7 @@ export default function ChatWindow({
     onScrollComplete,
     onAddFriend,
 }:ChatWindowProps){
+    const messages = useConversationMessages(activeChatId);
     const [inputText, setInputText] = useState<string>('');
     const [announcementAckSubmitting, setAnnouncementAckSubmitting] = useState(false);
     /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
@@ -82,6 +76,7 @@ export default function ChatWindow({
     const [showHeaderUnreadButton, setShowHeaderUnreadButton] = useState(false);
     const [highlightMessageKey, setHighlightMessageKey] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const caretCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const onReadMessageRef = useRef(onReadMessage);
     const shouldAutoScrollRef = useRef(true);
@@ -144,6 +139,25 @@ export default function ChatWindow({
     const [filterResults, setFilterResults] = useState<SearchResultData[]>([]);
     const [filterLoading, setFilterLoading] = useState(false);
     const searchPanelRef = useRef<HTMLDivElement>(null);
+
+    const virtualizer = useVirtualizer({
+        count: messages.length,
+        getScrollElement: () => scrollRef.current,
+        estimateSize: () => 88,
+        overscan: 12,
+    });
+
+    const scrollToMessageByKey = useCallback(
+        (key: string, behavior: ScrollBehavior = 'smooth') => {
+            const idx = messagesRef.current.findIndex((m) => messageRowKey(m) === key);
+            if (idx >= 0) {
+                virtualizer.scrollToIndex(idx, { align: 'center', behavior });
+                setHighlightMessageKey(key);
+                setTimeout(() => setHighlightMessageKey(null), 2000);
+            }
+        },
+        [virtualizer],
+    );
 
     useEffect(() => {
         if (onReadMentions && activeChatId) {
@@ -381,17 +395,12 @@ export default function ChatWindow({
     );
 
     const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-        const el = scrollRef.current;
-        if (!el) return;
-        if (behavior === 'auto') {
-            const previousBehavior = el.style.scrollBehavior;
-            el.style.scrollBehavior = 'auto';
-            el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
-            el.style.scrollBehavior = previousBehavior;
+        const count = messagesRef.current.length;
+        if (count === 0) {
             return;
         }
-        el.scrollTo({ top: el.scrollHeight, behavior });
-    }, []);
+        virtualizer.scrollToIndex(count - 1, { align: 'end', behavior });
+    }, [virtualizer]);
 
     /** flex/输入框高度变化后 scrollHeight 可能晚一帧才稳定，双 rAF 再滚一次 */
     const scrollToBottomAfterLayout = useCallback(
@@ -418,7 +427,10 @@ export default function ChatWindow({
         const lineIndex = lines.length - 1;
         const lastLine = lines[lineIndex];
 
-        const canvas = document.createElement('canvas');
+        const canvas = caretCanvasRef.current ?? document.createElement('canvas');
+        if (!caretCanvasRef.current) {
+            caretCanvasRef.current = canvas;
+        }
         const ctx = canvas.getContext('2d')!;
         ctx.font = `${fontSize}px ${style.fontFamily}`;
         const textWidth = ctx.measureText(lastLine).width;
@@ -458,20 +470,12 @@ export default function ChatWindow({
 
     useEffect(() => {
         const key = localScrollTarget || (scrollToMessageId ? `id:${scrollToMessageId}` : null);
-        if (!key || !scrollRef.current) return;
+        if (!key) return;
 
-        const el = scrollRef.current.querySelector<HTMLElement>(
-            `[data-message-key="${CSS.escape(key)}"]`
-        );
-        
-        if (el) {
-            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-            setHighlightMessageKey(key);
-            setTimeout(() => setHighlightMessageKey(null), 2000);
-            if (localScrollTarget) setLocalScrollTarget(null);
-            if (scrollToMessageId) onScrollComplete?.();
-        }
-    }, [localScrollTarget, scrollToMessageId]);
+        scrollToMessageByKey(key, 'smooth');
+        if (localScrollTarget) setLocalScrollTarget(null);
+        if (scrollToMessageId) onScrollComplete?.();
+    }, [localScrollTarget, scrollToMessageId, scrollToMessageByKey, onScrollComplete]);
 
     useLayoutEffect(() => {
         messagesRef.current = messages;
@@ -592,17 +596,14 @@ export default function ChatWindow({
     };
 
     const jumpToFirstUnreadFromKeys = (unreadKeys: string[]) => {
-        const listEl = scrollRef.current;
-        if (!listEl) return;
-
         const targetKey = unreadKeys[0];
         if (!targetKey) {
             scrollToBottom('smooth');
             return;
         }
 
-        const targetElement = listEl.querySelector<HTMLElement>(`[data-message-key="${CSS.escape(targetKey)}"]`);
-        if (!targetElement) {
+        const idx = messagesRef.current.findIndex((m) => messageRowKey(m) === targetKey);
+        if (idx < 0) {
             scrollToBottom('smooth');
             headerUnreadKeysRef.current = [];
             floatingUnreadKeysRef.current = [];
@@ -611,14 +612,17 @@ export default function ChatWindow({
             return;
         }
 
-        const distanceToBottomFromUnread = listEl.scrollHeight - targetElement.offsetTop;
-        if (distanceToBottomFromUnread <= listEl.clientHeight) {
+        const lastIdx = messagesRef.current.length - 1;
+        if (idx >= lastIdx - 2) {
             scrollToBottom('smooth');
         } else {
-            listEl.scrollTo({ top: Math.max(targetElement.offsetTop - 12, 0), behavior: 'smooth' });
+            virtualizer.scrollToIndex(idx, { align: 'start', behavior: 'smooth' });
         }
 
-        syncUnreadFloatingVisibility(listEl);
+        const listEl = scrollRef.current;
+        if (listEl) {
+            syncUnreadFloatingVisibility(listEl);
+        }
     };
 
     const handleHeaderJumpToUnread = () => {
@@ -1111,119 +1115,45 @@ return (
                     scheduleSyncUnreadAfterScroll(e.currentTarget);
                 }}
             >
-                {messages.map((msg) => {
-                    const msgKey = messageRowKey(msg);
-                    const isSelf = !isOtherMemberMessage(msg, currentUserId);
-                    const senderLabel = (msg.senderUsername ?? '').trim() || `用户${msg.senderId}`;
-                    const avatarSrc = resolvedUserAvatar(msg.senderAvatar);
-                    const readLabel = msg.isRead ? "已读" : msg.status === "sending" ? "发送中" : msg.status === "failed" ? "失败" : "";
-                    /** 群聊不展示已读/未读；仍保留发送中、失败与重试 */
-                    const showSelfMeta =
-                        isSelf &&
-                        (isGroupChat
-                            ? msg.status === "sending" || msg.status === "failed"
-                            : readLabel.length > 0 || (msg.status === "failed" && msg.clientId));
-                    return (
-                    <div
-                        key={msgKey}
-                        data-message-key={msgKey}
-                        className={`message-item ${isSelf ? "self" : "other"}${isGroupChat ? " group-row" : ""}${highlightMessageKey === msgKey ? " message-highlight" : ""}`}
-                        onPointerEnter={(e) => handleMessageRowPointerEnter(msgKey, e)}
-                        onPointerLeave={() => handleMessageRowPointerLeave(msgKey)}
-                        onContextMenu={(e) => handleMessageRowContextMenu(msgKey, e)}
-                    >
-                        {isGroupChat && (
-                            <img
-                                className="message-sender-avatar"
-                                src={avatarSrc}
-                                alt=""
-                                onError={(e) => {
-                                    e.currentTarget.onerror = null;
-                                    e.currentTarget.src = DEFAULT_AVATAR;
-                                }}
-                            />
-                        )}
-                        <div className="message-item-main">
+                <div
+                    className="message-list-virtual-inner"
+                    style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}
+                >
+                    {virtualizer.getVirtualItems().map((virtualRow) => {
+                        const msg = messages[virtualRow.index];
+                        if (!msg) {
+                            return null;
+                        }
+                        return (
                             <div
-                                className={`message-top-bar${isGroupChat ? " with-sender" : ""}${isSelf ? " self" : " other"}`}
+                                key={virtualRow.key}
+                                data-index={virtualRow.index}
+                                ref={virtualizer.measureElement}
+                                className="message-list-virtual-item"
+                                style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    transform: `translateY(${virtualRow.start}px)`,
+                                }}
                             >
-                                {isGroupChat && (
-                                    <span className={`message-sender-name${isSelf ? " self" : ""}`}>{senderLabel}</span>
-                                )}
-                                <span className="msg-time-row">
-                                    {formatMessageTime(msg.timestamp)}
-                                </span>
+                                <MessageRow
+                                    msg={msg}
+                                    currentUserId={currentUserId}
+                                    isGroupChat={isGroupChat}
+                                    groupMembers={groupMembers}
+                                    highlightMessageKey={highlightMessageKey}
+                                    onScrollToMessage={scrollToMessageByKey}
+                                    onRetryMessage={onRetryMessage}
+                                    onPointerEnter={handleMessageRowPointerEnter}
+                                    onPointerLeave={handleMessageRowPointerLeave}
+                                    onContextMenu={handleMessageRowContextMenu}
+                                />
                             </div>
-                            <div className="message-bubble">
-                                {msg.replyTo && (
-                                    <div
-                                        className="reply-quote"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const targetMsg = messages.find(m => m.id === msg.replyTo!.messageId);
-                                            if (targetMsg) {
-                                                setLocalScrollTarget(messageRowKey(targetMsg));
-                                            }
-                                        }}
-                                    >
-                                        <span className="reply-quote-sender">
-                                            {msg.replyTo.senderUsername}
-                                        </span>
-                                        <span className="reply-quote-text">
-                                            {(msg.replyTo.content.length > 80
-                                                ? msg.replyTo.content.slice(0, 80) + '...'
-                                                : msg.replyTo.content
-                                            ).split(/(@\S+?)(?=\s|$)/g).map((part, i) =>
-                                                part.startsWith('@') &&
-                                                groupMembers?.some((m) => `@${m.username}` === part) ? (
-                                                    <span key={i} className="mention-highlight">
-                                                        {part}
-                                                    </span>
-                                                ) : (
-                                                    part
-                                                ),
-                                            )}
-                                        </span>
-                                        {(msg.replyTo.replyCount ?? 0) > 0 && (
-                                            <span className="reply-quote-count">{msg.replyTo.replyCount} 条回复</span>
-                                        )}
-                                    </div>
-                                )}
-                                <p className="message-text">
-                                    {msg.content.split(/(@\S+?)(?=\s|$)/g).map((part, i) =>
-                                        part.startsWith('@') &&
-                                        groupMembers?.some(
-                                            (m) => `@${m.username}` === part,
-                                        ) ? (
-                                            <span key={i} className="mention-highlight">
-                                                {part}
-                                            </span>
-                                        ) : (
-                                            part
-                                        ),
-                                    )}
-                                </p>
-                                {showSelfMeta && (
-                                    <div className="message-meta">
-                                        {isGroupChat ? (
-                                            (msg.status === "sending" || msg.status === "failed") && (
-                                                <span className="msg-read">{msg.status === "sending" ? "发送中" : "失败"}</span>
-                                            )
-                                        ) : (
-                                            readLabel ? <span className="msg-read">{readLabel}</span> : null
-                                        )}
-                                        {msg.status === "failed" && msg.clientId ? (
-                                            <button type="button" className="msg-retry" onClick={() => onRetryMessage?.(msg.clientId!)}>
-                                                重试
-                                            </button>
-                                        ) : null}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    );
-                })}
+                        );
+                    })}
+                </div>
             </div>
             {unreadFloatingCount > 0 && (
                 <button
@@ -1242,13 +1172,7 @@ return (
                     className="mention-jump-button"
                     aria-label="有人@你，点击定位"
                     onClick={() => {
-                        const key = `id:${mentionTargetMessageId}`;
-                        const el = scrollRef.current?.querySelector<HTMLElement>(
-                            `[data-message-key="${CSS.escape(key)}"]`,
-                        );
-                        if (el) {
-                            el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                        }
+                        scrollToMessageByKey(`id:${mentionTargetMessageId}`, 'smooth');
                         onClearMentionTarget?.();
                     }}
                 >

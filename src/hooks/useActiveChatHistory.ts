@@ -1,17 +1,18 @@
-import { useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useEffect } from 'react';
 
 import { CHAT_HISTORY_PAGE_SIZE } from '../constants/string';
+import { useMessageStoreActions } from '../contexts/MessageStoreContext';
 import { mapHistoryMessage } from '../mappers/chat';
 import { getChatMessages } from '../services/chat';
-import type { Message } from '../types/entity';
 
 export function useActiveChatHistory(
     activeChatId: number,
-    setMessageStore: Dispatch<SetStateAction<Record<number, Message[]>>>,
     targetTimestamp?: string,
     filterSenderId?: number,
     filterEndTime?: string,
 ) {
+    const { setMessageStore } = useMessageStoreActions();
+
     useEffect(() => {
         if (!activeChatId) {
             return;

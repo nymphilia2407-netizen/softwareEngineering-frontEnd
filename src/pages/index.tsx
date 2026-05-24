@@ -23,7 +23,7 @@ import { deleteUser } from '../services/user';
 import { markMentionRead } from '../services/chat';
 import type { ChatWebSocketClient } from '../services/websocket';
 import type { ActiveTabType, ChatListItem, MyInvitationData } from '../types/chat';
-import type { Group, Message, User } from '../types/entity';
+import type { Group, User } from '../types/entity';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
 import {
     cacheAvatarsFromChatRooms,
@@ -33,10 +33,19 @@ import {
 } from '../utils/avatar';
 import { clearUnreadRoom, mergeChatRoomsFromServer, sortChatRoomsForDisplay } from '../utils/chatRoomList';
 import { decodeTokenPayload, readInitialUserFromLocalCache } from '../utils/jwtProfile';
+import { MessageStoreProvider, useMessageStoreActions } from '../contexts/MessageStoreContext';
 
 import '../styles/index.css';
 
 export default function Index() {
+    return (
+        <MessageStoreProvider>
+            <IndexPage />
+        </MessageStoreProvider>
+    );
+}
+
+function IndexPage() {
     const tokenPayload = decodeTokenPayload();
     const profileBoot = useMemo(() => readInitialUserFromLocalCache(), []);
     const [currentUserId, setCurrentUserId] = useState<number>(tokenPayload?.user_id ?? 0);
@@ -50,7 +59,6 @@ export default function Index() {
     const [friends, setFriends] = useState<User[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [chatRooms, setChatRooms] = useState<ChatListItem[]>([]);
-    const [messageStore, setMessageStore] = useState<Record<number, Message[]>>({});
     const [chatSessionInfoOpen, setChatSessionInfoOpen] = useState<boolean>(false);
     const [profileBirthday, setProfileBirthday] = useState<string>(profileBoot.profileBirthday);
     const [profileAddress, setProfileAddress] = useState<string>(profileBoot.profileAddress);
@@ -73,7 +81,7 @@ export default function Index() {
     const userNameRef = useRef<string>(userName);
     const myAvatarRef = useRef<string>(myAvatar);
     const pendingSendTimers = useRef<Record<string, ReturnType<typeof setTimeout> | null>>({});
-    const messageStoreRef = useRef<Record<number, Message[]>>(messageStore);
+    const { setMessageStore, messageStoreRef } = useMessageStoreActions();
     /** 乐观消息的临时负数 id，保证同毫秒内多次发送也不与 React key 冲突 */
     const optimisticIdSeqRef = useRef(0);
     /** 已在 WS 上 subscribe_room 的会话；新建私聊在连接之后才出现，必须补订阅才能收到发消息回执 */
@@ -104,10 +112,6 @@ export default function Index() {
     useEffect(() => {
         myAvatarRef.current = myAvatar;
     }, [myAvatar]);
-
-    useEffect(() => {
-        messageStoreRef.current = messageStore;
-    }, [messageStore]);
 
     const activeChatIsGroup = useMemo(
         () => chatRooms.find((room) => room.id === activeChatId)?.isGroup ?? false,
@@ -314,29 +318,27 @@ export default function Index() {
         // 先更新 messageStore，然后基于新的 messageStore 更新 chatRooms
         setMessageStore((prev) => {
             const newMessages = (prev[convId] || []).filter((m) => m.id !== messageId);
-            const newStore = { ...prev, [convId]: newMessages };
-
-            // 同时更新 chatRooms（使用最新的消息列表）
-            setChatRooms((prevRooms) => {
-                const room = prevRooms.find((r) => r.id === convId);
-                if (!room) return prevRooms;
-                let newLastMsg = '[暂无消息]';
-                let newLastTime = '';
-                if (newMessages.length) {
-                    const latest = newMessages.reduce((a, b) => (a.timestamp > b.timestamp ? a : b));
-                    newLastMsg = latest.content;
-                    newLastTime = latest.time || '';
-                }
-                const updatedRoom = { ...room, lastMessage: newLastMsg, lastTime: newLastTime };
-                return sortChatRoomsForDisplay([
-                    updatedRoom,
-                    ...prevRooms.filter((r) => r.id !== convId),
-                ]);
-            });
-
-            return newStore;
+            return { ...prev, [convId]: newMessages };
         });
-    }, []);
+
+        setChatRooms((prevRooms) => {
+            const room = prevRooms.find((r) => r.id === convId);
+            if (!room) return prevRooms;
+            const newMessages = (messageStoreRef.current[convId] || []).filter((m) => m.id !== messageId);
+            let newLastMsg = '[暂无消息]';
+            let newLastTime = '';
+            if (newMessages.length) {
+                const latest = newMessages.reduce((a, b) => (a.timestamp > b.timestamp ? a : b));
+                newLastMsg = latest.content;
+                newLastTime = latest.time || '';
+            }
+            const updatedRoom = { ...room, lastMessage: newLastMsg, lastTime: newLastTime };
+            return sortChatRoomsForDisplay([
+                updatedRoom,
+                ...prevRooms.filter((r) => r.id !== convId),
+            ]);
+        });
+    }, [setMessageStore]);
 
     useEffect(() => {
         if (!activeChatId || !activeChatIsGroup || chatSessionInfoOpen) {
@@ -392,13 +394,11 @@ export default function Index() {
         () => chatListData.filter((r) => r.hasUnreadMention === true).length,
         [chatListData],
     );
-    const messages = messageStore[activeChatId] ?? [];
     const activeChat = activeChatId ? chatListData.find((chat) => chat.id === activeChatId) ?? null : null;
     const activeChatName = activeChat?.name ?? selectedContact?.username ?? '';
 
     useActiveChatHistory(
         activeChatId,
-        setMessageStore,
         scrollTarget?.convId === activeChatId ? scrollTarget.timestamp : undefined,
     );
 
@@ -417,7 +417,6 @@ export default function Index() {
 
     const { handleSendMessage, handleRetryMessage } = useIndexOptimisticSend(
         activeChatId,
-        messageStore,
         optimisticRefs,
         activeChatIdRef,
         setMessageStore,
@@ -947,7 +946,6 @@ export default function Index() {
                                     ? (announcementId) => handleAcknowledgeGroupAnnouncement(activeChatId, announcementId)
                                     : undefined
                             }
-                            messages={messages}
                             initialUnreadCount={entryUnreadHintCount}
                             currentUserId={currentUserId}
                             groupMembers={activeGroupMembers}

@@ -19,7 +19,6 @@ export type IndexOptimisticRefs = {
 
 export function useIndexOptimisticSend(
     activeChatId: number,
-    _messageStore: Record<number, Message[]>,
     r: IndexOptimisticRefs,
     activeChatIdRef: MutableRefObject<number>,
     setMessageStore: Dispatch<SetStateAction<Record<number, Message[]>>>,
