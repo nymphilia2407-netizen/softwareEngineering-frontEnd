@@ -14,7 +14,7 @@ import { CHATICON, CONFIGICON, CONTACTICON } from '../constants/string';
 import { useActiveChatHistory } from '../hooks/useActiveChatHistory';
 import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket';
 import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
-import { mapChatRoom, mapFriendSummary, mapGroupSummary, groupSummariesFromRoomList } from '../mappers/chat';
+import { mapChatRoom, mapFriendSummary, mapGroupSummary, mergeGroupsFromRoomSync } from '../mappers/chat';
 import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage, clearConversationMessages, getUnreadMentions } from '../services/chat';
 import { createGroup, getGroupList, getGroupDetail, updateGroupAvatar, getMyInvitations, respondToInvitation } from '../services/group';
 import { getFriendList } from '../services/friend';
@@ -190,7 +190,7 @@ export default function Index() {
                     }),
                 );
             });
-            setGroups(groupSummariesFromRoomList(roomList));
+            setGroups((prev) => mergeGroupsFromRoomSync(roomList, prev));
         } catch (error) {
             console.error('同步群会话列表失败:', error);
         }

@@ -620,7 +620,7 @@ export default function ChatWindow({
                 conversation_id: activeChatId,
                 conversation_name: activeChatName,
                 sender: { user_id: m.sender_id, username: m.sender_username || '', avatar: m.sender_avatar || '' },
-                content: m.content,
+                content: m.content.length > 200 ? `${m.content.slice(0, 200)}…` : m.content,
                 timestamp: m.created_at,
             }));
             results.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -644,7 +644,7 @@ export default function ChatWindow({
         if (!q) return;
         setSearchLoading(true);
         try {
-            const data = await searchMessages(q);
+            const data = await searchMessages(q, 1, undefined, { countTotal: false });
             setSearchResults(data.results);
         } catch (err) {
             alert(err instanceof Error ? err.message : '搜索失败');

@@ -71,7 +71,23 @@ export const groupSummariesFromRoomList = (roomList: ChatRoomSummaryData[]): Gro
                 group_name: r.name,
                 avatar: r.avatar || '',
                 owner_id: null,
-                member_count: 0,
+                member_count: r.member_count ?? 0,
                 created_at: r.last_time && r.last_time.length > 0 ? r.last_time : new Date().toISOString(),
             }),
         );
+
+/** 用会话列表同步群聊；保留本地已知的正确人数，以及尚未出现在列表中的新建群 */
+export const mergeGroupsFromRoomSync = (roomList: ChatRoomSummaryData[], previous: Group[]): Group[] => {
+    const prevMap = new Map(previous.map((g) => [g.id, g]));
+    const fromRooms = groupSummariesFromRoomList(roomList);
+    const roomIds = new Set(fromRooms.map((g) => g.id));
+    const merged = fromRooms.map((g) => {
+        const existing = prevMap.get(g.id);
+        if (g.memberCount <= 0 && existing && existing.memberCount > 0) {
+            return { ...g, memberCount: existing.memberCount };
+        }
+        return g;
+    });
+    const pending = previous.filter((g) => !roomIds.has(g.id));
+    return [...merged, ...pending];
+};

@@ -28,7 +28,6 @@ export function useActiveChatHistory(
                     targetTimestamp,
                     filterSenderId,
                     filterEndTime,
-                    { includeAvatars: true },
                 );
 
                 if (cancelled) {

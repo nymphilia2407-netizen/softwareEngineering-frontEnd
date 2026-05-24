@@ -234,12 +234,19 @@ export const searchMessages = async (
     keyword: string,
     page = 1,
     pageSize: number = CHAT_SEARCH_PAGE_SIZE,
+    options?: { countTotal?: boolean },
 ) => {
     const response = await request.get<
         unknown,
-        ApiResponse<{ results: SearchResultData[]; total: number }>
+        ApiResponse<{ results: SearchResultData[]; total: number; scan_truncated?: boolean }>
     >('/api/conversations/messages/search/', {
-        params: { q: keyword, page, page_size: pageSize, include_avatars: 0 },
+        params: {
+            q: keyword,
+            page,
+            page_size: pageSize,
+            include_avatars: 0,
+            count_total: options?.countTotal === false ? 0 : 1,
+        },
         ...heavyRequestConfig(),
     });
     const data = unwrapApiData(response, '搜索消息失败');

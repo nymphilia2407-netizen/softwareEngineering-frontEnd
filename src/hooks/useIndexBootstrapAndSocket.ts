@@ -287,23 +287,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                             return sortChatRoomsForDisplay([row, ...prev]);
                         });
 
-                        setGroups((prev) => {
-                            if (prev.some((g) => g.id === d.conversation_id)) {
-                                return prev;
-                            }
-
-                            const next: Group = {
-                                id: d.conversation_id,
-                                groupname: displayName,
-                                avatar: resolvedUserAvatar(d.avatar || ''),
-                                ownerId: 0,
-                                adminIds: [],
-                                memberCount: 0,
-                                createdTime: Date.now(),
-                            };
-
-                            return [next, ...prev];
-                        });
+                        // 群列表与人数由紧随其后的 syncChatRoomsAndGroups 从会话接口同步，避免先写入 memberCount: 0
                     } else if (d.action === 'avatar_updated') {
                         const displayName = d.group_name?.trim() || '群聊';
                         setGroupSyncToast(`「${displayName}」群头像已更新`);
