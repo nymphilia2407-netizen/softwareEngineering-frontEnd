@@ -393,6 +393,19 @@ export default function ChatWindow({
         el.scrollTo({ top: el.scrollHeight, behavior });
     }, []);
 
+    /** flex/输入框高度变化后 scrollHeight 可能晚一帧才稳定，双 rAF 再滚一次 */
+    const scrollToBottomAfterLayout = useCallback(
+        (behavior: ScrollBehavior = 'auto') => {
+            scrollToBottom(behavior);
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    scrollToBottom(behavior);
+                });
+            });
+        },
+        [scrollToBottom],
+    );
+
     const getCaretCoordinates = useCallback((textarea: HTMLTextAreaElement, position: number) => {
         const style = getComputedStyle(textarea);
         const paddingLeft = parseFloat(style.paddingLeft) || 0;
@@ -498,8 +511,12 @@ export default function ChatWindow({
         if (hasNewMessage) {
             hasConfirmedReadRef.current = false;
             const latestMessage = messages[messages.length - 1];
-            if (shouldAutoScrollRef.current) {
-                scrollToBottom('auto');
+            const isOwnMessage = latestMessage && !isOtherMemberMessage(latestMessage, currentUserId);
+            if (shouldAutoScrollRef.current || isOwnMessage) {
+                if (isOwnMessage) {
+                    shouldAutoScrollRef.current = true;
+                }
+                scrollToBottomAfterLayout('auto');
             } else if (latestMessage && isOtherMemberMessage(latestMessage, currentUserId)) {
                 if (nextLastMessageKey && !floatingUnreadKeysRef.current.includes(nextLastMessageKey)) {
                     floatingUnreadKeysRef.current.push(nextLastMessageKey);
@@ -508,7 +525,7 @@ export default function ChatWindow({
         }
         lastMessageKeyRef.current = nextLastMessageKey;
         syncUnreadFloatingVisibility(listEl);
-    }, [messages, scrollToBottom, currentUserId, syncUnreadFloatingVisibility]);
+    }, [messages, scrollToBottomAfterLayout, currentUserId, syncUnreadFloatingVisibility]);
 
     /** 群聊 flex + 头像异步撑高时，仅靠 scroll 同步 getBoundingClientRect 易漏判；用 IO 判定「已进入列表可视区」 */
     useEffect(() => {
@@ -686,6 +703,7 @@ export default function ChatWindow({
 
     const handleSend = () => {
         if(!inputText.trim()) return;
+        shouldAutoScrollRef.current = true;
         const mentionedUserIds = extractMentionedUserIds(inputText);
         onSendMessage(inputText, mentionedUserIds, replyTarget?.messageId);
         setInputText('');

@@ -1,9 +1,8 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 
 import { DEFAULT_AVATAR } from '../constants/string';
 import type { ChatListItem } from '../types/chat';
-import { sortChatRoomsForDisplay } from '../utils/chatRoomList';
 
 import '../styles/chatList.css';
 
@@ -16,7 +15,7 @@ interface ChatListProps {
     onMuteChat?: (convId: number, muted: boolean) => void;
 }
 
-export default function ChatList({ chats, activeId, onChatClick, onClearChat, onPinChat, onMuteChat }: ChatListProps) {
+function ChatList({ chats, activeId, onChatClick, onClearChat, onPinChat, onMuteChat }: ChatListProps) {
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [contextMenu, setContextMenu] = useState<{
         chat: ChatListItem;
@@ -27,11 +26,11 @@ export default function ChatList({ chats, activeId, onChatClick, onClearChat, on
 
     const filteredChats = useMemo(() => {
         const q = searchQuery.toLowerCase();
-        return sortChatRoomsForDisplay(
-            chats.filter(
-                (chat) =>
-                    chat.name.toLowerCase().includes(q) || chat.lastMessage.toLowerCase().includes(q),
-            ),
+        if (!q) {
+            return chats;
+        }
+        return chats.filter(
+            (chat) => chat.name.toLowerCase().includes(q) || chat.lastMessage.toLowerCase().includes(q),
         );
     }, [chats, searchQuery]);
 
@@ -188,3 +187,5 @@ export default function ChatList({ chats, activeId, onChatClick, onClearChat, on
         </div>
     );
 }
+
+export default memo(ChatList);

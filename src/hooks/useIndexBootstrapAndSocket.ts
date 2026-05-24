@@ -1,7 +1,7 @@
 import { useEffect, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from 'react';
 
 import { BACKENDURL, DEFAULT_AVATAR } from '../constants/string';
-import { mapChatRoom, mapFriendSummary } from '../mappers/chat';
+import { mapChatRoom, mapFriendSummary, groupSummariesFromRoomList } from '../mappers/chat';
 import { getChatRooms, getUnreadMentions } from '../services/chat';
 import { getFriendList, getReceivedFriendRequests } from '../services/friend';
 import { getMyInvitations, type PendingGroupAnnouncement } from '../services/group';
@@ -88,6 +88,17 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
 
     useEffect(() => {
         let cancelled = false;
+        let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+        const scheduleSyncChatRoomsAndGroups = () => {
+            if (syncDebounceTimer) {
+                clearTimeout(syncDebounceTimer);
+            }
+            syncDebounceTimer = setTimeout(() => {
+                syncDebounceTimer = null;
+                void syncChatRoomsAndGroups();
+            }, 400);
+        };
 
         const syncCurrentUser = async () => {
             try {
@@ -156,6 +167,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 cacheAvatarsFromChatRooms(roomList);
                 const mappedRooms = roomList.map(mapChatRoom);
                 setChatRooms((prev) => mergeChatRoomsFromServer(prev, mappedRooms));
+                setGroups(groupSummariesFromRoomList(roomList));
                 setActiveChatId((currentActiveChatId) => currentActiveChatId || mappedRooms[0]?.id || 0);
             } catch (error) {
                 console.error('获取会话列表失败:', error);
@@ -168,7 +180,6 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         void syncCurrentUser();
         void syncFriendList();
         void syncChatRooms();
-        void syncGroupList();
 
         getUnreadMentions()
             .then((mentions) => {
@@ -299,7 +310,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                                 delete next[d.conversation_id];
                                 return next;
                             });
-                            void syncChatRoomsAndGroups();
+                            void scheduleSyncChatRoomsAndGroups();
                             refetchPendingGroupAnnouncement(d.conversation_id);
                         } else if (operator && operator === selfName) {
                             setGroupSyncToast(`你已将 ${joinedNames} 加入群聊「${displayName}」`);
@@ -385,7 +396,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                     }
 
                     if (!d.action.startsWith('announcement_')) {
-                        void syncChatRoomsAndGroups();
+                        scheduleSyncChatRoomsAndGroups();
                     }
                 }
 
@@ -413,23 +424,17 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 }
             });
 
-            const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
-                if (status === 'open') {
-                    void getFriendList()
-                        .then((friendList) => {
-                            if (!cancelled) {
-                                cacheAvatarsFromFriends(friendList);
-                                setFriends(friendList.map(mapFriendSummary));
-                            }
-                        })
-                        .catch(() => {});
-                }
+            const unsubscribeStatus = client.onStatusChange((_status: 'connecting' | 'open' | 'closed' | 'error') => {
+                // 好友列表已在 bootstrap 加载；在线状态由 presence_update 推送更新
             });
 
             client.connect();
 
             return () => {
                 cancelled = true;
+                if (syncDebounceTimer) {
+                    clearTimeout(syncDebounceTimer);
+                }
                 unsubscribeMessage();
                 unsubscribeStatus();
                 client.disconnect();

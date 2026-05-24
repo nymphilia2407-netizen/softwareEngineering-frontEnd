@@ -7,6 +7,18 @@ export const sameUserId = (a: number, b: number) => Number(a) === Number(b);
 
 const sortMessagesByTime = (messages: Message[]) => [...messages].sort((left, right) => left.timestamp - right.timestamp);
 
+/** 新消息时间单调递增时 O(1) 追加，否则才全量排序 */
+const appendMessageSorted = (messages: Message[], incoming: Message): Message[] => {
+    if (messages.length === 0) {
+        return [incoming];
+    }
+    const last = messages[messages.length - 1];
+    if (incoming.timestamp >= last.timestamp) {
+        return [...messages, incoming];
+    }
+    return sortMessagesByTime([...messages, incoming]);
+};
+
 export const formatIncomingMessage = (message: ChatIncomingMessage): Message => {
     const timestamp = new Date(message.created_at).getTime();
     if (message.sender_avatar) {
@@ -47,11 +59,12 @@ export const replaceOrAppendIncomingMessage = (
         const matchedIndex = roomMessages.findIndex((message) => message.clientId === incomingMessage.clientId);
 
         if (matchedIndex !== -1) {
-            roomMessages[matchedIndex] = { ...incomingMessage, status: 'sent' };
+            const updated = [...roomMessages];
+            updated[matchedIndex] = { ...incomingMessage, status: 'sent' };
             return {
                 nextStore: {
                     ...store,
-                    [conversationId]: sortMessagesByTime(roomMessages),
+                    [conversationId]: updated,
                 },
                 consumedClientId: incomingMessage.clientId,
             };
@@ -65,7 +78,7 @@ export const replaceOrAppendIncomingMessage = (
     return {
         nextStore: {
             ...store,
-            [conversationId]: sortMessagesByTime([...roomMessages, incomingMessage]),
+            [conversationId]: appendMessageSorted(roomMessages, incomingMessage),
         },
         fromSelf: sameUserId(incomingMessage.senderId, currentUserId),
     };
@@ -76,23 +89,36 @@ export const applyReadReceiptToMessages = (
     receipt: ChatReadReceiptData,
     currentUserId: number
 ) => {
-    const roomMessages = store[receipt.conversation_id] ? [...store[receipt.conversation_id]] : [];
-
-    if (roomMessages.length === 0) {
+    const roomMessages = store[receipt.conversation_id];
+    if (!roomMessages || roomMessages.length === 0) {
         return store;
     }
 
+    let changed = false;
     const updatedMessages = roomMessages.map((message) => {
         if (message.id > receipt.last_message_id) {
             return message;
         }
 
         if (sameUserId(receipt.reader_id, currentUserId)) {
-            return sameUserId(message.senderId, currentUserId) ? message : { ...message, isRead: true };
+            if (sameUserId(message.senderId, currentUserId) || message.isRead) {
+                return message;
+            }
+            changed = true;
+            return { ...message, isRead: true };
         }
 
-        return sameUserId(message.senderId, currentUserId) ? { ...message, isRead: true } : message;
+        if (sameUserId(message.senderId, currentUserId) && !message.isRead) {
+            changed = true;
+            return { ...message, isRead: true };
+        }
+
+        return message;
     });
+
+    if (!changed) {
+        return store;
+    }
 
     return {
         ...store,
@@ -106,10 +132,8 @@ export const markMessageFailedInStore = (
     clientId: string
 ) => ({
     ...store,
-    [conversationId]: sortMessagesByTime(
-        (store[conversationId] ?? []).map((message) =>
-            message.clientId === clientId && message.status === 'sending' ? { ...message, status: 'failed' } : message
-        )
+    [conversationId]: (store[conversationId] ?? []).map((message) =>
+        message.clientId === clientId && message.status === 'sending' ? { ...message, status: 'failed' as const } : message
     ),
 });
 
@@ -119,7 +143,7 @@ export const appendOptimisticMessage = (
     message: Message
 ) => ({
     ...store,
-    [conversationId]: sortMessagesByTime([...(store[conversationId] ?? []), message]),
+    [conversationId]: appendMessageSorted(store[conversationId] ?? [], message),
 });
 
 /** 时间处理：当天仅显示时间，非当天显示月日，非当年加上年份 */

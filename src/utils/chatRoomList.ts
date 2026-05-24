@@ -14,6 +14,27 @@ export const sortChatRoomsForDisplay = (rooms: ChatListItem[]): ChatListItem[] =
         return new Date(b.lastTime).getTime() - new Date(a.lastTime).getTime();
     });
 
+/** 将更新的会话移到正确位置，避免每次全量 O(n log n) 排序 */
+const repositionUpdatedRoom = (rooms: ChatListItem[], updatedRoom: ChatListItem, fromIndex: number): ChatListItem[] => {
+  const remaining = [...rooms.slice(0, fromIndex), ...rooms.slice(fromIndex + 1)];
+  const isPinned = updatedRoom.isPinned === true;
+
+  if (isPinned) {
+      return [updatedRoom, ...remaining.filter((r) => r.isPinned === true && r.id !== updatedRoom.id), ...remaining.filter((r) => r.isPinned !== true)];
+  }
+
+  const pinned = remaining.filter((r) => r.isPinned === true);
+  const unpinned = remaining.filter((r) => r.isPinned !== true);
+  const updatedTime = new Date(updatedRoom.lastTime).getTime();
+
+  let insertAt = 0;
+  while (insertAt < unpinned.length && new Date(unpinned[insertAt].lastTime).getTime() >= updatedTime) {
+      insertAt += 1;
+  }
+
+  return [...pinned, ...unpinned.slice(0, insertAt), updatedRoom, ...unpinned.slice(insertAt)];
+};
+
 export const updateRoomOnIncomingMessage = (
     rooms: ChatListItem[],
     incomingMessage: Message,
@@ -35,8 +56,7 @@ export const updateRoomOnIncomingMessage = (
             room.unreadCount = (room.unreadCount || 0) + 1;
         }
 
-        const remainingRooms = [...rooms.slice(0, index), ...rooms.slice(index + 1)];
-        return sortChatRoomsForDisplay([room, ...remainingRooms]);
+        return repositionUpdatedRoom(rooms, room, index);
     }
 
     return sortChatRoomsForDisplay([

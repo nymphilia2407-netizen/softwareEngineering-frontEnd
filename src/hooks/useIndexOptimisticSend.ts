@@ -19,7 +19,7 @@ export type IndexOptimisticRefs = {
 
 export function useIndexOptimisticSend(
     activeChatId: number,
-    messageStore: Record<number, Message[]>,
+    _messageStore: Record<number, Message[]>,
     r: IndexOptimisticRefs,
     activeChatIdRef: MutableRefObject<number>,
     setMessageStore: Dispatch<SetStateAction<Record<number, Message[]>>>,
@@ -216,7 +216,7 @@ export function useIndexOptimisticSend(
 
     const handleRetryMessage = useCallback(
         (clientId: string) => {
-            const store = messageStore;
+            const store = r.messageStoreRef.current;
             for (const convKey of Object.keys(store)) {
                 const convId = Number(convKey);
                 const msgs = store[convId] || [];
@@ -231,7 +231,7 @@ export function useIndexOptimisticSend(
                 }
             }
         },
-        [messageStore, sendMessageDirect, setMessageStore],
+        [r.messageStoreRef, sendMessageDirect, setMessageStore],
     );
 
     return { handleSendMessage, handleRetryMessage };

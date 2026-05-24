@@ -78,6 +78,7 @@ export default function Index() {
     const optimisticIdSeqRef = useRef(0);
     /** 已在 WS 上 subscribe_room 的会话；新建私聊在连接之后才出现，必须补订阅才能收到发消息回执 */
     const subscribedWsRoomsRef = useRef<Set<number>>(new Set());
+    const lastFriendsRoomsSyncRef = useRef(0);
     // 用于展示联系人具体信息（好友 / 群）
     const [contactDetailUserId, setContactDetailUserId] = useState<number | null>(null);
     const [contactDetailGroupId, setContactDetailGroupId] = useState<number | null>(null);
@@ -246,12 +247,17 @@ export default function Index() {
         return () => globalThis.clearTimeout(timer);
     }, [groupSyncToast]);
 
-    /** 对方同意好友请求后发起方无推送：切到联系人或回到前台时同步列表 */
+    /** 对方同意好友请求后发起方无推送：切到联系人或回到前台时同步列表（30s 内不重复拉取） */
     useEffect(() => {
         if (activeTab !== 'contacts') {
             return;
         }
 
+        const now = Date.now();
+        if (now - lastFriendsRoomsSyncRef.current < 30_000) {
+            return;
+        }
+        lastFriendsRoomsSyncRef.current = now;
         void refreshFriendsAndRooms();
     }, [activeTab, refreshFriendsAndRooms]);
 
@@ -268,7 +274,11 @@ export default function Index() {
             }
 
             debounceTimer = setTimeout(() => {
-                void refreshFriendsAndRooms();
+                const now = Date.now();
+                if (now - lastFriendsRoomsSyncRef.current >= 30_000) {
+                    lastFriendsRoomsSyncRef.current = now;
+                    void refreshFriendsAndRooms();
+                }
                 debounceTimer = null;
             }, 400);
         };
@@ -414,7 +424,7 @@ export default function Index() {
         setChatRooms,
     );
 
-    const handleReadMessage = (convId: number, lastMsgId: number) => {
+    const handleReadMessage = useCallback((convId: number, lastMsgId: number) => {
         if (lastMsgId > 0) {
             socketRef.current?.send({
                 type: 'read_message',
@@ -422,10 +432,8 @@ export default function Index() {
             });
         }
 
-        // 乐观设置该会话为已读（前端显示）
         setChatRooms((prev) => prev.map((r) => (r.id === convId ? { ...r, unreadCount: 0 } : r)));
-        /** 不在此处立刻 getChatRooms：服务端 last_read 可能尚未落库，拉列表会把角标又刷回非 0 */
-    };
+    }, []);
 
     const handleCreateGroup = async ({
         groupName,
