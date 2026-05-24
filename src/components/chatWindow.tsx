@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
 import type { SearchResultData } from "../types/chat";
-import { searchMessages, getChatMessages } from "../services/chat";
+import { searchMessages, getChatMessages, CHAT_FILTER_PAGE_SIZE } from "../services/chat";
 import { sameUserId, formatMessageTime } from '../utils/messageStore';
 import { resolvedUserAvatar } from '../utils/avatar';
 
@@ -607,7 +607,14 @@ export default function ChatWindow({
         try {
             const startTime = draftStartDate ? draftStartDate + 'T00:00:00' : undefined;
             const endTime = draftEndDate ? draftEndDate + 'T23:59:59' : undefined;
-            const data = await getChatMessages(activeChatId, 200, 0, startTime, draftSenderId || undefined, endTime);
+            const data = await getChatMessages(
+                activeChatId,
+                CHAT_FILTER_PAGE_SIZE,
+                0,
+                startTime,
+                draftSenderId || undefined,
+                endTime,
+            );
             const results: SearchResultData[] = data.messages.map((m) => ({
                 message_id: m.id,
                 conversation_id: activeChatId,
@@ -637,7 +644,7 @@ export default function ChatWindow({
         if (!q) return;
         setSearchLoading(true);
         try {
-            const data = await searchMessages(q, 1, 50);
+            const data = await searchMessages(q);
             setSearchResults(data.results);
         } catch (err) {
             alert(err instanceof Error ? err.message : '搜索失败');

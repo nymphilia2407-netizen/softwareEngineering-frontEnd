@@ -1,9 +1,38 @@
-import request from '../utils/request';
+import type { AxiosRequestConfig } from 'axios';
 
-import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
+import {
+    CHAT_FILTER_PAGE_SIZE,
+    CHAT_HISTORY_PAGE_SIZE,
+    CHAT_SEARCH_PAGE_SIZE,
+    HEAVY_API_TIMEOUT_MS,
+} from '../constants/string';
+import request from '../utils/request';
 import { mergeUserAvatars, getCachedAvatar } from '../utils/avatar';
+import { assertApiSuccess, unwrapApiData, type ApiResponse } from './apiResponse';
 import type { ReplyToData } from '../types/entity';
 import type { SearchResultData } from '../types/chat';
+
+export { CHAT_FILTER_PAGE_SIZE, CHAT_HISTORY_PAGE_SIZE, CHAT_SEARCH_PAGE_SIZE };
+
+export interface GetChatMessagesOptions {
+    /** 默认 false：不请求内联头像，依赖本地缓存与默认头像 */
+    includeAvatars?: boolean;
+    timeoutMs?: number;
+}
+
+function heavyRequestConfig(timeoutMs = HEAVY_API_TIMEOUT_MS): AxiosRequestConfig {
+    return { timeout: timeoutMs };
+}
+
+function normalizeSearchResults(results: SearchResultData[]): SearchResultData[] {
+    return results.map((row) => ({
+        ...row,
+        sender: {
+            ...row.sender,
+            avatar: '',
+        },
+    }));
+}
 
 export interface ChatRoomSummaryData {
     room_id: number;
@@ -103,22 +132,38 @@ export const getChatRooms = async () => {
     return rows.map(mapConversationRow);
 };
 
-export const getChatMessages = async (roomId: number, limit = 50, offset = 0, startTime?: string, senderId?: number, endTime?: string) => {
+export const getChatMessages = async (
+    roomId: number,
+    limit = CHAT_HISTORY_PAGE_SIZE,
+    offset = 0,
+    startTime?: string,
+    senderId?: number,
+    endTime?: string,
+    options?: GetChatMessagesOptions,
+) => {
     const page = Math.floor(offset / limit) + 1;
     const pageSize = limit;
+    const includeAvatars = options?.includeAvatars === true;
     const params: Record<string, string | number> = { page, page_size: pageSize };
+    if (!includeAvatars) {
+        params.include_avatars = 0;
+    }
     if (startTime) params.start_time = startTime;
     if (senderId) params.sender_id = senderId;
     if (endTime) params.end_time = endTime;
     const response = await request.get<
         unknown,
         ApiResponse<{ messages: BackendMessageRow[]; total_pages: number; current_page: number }>
-    >(`/api/conversations/${roomId}/messages/`, { params });
+    >(`/api/conversations/${roomId}/messages/`, {
+        params,
+        ...heavyRequestConfig(options?.timeoutMs),
+    });
 
     const payload = unwrapApiData(response, '获取聊天记录失败');
     const { messages, user_avatars } = payload as { messages: BackendMessageRow[]; user_avatars?: Record<string, string> };
-    // 将服务端返回的头像映射合并到本地缓存，保证同一 user_id 只保留一份头像
-    mergeUserAvatars(user_avatars);
+    if (includeAvatars) {
+        mergeUserAvatars(user_avatars);
+    }
     return {
         room_id: roomId,
         count: messages.length,
@@ -185,12 +230,21 @@ export const markMentionRead = async (mentionId: number): Promise<void> => {
     await request.post(`/api/conversations/mentions/${mentionId}/read/`);
 };
 
-export const searchMessages = async (keyword: string, page = 1, pageSize = 20) => {
+export const searchMessages = async (
+    keyword: string,
+    page = 1,
+    pageSize: number = CHAT_SEARCH_PAGE_SIZE,
+) => {
     const response = await request.get<
         unknown,
         ApiResponse<{ results: SearchResultData[]; total: number }>
     >('/api/conversations/messages/search/', {
-        params: { q: keyword, page, page_size: pageSize },
+        params: { q: keyword, page, page_size: pageSize, include_avatars: 0 },
+        ...heavyRequestConfig(),
     });
-    return unwrapApiData(response, '搜索消息失败');
+    const data = unwrapApiData(response, '搜索消息失败');
+    return {
+        ...data,
+        results: normalizeSearchResults(data.results),
+    };
 };

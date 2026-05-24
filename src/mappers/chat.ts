@@ -3,17 +3,20 @@ import type { FriendSummaryData } from '../services/friend';
 import type { GroupSummaryData } from '../services/group';
 import type { ChatListItem } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
-import { resolvedUserAvatar } from '../utils/avatar';
+import { getCachedAvatar, resolvedUserAvatar, setCachedAvatar } from '../utils/avatar';
 
-export const mapFriendSummary = (friend: FriendSummaryData): User => ({
-    id: friend.user_id,
-    username: friend.username,
-    avatar: resolvedUserAvatar(friend.avatar),
-    status: friend.status ?? 'online',
-    registerTime: Date.now(),
-    lastLoginTime: Date.now(),
-    tag: friend.tag,
-});
+export const mapFriendSummary = (friend: FriendSummaryData): User => {
+    setCachedAvatar(friend.user_id, friend.avatar);
+    return {
+        id: friend.user_id,
+        username: friend.username,
+        avatar: resolvedUserAvatar(friend.avatar),
+        status: friend.status ?? 'online',
+        registerTime: Date.now(),
+        lastLoginTime: Date.now(),
+        tag: friend.tag,
+    };
+};
 
 export const mapHistoryMessage = (roomId: number, message: ChatMessageData): Message => {
     const timestamp = new Date(message.created_at).getTime();
@@ -23,7 +26,7 @@ export const mapHistoryMessage = (roomId: number, message: ChatMessageData): Mes
         convId: message.room_id ?? roomId,
         senderId: message.sender_id,
         senderUsername: message.sender_username,
-        senderAvatar: message.sender_avatar,
+        senderAvatar: resolvedUserAvatar(getCachedAvatar(message.sender_id) ?? message.sender_avatar),
         type: 'text',
         status: 'sent',
         content: message.content,

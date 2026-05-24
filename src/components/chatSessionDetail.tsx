@@ -219,7 +219,7 @@ export default function ChatSessionDetail({
         if (!q) return;
         setSearchLoading(true);
         try {
-            const data = await searchMessages(q, 1, 50);
+            const data = await searchMessages(q);
             setSearchResults(data.results);
             setSearchTotal(data.total);
         } catch (err) {

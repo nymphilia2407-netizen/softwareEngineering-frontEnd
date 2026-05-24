@@ -10,7 +10,12 @@ import { createChatWebSocketClient, type ChatSocketEvent, type ChatWebSocketClie
 import type { ChatListItem } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
-import { resolvedUserAvatar } from '../utils/avatar';
+import {
+    cacheAvatarsFromChatRooms,
+    cacheAvatarsFromFriends,
+    resolvedUserAvatar,
+    setCachedAvatar,
+} from '../utils/avatar';
 import { clearUnreadRoom, sortChatRoomsForDisplay, updateRoomOnIncomingMessage } from '../utils/chatRoomList';
 import {
     applyReadReceiptToMessages,
@@ -96,6 +101,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                 setProfileSignature(currentUser.signature);
                 setProfilePhone(currentUser.phone ?? '');
                 setUserEmail(currentUser.email ?? '');
+                setCachedAvatar(currentUser.user_id, resolvedAvatar);
                 persistUserProfile({
                     username: currentUser.username,
                     avatar: resolvedAvatar,
@@ -117,6 +123,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                     return;
                 }
 
+                cacheAvatarsFromFriends(friendList);
                 setFriends(friendList.map(mapFriendSummary));
             } catch (error) {
                 console.error('获取好友列表失败:', error);
@@ -140,6 +147,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                     return;
                 }
 
+                cacheAvatarsFromChatRooms(roomList);
                 const mappedRooms = roomList.map(mapChatRoom);
                 setChatRooms((prev) => {
                     const prevMap = new Map(prev.map((r) => [r.id, r]));

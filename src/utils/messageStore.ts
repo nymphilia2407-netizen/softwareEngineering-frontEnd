@@ -1,5 +1,6 @@
 import type { ChatIncomingMessage, ChatReadReceiptData } from '../services/websocket';
 import type { Message } from '../types/entity';
+import { getCachedAvatar, setCachedAvatar, resolvedUserAvatar } from './avatar';
 
 /** 与 ChatWindow.isOtherMemberMessage 一致：避免 senderId / currentUserId 类型不一致或短暂为 0 时误判己方消息 */
 export const sameUserId = (a: number, b: number) => Number(a) === Number(b);
@@ -8,13 +9,19 @@ const sortMessagesByTime = (messages: Message[]) => [...messages].sort((left, ri
 
 export const formatIncomingMessage = (message: ChatIncomingMessage): Message => {
     const timestamp = new Date(message.created_at).getTime();
+    if (message.sender_avatar) {
+        setCachedAvatar(message.sender_id, message.sender_avatar);
+    }
+    const senderAvatar = resolvedUserAvatar(
+        getCachedAvatar(message.sender_id) ?? message.sender_avatar,
+    );
 
     return {
         id: message.id,
         convId: message.conversation_id,
         senderId: message.sender_id,
         senderUsername: message.sender_username,
-        senderAvatar: message.sender_avatar,
+        senderAvatar,
         type: 'text',
         status: 'sent',
         content: message.content,

@@ -1,5 +1,6 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 
+import { CHAT_HISTORY_PAGE_SIZE } from '../constants/string';
 import { mapHistoryMessage } from '../mappers/chat';
 import { getChatMessages } from '../services/chat';
 import type { Message } from '../types/entity';
@@ -20,7 +21,15 @@ export function useActiveChatHistory(
 
         const loadMessages = async () => {
             try {
-                const history = await getChatMessages(activeChatId, 100, 0, targetTimestamp, filterSenderId, filterEndTime);
+                const history = await getChatMessages(
+                    activeChatId,
+                    CHAT_HISTORY_PAGE_SIZE,
+                    0,
+                    targetTimestamp,
+                    filterSenderId,
+                    filterEndTime,
+                    { includeAvatars: true },
+                );
 
                 if (cancelled) {
                     return;

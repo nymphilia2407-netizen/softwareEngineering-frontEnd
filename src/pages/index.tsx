@@ -25,7 +25,12 @@ import type { ChatWebSocketClient } from '../services/websocket';
 import type { ActiveTabType, ChatListItem, MyInvitationData } from '../types/chat';
 import type { Group, Message, User } from '../types/entity';
 import { persistUserProfile, tokenUtils } from '../utils/auth';
-import { resolvedUserAvatar } from '../utils/avatar';
+import {
+    cacheAvatarsFromChatRooms,
+    cacheAvatarsFromFriends,
+    resolvedUserAvatar,
+    setCachedAvatar,
+} from '../utils/avatar';
 import { clearUnreadRoom, sortChatRoomsForDisplay } from '../utils/chatRoomList';
 import { decodeTokenPayload, readInitialUserFromLocalCache } from '../utils/jwtProfile';
 
@@ -111,6 +116,7 @@ export default function Index() {
         if (groupMembersCache[activeChatId]) return;
         getGroupDetail(activeChatId)
             .then((detail) => {
+                detail.members.forEach((m) => setCachedAvatar(m.user_id, m.avatar));
                 setGroupMembersCache((prev) => ({
                     ...prev,
                     [activeChatId]: detail.members.map((m) => ({
@@ -147,6 +153,8 @@ export default function Index() {
     const refreshFriendsAndRooms = useCallback(async () => {
         try {
             const [friendList, roomList] = await Promise.all([getFriendList(), getChatRooms()]);
+            cacheAvatarsFromFriends(friendList);
+            cacheAvatarsFromChatRooms(roomList);
             setFriends(friendList.map(mapFriendSummary));
             setChatRooms((prev) => {
                 const prevMap = new Map(prev.map((r) => [r.id, r]));

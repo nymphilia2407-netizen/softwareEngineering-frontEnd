@@ -14,3 +14,15 @@ export const BACKENDURL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1
 /** 收不到 WS 回执时的等待上限；过长易被当成卡死，过短易误判弱网失败 */
 export const SEND_ACK_TIMEOUT_MS = 8000;
 export const SEND_ACK_GRACE_MS = 2000;
+
+/** 消息搜索 / 历史拉取等可能较大的接口超时（毫秒） */
+export const HEAVY_API_TIMEOUT_MS = 45_000;
+
+/** 全局搜索消息每页条数（避免响应体过大） */
+export const CHAT_SEARCH_PAGE_SIZE = 20;
+
+/** 会话内按条件筛选历史每页条数 */
+export const CHAT_FILTER_PAGE_SIZE = 40;
+
+/** 进入会话时首屏历史条数 */
+export const CHAT_HISTORY_PAGE_SIZE = 50;
