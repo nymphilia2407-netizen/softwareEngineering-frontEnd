@@ -16,7 +16,7 @@ import { useIndexBootstrapAndSocket } from '../hooks/useIndexBootstrapAndSocket'
 import { useIndexOptimisticSend, type IndexOptimisticRefs } from '../hooks/useIndexOptimisticSend';
 import { mapChatRoom, mapFriendSummary, mapGroupSummary, mergeGroupsFromRoomSync } from '../mappers/chat';
 import { getChatRooms, setConversationMuted, setConversationPinned, deleteMessage, clearConversationMessages, getUnreadMentions } from '../services/chat';
-import { createGroup, getGroupList, getGroupDetail, updateGroupAvatar, getMyInvitations, respondToInvitation } from '../services/group';
+import { createGroup, getGroupList, getGroupDetail, updateGroupAvatar, getMyInvitations, respondToInvitation, getGroupPendingAnnouncement, acknowledgeGroupAnnouncement, type PendingGroupAnnouncement } from '../services/group';
 import { getFriendList } from '../services/friend';
 import { sendFriendRequest } from '../services/friend';
 import { deleteUser } from '../services/user';
@@ -31,7 +31,7 @@ import {
     resolvedUserAvatar,
     setCachedAvatar,
 } from '../utils/avatar';
-import { clearUnreadRoom, sortChatRoomsForDisplay } from '../utils/chatRoomList';
+import { clearUnreadRoom, mergeChatRoomsFromServer, sortChatRoomsForDisplay } from '../utils/chatRoomList';
 import { decodeTokenPayload, readInitialUserFromLocalCache } from '../utils/jwtProfile';
 
 import '../styles/index.css';
@@ -64,6 +64,8 @@ export default function Index() {
     const [groupMembersCache, setGroupMembersCache] = useState<Record<number, { id: number; username: string }[]>>({});
     const [scrollTarget, setScrollTarget] = useState<{ convId: number; messageId: number; timestamp: string } | null>(null);
     const [mentionTargetMap, setMentionTargetMap] = useState<Record<number, number>>({});
+    const [groupDetailRefreshKeys, setGroupDetailRefreshKeys] = useState<Record<number, number>>({});
+    const [pendingGroupAnnouncements, setPendingGroupAnnouncements] = useState<Record<number, PendingGroupAnnouncement | null>>({});
 
     const socketRef = useRef<ChatWebSocketClient | null>(null);
     const currentUserIdRef = useRef<number>(currentUserId);
@@ -156,19 +158,7 @@ export default function Index() {
             cacheAvatarsFromFriends(friendList);
             cacheAvatarsFromChatRooms(roomList);
             setFriends(friendList.map(mapFriendSummary));
-            setChatRooms((prev) => {
-                const prevMap = new Map(prev.map((r) => [r.id, r]));
-                return sortChatRoomsForDisplay(
-                    roomList.map((room) => {
-                        const mapped = mapChatRoom(room);
-                        const existing = prevMap.get(mapped.id);
-                        if (existing?.hasUnreadMention) {
-                            mapped.hasUnreadMention = true;
-                        }
-                        return mapped;
-                    }),
-                );
-            });
+            setChatRooms((prev) => mergeChatRoomsFromServer(prev, roomList.map(mapChatRoom)));
         } catch (error) {
             console.error('刷新好友或会话失败:', error);
         }
@@ -177,19 +167,7 @@ export default function Index() {
     const syncChatRoomsAndGroups = useCallback(async () => {
         try {
             const roomList = await getChatRooms();
-            setChatRooms((prev) => {
-                const prevMap = new Map(prev.map((r) => [r.id, r]));
-                return sortChatRoomsForDisplay(
-                    roomList.map((room) => {
-                        const mapped = mapChatRoom(room);
-                        const existing = prevMap.get(mapped.id);
-                        if (existing?.hasUnreadMention) {
-                            mapped.hasUnreadMention = true;
-                        }
-                        return mapped;
-                    }),
-                );
-            });
+            setChatRooms((prev) => mergeChatRoomsFromServer(prev, roomList.map(mapChatRoom)));
             setGroups((prev) => mergeGroupsFromRoomSync(roomList, prev));
         } catch (error) {
             console.error('同步群会话列表失败:', error);
@@ -206,6 +184,48 @@ export default function Index() {
             data: { conversation_id: conversationId },
         });
     }, []);
+
+    const bumpGroupDetailRefresh = useCallback((conversationId: number) => {
+        if (!conversationId) {
+            return;
+        }
+
+        setGroupDetailRefreshKeys((prev) => ({
+            ...prev,
+            [conversationId]: (prev[conversationId] ?? 0) + 1,
+        }));
+    }, []);
+
+    const applyPendingGroupAnnouncement = useCallback((conversationId: number, pending: PendingGroupAnnouncement | null) => {
+        if (!conversationId) {
+            return;
+        }
+
+        const effective =
+            pending && pending.author_id === currentUserIdRef.current
+                ? null
+                : pending;
+
+        setPendingGroupAnnouncements((prev) => ({
+            ...prev,
+            [conversationId]: effective,
+        }));
+    }, []);
+
+    const refetchPendingGroupAnnouncement = useCallback((conversationId: number) => {
+        if (!conversationId) {
+            return;
+        }
+
+        void getGroupPendingAnnouncement(conversationId)
+            .then((pending) => applyPendingGroupAnnouncement(conversationId, pending))
+            .catch(() => applyPendingGroupAnnouncement(conversationId, null));
+    }, [applyPendingGroupAnnouncement]);
+
+    const handleAcknowledgeGroupAnnouncement = useCallback(async (groupId: number, announcementId: number) => {
+        await acknowledgeGroupAnnouncement(groupId, announcementId);
+        applyPendingGroupAnnouncement(groupId, null);
+    }, [applyPendingGroupAnnouncement]);
 
     useEffect(() => {
         for (const room of chatRooms) {
@@ -308,6 +328,16 @@ export default function Index() {
         });
     }, []);
 
+    useEffect(() => {
+        if (!activeChatId || !activeChatIsGroup || chatSessionInfoOpen) {
+            return;
+        }
+
+        void getGroupPendingAnnouncement(activeChatId)
+            .then((pending) => applyPendingGroupAnnouncement(activeChatId, pending))
+            .catch(() => applyPendingGroupAnnouncement(activeChatId, null));
+    }, [activeChatId, activeChatIsGroup, chatSessionInfoOpen, groupDetailRefreshKeys[activeChatId], applyPendingGroupAnnouncement]);
+
     useIndexBootstrapAndSocket({
         socketRef,
         pendingSendTimers,
@@ -334,6 +364,9 @@ export default function Index() {
         setPendingFriendRequestCount,
         setMyInvitationCount,
         setMentionTargetMap,
+        bumpGroupDetailRefresh,
+        setPendingGroupAnnouncement: applyPendingGroupAnnouncement,
+        refetchPendingGroupAnnouncement,
     });
 
     const chatListData: ChatListItem[] = chatRooms;
@@ -568,7 +601,11 @@ export default function Index() {
         setContactDetailGroupId(null);
         setChatSessionInfoOpen(false);
         setActiveChatId(roomId);
-        setEntryUnreadHintCount(matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0);
+        const hint = matchedRoom ? Math.max(0, matchedRoom.unreadCount || 0) : 0;
+        setEntryUnreadHintCount(hint);
+        if (roomId > 0) {
+            setChatRooms((prev) => clearUnreadRoom(prev, roomId));
+        }
     }, [chatRooms, selectedContact]);
 
     const handleContactGroupEnterChat = useCallback(
@@ -858,6 +895,7 @@ export default function Index() {
                         mode="group"
                         roomId={contactDetailGroupId}
                         currentUserId={currentUserId}
+                        groupDetailRefreshKey={groupDetailRefreshKeys[contactDetailGroupId] ?? 0}
                         onBack={() => setContactDetailGroupId(null)}
                         onEnterChat={handleContactGroupEnterChat}
                         onLeftOrDissolved={handleContactGroupLeftOrDissolved}
@@ -872,6 +910,7 @@ export default function Index() {
                             isGroup={activeChatIsGroup}
                             currentUserId={currentUserId}
                             otherUserId={activeChat?.otherUserId ?? null}
+                            groupDetailRefreshKey={groupDetailRefreshKeys[activeChatId] ?? 0}
                             conversationMuted={activeChat?.isMuted === true}
                             onConversationMutedChange={handleConversationMutedChange}
                             conversationPinned={activeChat?.isPinned === true}
@@ -894,6 +933,12 @@ export default function Index() {
                             activeChatId={activeChatId}
                             activeChatName={activeChatName}
                             isGroupChat={activeChatIsGroup}
+                            pendingGroupAnnouncement={activeChatIsGroup ? (pendingGroupAnnouncements[activeChatId] ?? null) : null}
+                            onAcknowledgeGroupAnnouncement={
+                                activeChatIsGroup
+                                    ? (announcementId) => handleAcknowledgeGroupAnnouncement(activeChatId, announcementId)
+                                    : undefined
+                            }
                             messages={messages}
                             initialUnreadCount={entryUnreadHintCount}
                             currentUserId={currentUserId}

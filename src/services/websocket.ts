@@ -29,7 +29,15 @@ export interface ChatReadReceiptData {
 
 /** Django ChatConsumer.group_sync 推送的 data */
 export interface GroupSyncEventData {
-    action: 'created' | 'avatar_updated' | 'member_joined' | 'invitation_pending' | 'mute_updated';
+    action:
+        | 'created'
+        | 'avatar_updated'
+        | 'member_joined'
+        | 'invitation_pending'
+        | 'mute_updated'
+        | 'announcement_published'
+        | 'announcement_updated'
+        | 'announcement_deleted';
     conversation_id: number;
     group_name?: string;
     avatar?: string;
@@ -45,6 +53,14 @@ export interface GroupSyncEventData {
     /** mute_updated 时附带 */
     user_id?: number;
     muted_until?: string | null;
+    /** 群公告变更时附带 */
+    author_username?: string;
+    author_user_id?: number;
+    operator_user_id?: number;
+    announcement_id?: number;
+    content?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 /** Django ChatConsumer.chat_message 推送的 data 形状 */

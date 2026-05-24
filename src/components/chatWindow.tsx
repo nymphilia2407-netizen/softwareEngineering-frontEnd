@@ -5,6 +5,7 @@ import { DEFAULT_AVATAR } from "../constants/string";
 import { type Message } from "../types/entity";
 import type { SearchResultData } from "../types/chat";
 import { searchMessages, getChatMessages, CHAT_FILTER_PAGE_SIZE } from "../services/chat";
+import type { PendingGroupAnnouncement } from '../services/group';
 import { sameUserId, formatMessageTime } from '../utils/messageStore';
 import { resolvedUserAvatar } from '../utils/avatar';
 
@@ -30,6 +31,9 @@ interface ChatWindowProps{
     currentUserId: number;
     /** 群成员列表，用于@建议弹窗（私聊时可为对方用户名） */
     groupMembers?: { id: number; username: string }[];
+    /** 待确认的群公告（群聊顶部展示） */
+    pendingGroupAnnouncement?: PendingGroupAnnouncement | null;
+    onAcknowledgeGroupAnnouncement?: (announcementId: number) => Promise<void>;
     /** @提醒已读回调 */
     onReadMentions?: (convId: number) => void;
     onSendMessage: (content: string, mentionedUserIds?: number[], replyToId?: number) => void
@@ -54,6 +58,8 @@ export default function ChatWindow({
     initialUnreadCount = 0,
     currentUserId,
     groupMembers,
+    pendingGroupAnnouncement = null,
+    onAcknowledgeGroupAnnouncement,
     onReadMentions,
     onSendMessage,
     onReadMessage,
@@ -68,6 +74,7 @@ export default function ChatWindow({
     onAddFriend,
 }:ChatWindowProps){
     const [inputText, setInputText] = useState<string>('');
+    const [announcementAckSubmitting, setAnnouncementAckSubmitting] = useState(false);
     /** 远离底部时展示：仅统计「下方」新来的对方消息（与顶栏历史未读分开） */
     const [unreadFloatingCount, setUnreadFloatingCount] = useState(0);
     /** 顶栏「上方未读」= 进会话时按 initialUnread 种下的对方消息，上滑读历史时递减 */
@@ -1033,6 +1040,36 @@ return (
                     </button>
                 )}
             </div>
+
+            {isGroupChat && pendingGroupAnnouncement && pendingGroupAnnouncement.author_id !== currentUserId ? (
+                <div className="group-announcement-banner" role="note" aria-live="polite">
+                    <p className="group-announcement-banner-label">群公告</p>
+                    <p className="group-announcement-banner-content">{pendingGroupAnnouncement.content}</p>
+                    {pendingGroupAnnouncement.author_name ? (
+                        <p className="group-announcement-banner-meta">发布者：{pendingGroupAnnouncement.author_name}</p>
+                    ) : null}
+                    <button
+                        type="button"
+                        className="group-announcement-banner-confirm"
+                        disabled={announcementAckSubmitting}
+                        onClick={async () => {
+                            if (!onAcknowledgeGroupAnnouncement || announcementAckSubmitting) {
+                                return;
+                            }
+                            setAnnouncementAckSubmitting(true);
+                            try {
+                                await onAcknowledgeGroupAnnouncement(pendingGroupAnnouncement.id);
+                            } catch (err) {
+                                alert(err instanceof Error ? err.message : '确认失败');
+                            } finally {
+                                setAnnouncementAckSubmitting(false);
+                            }
+                        }}
+                    >
+                        {announcementAckSubmitting ? '确认中...' : '确认'}
+                    </button>
+                </div>
+            ) : null}
 
             <div
                 className="message-list"

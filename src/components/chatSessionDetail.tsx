@@ -16,6 +16,8 @@ export interface ChatSessionDetailProps {
     otherUserId: number | null;
     /** 当前会话是否消息免打扰（来自会话列表） */
     conversationMuted: boolean;
+    /** WebSocket 群公告变更时递增，用于刷新群详情 */
+    groupDetailRefreshKey?: number;
     onConversationMutedChange: (muted: boolean) => Promise<void>;
     conversationPinned: boolean;
     onConversationPinnedChange: (pinned: boolean) => Promise<void>;
@@ -34,6 +36,7 @@ export default function ChatSessionDetail({
     onBack,
     onDeleted,
     conversationMuted,
+    groupDetailRefreshKey = 0,
     onConversationMutedChange,
     conversationPinned,
     onConversationPinnedChange,
@@ -86,6 +89,16 @@ export default function ChatSessionDetail({
                 .catch(err => setError(err.message || '获取好友信息失败'));
         }
     }, [roomId, isGroup, otherUserId]);
+
+    useEffect(() => {
+        if (!isGroup || !groupDetailRefreshKey) {
+            return;
+        }
+
+        getGroupDetail(roomId)
+            .then(setGroupDetail)
+            .catch((err) => setError(err.message || '获取群信息失败'));
+    }, [roomId, isGroup, groupDetailRefreshKey]);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {

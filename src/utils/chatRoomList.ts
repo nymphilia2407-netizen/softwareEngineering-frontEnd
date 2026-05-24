@@ -58,3 +58,23 @@ export const updateRoomOnIncomingMessage = (
 
 export const clearUnreadRoom = (rooms: ChatListItem[], conversationId: number) =>
     rooms.map((room) => (room.id === conversationId ? { ...room, unreadCount: 0 } : room));
+
+/**
+ * 用服务端会话列表覆盖本地时，保留前端已乐观清零的未读与 @ 状态，
+ * 避免 read_message 尚未落库时 getChatRooms 把角标刷回非 0。新消息仍由 WS 递增未读。
+ */
+export const mergeChatRoomsFromServer = (prev: ChatListItem[], mappedRooms: ChatListItem[]): ChatListItem[] => {
+    const prevMap = new Map(prev.map((r) => [r.id, r]));
+    return sortChatRoomsForDisplay(
+        mappedRooms.map((mapped) => {
+            const existing = prevMap.get(mapped.id);
+            if (existing?.hasUnreadMention) {
+                mapped.hasUnreadMention = true;
+            }
+            if (existing && (existing.unreadCount ?? 0) === 0) {
+                mapped.unreadCount = 0;
+            }
+            return mapped;
+        }),
+    );
+};

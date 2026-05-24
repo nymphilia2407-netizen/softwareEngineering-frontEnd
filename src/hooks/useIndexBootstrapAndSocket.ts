@@ -4,7 +4,7 @@ import { BACKENDURL, DEFAULT_AVATAR } from '../constants/string';
 import { mapChatRoom, mapFriendSummary } from '../mappers/chat';
 import { getChatRooms, getUnreadMentions } from '../services/chat';
 import { getFriendList, getReceivedFriendRequests } from '../services/friend';
-import { getMyInvitations } from '../services/group';
+import { getMyInvitations, type PendingGroupAnnouncement } from '../services/group';
 import { getCurrentUser } from '../services/user';
 import { createChatWebSocketClient, type ChatSocketEvent, type ChatWebSocketClient } from '../services/websocket';
 import type { ChatListItem } from '../types/chat';
@@ -16,7 +16,7 @@ import {
     resolvedUserAvatar,
     setCachedAvatar,
 } from '../utils/avatar';
-import { clearUnreadRoom, sortChatRoomsForDisplay, updateRoomOnIncomingMessage } from '../utils/chatRoomList';
+import { clearUnreadRoom, mergeChatRoomsFromServer, sortChatRoomsForDisplay, updateRoomOnIncomingMessage } from '../utils/chatRoomList';
 import {
     applyReadReceiptToMessages,
     formatIncomingMessage,
@@ -49,6 +49,9 @@ export type IndexBootstrapSocketParams = {
     setPendingFriendRequestCount: Dispatch<SetStateAction<number>>;
     setMyInvitationCount: Dispatch<SetStateAction<number>>;
     setMentionTargetMap: Dispatch<SetStateAction<Record<number, number>>>;
+    bumpGroupDetailRefresh: (conversationId: number) => void;
+    setPendingGroupAnnouncement: (conversationId: number, announcement: PendingGroupAnnouncement | null) => void;
+    refetchPendingGroupAnnouncement: (conversationId: number) => void;
 };
 
 export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
@@ -78,6 +81,9 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
         setPendingFriendRequestCount,
         setMyInvitationCount,
         setMentionTargetMap,
+        bumpGroupDetailRefresh,
+        setPendingGroupAnnouncement,
+        refetchPendingGroupAnnouncement,
     } = params;
 
     useEffect(() => {
@@ -149,18 +155,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
 
                 cacheAvatarsFromChatRooms(roomList);
                 const mappedRooms = roomList.map(mapChatRoom);
-                setChatRooms((prev) => {
-                    const prevMap = new Map(prev.map((r) => [r.id, r]));
-                    return sortChatRoomsForDisplay(
-                        mappedRooms.map((mapped) => {
-                            const existing = prevMap.get(mapped.id);
-                            if (existing?.hasUnreadMention) {
-                                mapped.hasUnreadMention = true;
-                            }
-                            return mapped;
-                        }),
-                    );
-                });
+                setChatRooms((prev) => mergeChatRoomsFromServer(prev, mappedRooms));
                 setActiveChatId((currentActiveChatId) => currentActiveChatId || mappedRooms[0]?.id || 0);
             } catch (error) {
                 console.error('获取会话列表失败:', error);
@@ -305,6 +300,7 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                                 return next;
                             });
                             void syncChatRoomsAndGroups();
+                            refetchPendingGroupAnnouncement(d.conversation_id);
                         } else if (operator && operator === selfName) {
                             setGroupSyncToast(`你已将 ${joinedNames} 加入群聊「${displayName}」`);
                         } else {
@@ -339,15 +335,58 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                                 setGroupSyncToast(`你已被解除禁言（群聊[${displayName}]）`);
                             }
                         }
+                    } else if (
+                        d.action === 'announcement_published'
+                        || d.action === 'announcement_updated'
+                        || d.action === 'announcement_deleted'
+                    ) {
+                        const displayName = d.group_name?.trim() || '群聊';
+                        const author = d.author_username?.trim() || '管理员';
+                        const currentUserId = currentUserIdRef.current;
+                        const isPublisher = d.author_user_id === currentUserId;
+                        const isOperator = d.operator_user_id === currentUserId;
+                        const inActiveChat = activeChatIdRef.current === d.conversation_id;
+
+                        if (d.action === 'announcement_published' || d.action === 'announcement_updated') {
+                            if (!isPublisher && !isOperator && d.announcement_id != null && d.content) {
+                                setPendingGroupAnnouncement(d.conversation_id, {
+                                    id: d.announcement_id,
+                                    author_id: d.author_user_id ?? 0,
+                                    content: d.content,
+                                    author_name: author,
+                                    created_at: d.created_at ?? new Date().toISOString(),
+                                    updated_at: d.updated_at ?? d.created_at ?? new Date().toISOString(),
+                                });
+                            } else if (isPublisher || isOperator) {
+                                setPendingGroupAnnouncement(d.conversation_id, null);
+                            }
+
+                            if (!isPublisher && !isOperator && !inActiveChat) {
+                                if (d.action === 'announcement_published') {
+                                    setGroupSyncToast(`${author} 在「${displayName}」发布了新公告`);
+                                } else {
+                                    setGroupSyncToast(`${author} 更新了「${displayName}」的公告`);
+                                }
+                            }
+                        } else {
+                            void refetchPendingGroupAnnouncement(d.conversation_id);
+                            if (!isOperator && !inActiveChat) {
+                                setGroupSyncToast(`${author} 删除了「${displayName}」的公告`);
+                            }
+                        }
+
+                        bumpGroupDetailRefresh(d.conversation_id);
                     }
 
-                    if (d.action !== 'avatar_updated') {
+                    if (d.action !== 'avatar_updated' && !d.action.startsWith('announcement_')) {
                         getMyInvitations()
                             .then((list) => setMyInvitationCount(list.length))
                             .catch(() => {});
                     }
 
-                    void syncChatRoomsAndGroups();
+                    if (!d.action.startsWith('announcement_')) {
+                        void syncChatRoomsAndGroups();
+                    }
                 }
 
                 if (event.type === 'friend_request') {

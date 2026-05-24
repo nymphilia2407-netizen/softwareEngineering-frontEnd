@@ -22,6 +22,16 @@ export interface GroupMemberData {
     is_muted: boolean;
 }
 
+/** 当前用户尚未确认的群公告（聊天窗口顶部展示） */
+export interface PendingGroupAnnouncement {
+    id: number;
+    author_id: number;
+    content: string;
+    author_name: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface GroupDetailData {
     room_id: number;
     group_name: string;
@@ -71,7 +81,16 @@ interface BackendGroupDetailData {
         author_username: string;
         content: string;
         created_at: string;
+        updated_at?: string;
     }>;
+    pending_announcement?: {
+        id: number;
+        author_id: number;
+        content: string;
+        author_username: string;
+        created_at: string;
+        updated_at: string;
+    } | null;
 }
 
 /** 从会话列表推导群列表（后端未提供 GET /api/groups/） */
@@ -165,6 +184,42 @@ export const getGroupDetail = async (roomId: number) => {
     };
 
     return mapped;
+};
+
+const mapPendingAnnouncement = (
+    raw: BackendGroupDetailData['pending_announcement'],
+): PendingGroupAnnouncement | null => {
+    if (!raw) {
+        return null;
+    }
+
+    return {
+        id: raw.id,
+        author_id: raw.author_id,
+        content: raw.content,
+        author_name: raw.author_username,
+        created_at: raw.created_at,
+        updated_at: raw.updated_at,
+    };
+};
+
+/** 获取当前用户待确认的群公告 */
+export const getGroupPendingAnnouncement = async (groupId: number): Promise<PendingGroupAnnouncement | null> => {
+    const response = await request.get<
+        unknown,
+        ApiResponse<{ pending_announcement: BackendGroupDetailData['pending_announcement'] }>
+    >(`/api/groups/${groupId}/announcements/pending/`);
+    const data = unwrapApiData(response, '获取群公告失败');
+    return mapPendingAnnouncement(data.pending_announcement ?? null);
+};
+
+/** 确认已读群公告（关闭聊天窗口顶部公告条） */
+export const acknowledgeGroupAnnouncement = async (groupId: number, announcementId: number): Promise<void> => {
+    const response = await request.post<unknown, ApiResponse<null>>(
+        `/api/groups/${groupId}/announcements/${announcementId}/ack/`,
+        {},
+    );
+    assertApiSuccess(response, '确认群公告失败');
 };
 
 /** 退出群聊（非群主） */

@@ -25,6 +25,8 @@ export type ContactSessionDetailProps =
           mode: 'group';
           roomId: number;
           currentUserId: number;
+          /** WebSocket 群公告变更时递增，用于刷新群详情 */
+          groupDetailRefreshKey?: number;
           onBack: () => void;
           onEnterChat: (roomId: number) => void;
           onLeftOrDissolved?: (roomId: number) => void;
@@ -178,6 +180,7 @@ function ContactFriendBranch({
 function ContactGroupBranch({
     roomId,
     currentUserId,
+    groupDetailRefreshKey = 0,
     onBack,
     onEnterChat,
     onLeftOrDissolved,
@@ -198,6 +201,16 @@ function ContactGroupBranch({
             .then(setDetail)
             .catch((err) => setError(err.message || '获取群信息失败'));
     }, [roomId]);
+
+    useEffect(() => {
+        if (!groupDetailRefreshKey) {
+            return;
+        }
+
+        getGroupDetail(roomId)
+            .then(setDetail)
+            .catch((err) => setError(err.message || '获取群信息失败'));
+    }, [roomId, groupDetailRefreshKey]);
 
     useEffect(() => {
         if (detail != null) {
