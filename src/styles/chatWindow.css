@@ -353,6 +353,8 @@
 }
 
 .message-list-virtual-item {
+    display: flex;
+    flex-direction: column;
     padding-bottom: 16px;
 }
 
@@ -380,6 +382,7 @@
 
 .message-item.self {
     align-self: flex-end;
+    margin-left: auto;
     flex-direction: row-reverse;
 }
 
