@@ -479,10 +479,15 @@ export default function ChatWindow({
 
     useLayoutEffect(() => {
         messagesRef.current = messages;
+    }, [messages]);
+
+    const lastMessageKey = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
+
+    useLayoutEffect(() => {
         const listEl = scrollRef.current;
         if (!listEl) return;
 
-        const nextLastMessageKey = messages.length ? messageRowKey(messages[messages.length - 1]) : null;
+        const nextLastMessageKey = lastMessageKey;
         if (lastMessageKeyRef.current === null) {
             if (!hasSeededRoomUnreadRef.current) {
                 if (messages.length > 0) {
@@ -529,7 +534,7 @@ export default function ChatWindow({
         }
         lastMessageKeyRef.current = nextLastMessageKey;
         syncUnreadFloatingVisibility(listEl);
-    }, [messages, scrollToBottomAfterLayout, currentUserId, syncUnreadFloatingVisibility]);
+    }, [lastMessageKey, messages.length, scrollToBottomAfterLayout, currentUserId, scrollToBottom, scrollToMessageId, syncUnreadFloatingVisibility]);
 
     /** 群聊 flex + 头像异步撑高时，仅靠 scroll 同步 getBoundingClientRect 易漏判；用 IO 判定「已进入列表可视区」 */
     useEffect(() => {
@@ -583,7 +588,7 @@ export default function ChatWindow({
         }
 
         return () => io.disconnect();
-    }, [messages, activeChatId, currentUserId, initialUnreadCount, scheduleSyncUnreadAfterScroll]);
+    }, [lastMessageKey, messages.length, activeChatId, currentUserId, initialUnreadCount, scheduleSyncUnreadAfterScroll]);
 
     const orderKeysByMessageTop = (keys: readonly string[]) => {
         const msgs = messagesRef.current;

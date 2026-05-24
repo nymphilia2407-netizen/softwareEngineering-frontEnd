@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useMemo, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo, memo, type FormEvent } from 'react';
 
 import AddFriendPanel from './contactList/AddFriendPanel';
 import ContactFriendsSection from './contactList/ContactFriendsSection';
@@ -43,7 +43,7 @@ interface ContactsProps{
     readonly onClearFriendRequests?: () => void;
 }
 
-export default function ContactList(props: Readonly<ContactsProps>) {
+function ContactList(props: Readonly<ContactsProps>) {
     const { friends, groups, currentUserId, onItemClick, onCreateGroup, onContactsChanged, pendingFriendRequestCount, onClearFriendRequests } = props;
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [isActionMenuOpen, setIsActionMenuOpen] = useState<boolean>(false);
@@ -171,11 +171,13 @@ export default function ContactList(props: Readonly<ContactsProps>) {
         };
     }, [isAddFriendOpen]);
 
-    const filteredFriends = friends.filter(f =>
-        f.username.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredFriends = useMemo(
+        () => friends.filter((f) => f.username.toLowerCase().includes(searchQuery.toLowerCase())),
+        [friends, searchQuery],
     );
-    const filteredGroups = groups.filter(g =>
-        g.groupname.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredGroups = useMemo(
+        () => groups.filter((g) => g.groupname.toLowerCase().includes(searchQuery.toLowerCase())),
+        [groups, searchQuery],
     );
 
     // 好友分组处理逻辑
@@ -573,5 +575,7 @@ export default function ContactList(props: Readonly<ContactsProps>) {
                 />
             </div>
         </div>
-    )
+    );
 }
+
+export default memo(ContactList);

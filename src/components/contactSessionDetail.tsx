@@ -207,7 +207,7 @@ function ContactGroupBranch({
             return;
         }
 
-        getGroupDetail(roomId)
+        getGroupDetail(roomId, { force: true })
             .then(setDetail)
             .catch((err) => setError(err.message || '获取群信息失败'));
     }, [roomId, groupDetailRefreshKey]);
@@ -265,7 +265,7 @@ function ContactGroupBranch({
         setNameSaving(true);
         try {
             await updateGroupName(roomId, next);
-            const d = await getGroupDetail(roomId);
+            const d = await getGroupDetail(roomId, { force: true });
             setDetail(d);
             onGroupProfileUpdated?.(roomId);
             alert('群名称已更新');
@@ -286,7 +286,7 @@ function ContactGroupBranch({
         try {
             const dataUrl = await readAvatarFileAsDataUrl(file);
             await updateGroupAvatar(roomId, dataUrl);
-            const d = await getGroupDetail(roomId);
+            const d = await getGroupDetail(roomId, { force: true });
             setDetail(d);
             onGroupProfileUpdated?.(roomId);
             alert('群头像已更新');

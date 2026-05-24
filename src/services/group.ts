@@ -153,13 +153,27 @@ export const updateGroupName = async (groupId: number, groupName: string): Promi
     assertApiSuccess(response, '修改群名称失败');
 };
 
-export const getGroupDetail = async (roomId: number) => {
+const GROUP_DETAIL_CACHE_TTL_MS = 30_000;
+const groupDetailCache = new Map<number, { data: GroupDetailData; fetchedAt: number }>();
+const groupDetailInflight = new Map<number, Promise<GroupDetailData>>();
+
+export function invalidateGroupDetailCache(roomId?: number) {
+    if (roomId == null) {
+        groupDetailCache.clear();
+        groupDetailInflight.clear();
+        return;
+    }
+    groupDetailCache.delete(roomId);
+    groupDetailInflight.delete(roomId);
+}
+
+async function fetchGroupDetailFromApi(roomId: number): Promise<GroupDetailData> {
     const response = await request.get<unknown, ApiResponse<BackendGroupDetailData>>(`/api/groups/${roomId}/`);
     const raw = unwrapApiData(response, '获取群聊详情失败');
 
     const ownerMember = raw.members.find((m) => m.role === 'owner');
 
-    const mapped: GroupDetailData = {
+    return {
         room_id: roomId,
         group_name: raw.group_name,
         avatar: raw.avatar ?? '',
@@ -182,9 +196,38 @@ export const getGroupDetail = async (roomId: number) => {
             author_name: a.author_username,
         })),
     };
+}
 
-    return mapped;
-};
+/** 带 TTL 缓存与并发去重的群详情获取；变更后请 invalidate 或传 force: true */
+export async function getGroupDetail(roomId: number, options?: { force?: boolean }): Promise<GroupDetailData> {
+    if (!options?.force) {
+        const cached = groupDetailCache.get(roomId);
+        if (cached && Date.now() - cached.fetchedAt < GROUP_DETAIL_CACHE_TTL_MS) {
+            return cached.data;
+        }
+        const pending = groupDetailInflight.get(roomId);
+        if (pending) {
+            return pending;
+        }
+    } else {
+        groupDetailCache.delete(roomId);
+        groupDetailInflight.delete(roomId);
+    }
+
+    const promise = fetchGroupDetailFromApi(roomId)
+        .then((data) => {
+            groupDetailCache.set(roomId, { data, fetchedAt: Date.now() });
+            groupDetailInflight.delete(roomId);
+            return data;
+        })
+        .catch((err) => {
+            groupDetailInflight.delete(roomId);
+            throw err;
+        });
+
+    groupDetailInflight.set(roomId, promise);
+    return promise;
+}
 
 const mapPendingAnnouncement = (
     raw: BackendGroupDetailData['pending_announcement'],

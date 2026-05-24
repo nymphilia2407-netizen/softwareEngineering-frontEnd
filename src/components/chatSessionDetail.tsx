@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { getGroupDetail, dissolveGroup, leaveGroup, publishAnnouncement, updateMemberRole, muteMember, removeMember, inviteMembers, getGroupInvitations, processInvitation, updateAnnouncement, deleteAnnouncement } from '../services/group';
 import { searchMessages } from '../services/chat';
 import { getFriendDetail, deleteFriend } from '../services/friend';
@@ -73,6 +73,7 @@ export default function ChatSessionDetail({
 
     const currentMember = groupDetail?.members.find(m => m.user_id === currentUserId);
     const currentUserRole = currentMember?.role;
+    const friendIdSet = useMemo(() => new Set(friends.map((f) => f.id)), [friends]);
 
     useEffect(() => {
         setError(null);
@@ -95,7 +96,7 @@ export default function ChatSessionDetail({
             return;
         }
 
-        getGroupDetail(roomId)
+        getGroupDetail(roomId, { force: true })
             .then(setGroupDetail)
             .catch((err) => setError(err.message || '获取群信息失败'));
     }, [roomId, isGroup, groupDetailRefreshKey]);
@@ -129,7 +130,7 @@ export default function ChatSessionDetail({
 
     const refreshGroupDetail = async () => {
         try {
-            const detail = await getGroupDetail(roomId);
+            const detail = await getGroupDetail(roomId, { force: true });
             setGroupDetail(detail);
         } catch {}
     };
@@ -355,7 +356,7 @@ export default function ChatSessionDetail({
                                                     )}
                                                 </span>
                                                 <span className="member-actions">
-                                                    {!isSelf && !friends.some((f) => f.id === m.user_id) && onAddFriend && (
+                                                    {!isSelf && !friendIdSet.has(m.user_id) && onAddFriend && (
                                                         <button
                                                             type="button"
                                                             className="member-action-button member-action-button--friend"

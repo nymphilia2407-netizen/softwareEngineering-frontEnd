@@ -87,6 +87,7 @@ function IndexPage() {
     /** 已在 WS 上 subscribe_room 的会话；新建私聊在连接之后才出现，必须补订阅才能收到发消息回执 */
     const subscribedWsRoomsRef = useRef<Set<number>>(new Set());
     const lastFriendsRoomsSyncRef = useRef(0);
+    const pendingAnnouncementDebounceRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
     // 用于展示联系人具体信息（好友 / 群）
     const [contactDetailUserId, setContactDetailUserId] = useState<number | null>(null);
     const [contactDetailGroupId, setContactDetailGroupId] = useState<number | null>(null);
@@ -222,15 +223,43 @@ function IndexPage() {
             return;
         }
 
-        void getGroupPendingAnnouncement(conversationId)
-            .then((pending) => applyPendingGroupAnnouncement(conversationId, pending))
-            .catch(() => applyPendingGroupAnnouncement(conversationId, null));
+        if (pendingAnnouncementDebounceRef.current[conversationId]) {
+            clearTimeout(pendingAnnouncementDebounceRef.current[conversationId]!);
+        }
+
+        pendingAnnouncementDebounceRef.current[conversationId] = setTimeout(() => {
+            delete pendingAnnouncementDebounceRef.current[conversationId];
+            void getGroupPendingAnnouncement(conversationId)
+                .then((pending) => applyPendingGroupAnnouncement(conversationId, pending))
+                .catch(() => applyPendingGroupAnnouncement(conversationId, null));
+        }, 500);
     }, [applyPendingGroupAnnouncement]);
 
     const handleAcknowledgeGroupAnnouncement = useCallback(async (groupId: number, announcementId: number) => {
         await acknowledgeGroupAnnouncement(groupId, announcementId);
         applyPendingGroupAnnouncement(groupId, null);
     }, [applyPendingGroupAnnouncement]);
+
+    const handleOpenProfileSettings = useCallback(() => {
+        setActiveTab('settings');
+        setSettingsPanel('profile');
+    }, []);
+
+    const handleSelectChat = useCallback(() => {
+        setActiveTab('chat');
+        setSelectedContact(null);
+        setContactDetailUserId(null);
+        setContactDetailGroupId(null);
+    }, []);
+
+    const handleSelectContacts = useCallback(() => {
+        setActiveTab('contacts');
+    }, []);
+
+    const handleOpenSettingsMenu = useCallback(() => {
+        setActiveTab('settings');
+        setSettingsPanel('menu');
+    }, []);
 
     useEffect(() => {
         for (const room of chatRooms) {
@@ -771,21 +800,10 @@ function IndexPage() {
                 chatIcon={CHATICON}
                 contactIcon={CONTACTICON}
                 configIcon={CONFIGICON}
-                onOpenProfileSettings={() => {
-                    setActiveTab('settings');
-                    setSettingsPanel('profile');
-                }}
-                onSelectChat={() => {
-                    setActiveTab('chat');
-                    setSelectedContact(null);
-                    setContactDetailUserId(null);
-                    setContactDetailGroupId(null);
-                }}
-                onSelectContacts={() => setActiveTab('contacts')}
-                onOpenSettingsMenu={() => {
-                    setActiveTab('settings');
-                    setSettingsPanel('menu');
-                }}
+                onOpenProfileSettings={handleOpenProfileSettings}
+                onSelectChat={handleSelectChat}
+                onSelectContacts={handleSelectContacts}
+                onOpenSettingsMenu={handleOpenSettingsMenu}
             />
 
                 <div className="list-area">

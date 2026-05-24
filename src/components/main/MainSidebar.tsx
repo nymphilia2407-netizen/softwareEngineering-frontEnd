@@ -1,3 +1,5 @@
+import { memo } from 'react';
+
 import type { ActiveTabType } from '../../types/chat';
 
 interface MainSidebarProps {
@@ -17,7 +19,7 @@ interface MainSidebarProps {
     onOpenSettingsMenu: () => void;
 }
 
-export default function MainSidebar({
+function MainSidebar({
     myAvatar,
     userName,
     activeTab,
@@ -92,3 +94,5 @@ export default function MainSidebar({
         </aside>
     );
 }
+
+export default memo(MainSidebar);
