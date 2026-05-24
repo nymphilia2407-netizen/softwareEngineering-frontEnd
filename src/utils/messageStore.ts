@@ -122,16 +122,21 @@ export const appendOptimisticMessage = (
     [conversationId]: sortMessagesByTime([...(store[conversationId] ?? []), message]),
 });
 
-/** 时间处理：今天内显示时间，否则显示 月日 + 时间 */
+/** 时间处理：当天仅显示时间，非当天显示月日，非当年加上年份 */
 export const formatMessageTime = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
+    const time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const isSameDay =
         date.getFullYear() === now.getFullYear() &&
         date.getMonth() === now.getMonth() &&
         date.getDate() === now.getDate();
     if (isSameDay) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return time;
     }
-    return `${date.getMonth() + 1}月${date.getDate()}日 ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    const datePart = `${date.getMonth() + 1}月${date.getDate()}日`;
+    if (date.getFullYear() === now.getFullYear()) {
+        return `${datePart} ${time}`;
+    }
+    return `${date.getFullYear()}年${datePart} ${time}`;
 };

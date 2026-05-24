@@ -11,7 +11,7 @@ export const mapFriendSummary = (friend: FriendSummaryData): User => {
         id: friend.user_id,
         username: friend.username,
         avatar: resolvedUserAvatar(friend.avatar),
-        status: friend.status ?? 'online',
+        status: friend.status ?? 'offline',
         registerTime: Date.now(),
         lastLoginTime: Date.now(),
         tag: friend.tag,

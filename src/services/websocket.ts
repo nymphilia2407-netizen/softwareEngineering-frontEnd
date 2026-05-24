@@ -143,7 +143,14 @@ export type ChatSocketEvent =
     | {
         type: 'mention';
         data: MentionSocketData;
-    };
+    }
+    | {
+          type: 'presence_update';
+          data: {
+              user_id: number;
+              status: 'online' | 'offline' | 'busy';
+          };
+      };
 
 type MessageListener = (message: ChatSocketEvent) => void;
 type StatusListener = (status: 'connecting' | 'open' | 'closed' | 'error') => void;

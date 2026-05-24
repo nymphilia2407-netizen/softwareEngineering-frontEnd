@@ -393,6 +393,10 @@ function ContactGroupBranch({
                                 </dd>
                             </div>
                             <div>
+                                <dt>群聊ID</dt>
+                                <dd className="chat-session-group-id">{roomId}</dd>
+                            </div>
+                            <div>
                                 <dt>成员</dt>
                                 <dd>
                                     <ul className="contact-group-member-list">

@@ -324,6 +324,10 @@ export default function ChatSessionDetail({
                                 <dd>群聊</dd>
                             </div>
                             <div>
+                                <dt>群聊ID</dt>
+                                <dd className="chat-session-group-id">{roomId}</dd>
+                            </div>
+                            <div>
                                 <dt>成员 ({groupDetail.member_count})</dt>
                                 <dd>
                                     {groupDetail.members.map(m => {

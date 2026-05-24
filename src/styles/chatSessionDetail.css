@@ -194,6 +194,12 @@
     line-height: 1.45;
 }
 
+.chat-session-group-id {
+    font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    user-select: all;
+}
+
 .contact-detail-profile-head {
     display: flex;
     flex-direction: column;

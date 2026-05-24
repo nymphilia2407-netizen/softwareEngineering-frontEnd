@@ -2,7 +2,7 @@ export interface User {
     id: number;
     username: string;
     avatar: string;
-    status: 'online' | 'offline' | 'busy'; // 需要在websocket里获取
+    status: 'online' | 'offline' | 'busy';
     registerTime: number;
     lastLoginTime: number;
     tag?: string;

@@ -393,6 +393,13 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
                     setPendingFriendRequestCount((prev) => prev + 1);
                 }
 
+                if (event.type === 'presence_update') {
+                    const { user_id: userId, status } = event.data;
+                    setFriends((prev) =>
+                        prev.map((friend) => (friend.id === userId ? { ...friend, status } : friend)),
+                    );
+                }
+
                 if (event.type === 'mention') {
                     const d = event.data;
                     setMentionTargetMap((prev) => ({ ...prev, [d.conversation_id]: d.message_id }));
@@ -407,7 +414,16 @@ export function useIndexBootstrapAndSocket(params: IndexBootstrapSocketParams) {
             });
 
             const unsubscribeStatus = client.onStatusChange((status: 'connecting' | 'open' | 'closed' | 'error') => {
-                console.log('WebSocket status:', status);
+                if (status === 'open') {
+                    void getFriendList()
+                        .then((friendList) => {
+                            if (!cancelled) {
+                                cacheAvatarsFromFriends(friendList);
+                                setFriends(friendList.map(mapFriendSummary));
+                            }
+                        })
+                        .catch(() => {});
+                }
             });
 
             client.connect();
